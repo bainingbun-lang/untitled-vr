@@ -9,3 +9,5 @@
 | Aviso de fontconfig | Entorno Termux/proot sin configuración de fuentes | Sin acción registrada | NO VERIFICADO |
 | Autoload `res://mod_manager.gd` en errores de export | `project.godot` mal copiado | Corregido (ver T-EXPORT-TRIAGE); era el único error real del export | RESUELTO |
 | APK editor Android instalado no coincide con el 4.7 oficial | Instalación previa de `org.godotengine.editor.v4`, versión no verificada | Pendiente: instalar el APK 4.7 oficial (bloqueado por permisos) | ABIERTO |
+| `opencode run` muestra la ayuda o `t.includes is not a function` | Un mensaje largo con `--flags` se parsea como opciones; `--title` con mensaje largo también falla | Mensaje corto como posicional primero, detalle en archivo con `-f` colocado después del mensaje (`opencode run "msg" -m modelo --dir ... -f spec.txt`) | RESUELTO (verificado) |
+| `grun godot` falla con `libfontconfig.so.1` | Falta la biblioteca en el entorno proot/Termux | Ignorable: Godot funciona y termina con código 0 | RESUELTO (aviso, sin efecto) |

@@ -1,6 +1,6 @@
 # PROJECT_STATUS
 
-Actualizado: 2026-11-18. Repo: `$HOME/UNTITLED`, rama `main`, commit `95d7cda`.
+Actualizado: 2026-11-18. Repo: `$HOME/UNTITLED`, rama `main`, HEAD `628563e` (checkpoint Fase 0; `95d7cda` es el commit de migración anterior). Los archivos versionados en HEAD son 25 (incluye `spikes/` y `spikes/RESULTS.md`), no 7.
 
 ## Estado del juego
 
