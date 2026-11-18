@@ -1,0 +1,15 @@
+config_version=5
+
+[application]
+
+config/name="M1 base"
+config/features=PackedStringArray("4.7")
+run/main_scene="res://main.tscn"
+
+[autoload]
+
+ModManager="*res://mod_manager.gd"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"

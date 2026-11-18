@@ -1,0 +1,6 @@
+config_version=5
+
+[application]
+
+config/name="N1 bench"
+config/features=PackedStringArray("4.7")
