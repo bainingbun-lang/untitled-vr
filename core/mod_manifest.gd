@@ -5,7 +5,7 @@ const SCHEMA_VERSION := 1
 const DEFAULT_PRIORITY := 100
 const ID_PATTERN := "^[a-z0-9-]+\\.[a-z0-9-]+$"
 const SEMVER_PATTERN := "^[0-9]+\\.[0-9]+\\.[0-9]+$"
-const REPLACE_PART_PATTERN := "^[a-z0-9_.-]+$"
+const SYSTEM_PATTERN := "^[a-z0-9_-]+$"
 const VALID_PLATFORMS := ["android", "pc", "vr"]
 
 
@@ -30,61 +30,117 @@ static func parse(data: Dictionary) -> Dictionary:
 	}
 
 
-static func find_conflicts(manifests: Array) -> Array:
+static func find_conflicts(manifests: Array, base_owner: String = "untitled.base") -> Array:
 	var conflicts: Array = []
-	var systems: Dictionary = {}
+	var indexed := _index_replacements(manifests, base_owner)
+
+	for key in indexed:
+		var by_priority: Dictionary = indexed[key]
+		var best := _highest_priority(by_priority)
+		var module_ids: Array = by_priority[best]
+		if module_ids.size() < 2:
+			continue
+		var split := _split_key(key)
+		var owner: String = split[0]
+		var system: String = split[1]
+		var sorted_ids: Array = module_ids.duplicate()
+		sorted_ids.sort()
+		conflicts.append({
+			"owner": owner,
+			"system": system,
+			"priority": best,
+			"modules": sorted_ids,
+			"message": (
+				"Conflicto en el sistema '%s' de '%s': los módulos %s lo sustituyen con la misma prioridad %d"
+				% [system, owner, ", ".join(sorted_ids), best]
+			),
+		})
+
+	return conflicts
+
+
+static func resolve_replacements(
+	manifests: Array, base_owner: String = "untitled.base"
+) -> Dictionary:
+	var resolved: Dictionary = {}
+	var indexed := _index_replacements(manifests, base_owner)
+
+	for key in indexed:
+		var by_priority: Dictionary = indexed[key]
+		var best := _highest_priority(by_priority)
+		var module_ids: Array = by_priority[best]
+		if module_ids.size() == 1:
+			resolved[key] = module_ids[0]
+
+	return resolved
+
+
+static func _index_replacements(manifests: Array, base_owner: String) -> Dictionary:
+	var indexed: Dictionary = {}
 
 	for entry in manifests:
-		if typeof(entry) != TYPE_DICTIONARY:
+		var manifest := _manifest_of(entry)
+		if manifest.is_empty():
 			continue
-		var manifest: Dictionary = entry
-		if entry.has("manifest") and typeof(entry["manifest"]) == TYPE_DICTIONARY:
-			manifest = entry["manifest"]
-
-		var module_id := str(manifest.get("id", ""))
-		var priority := DEFAULT_PRIORITY
-		if typeof(manifest.get("priority", DEFAULT_PRIORITY)) == TYPE_INT:
-			priority = manifest.get("priority", DEFAULT_PRIORITY)
-
-		var replaces: Variant = manifest.get("replaces", [])
-		if typeof(replaces) != TYPE_ARRAY:
+		var result := parse(manifest)
+		if not result["ok"]:
 			continue
-
-		for raw in replaces:
-			if typeof(raw) != TYPE_STRING:
+		var normalized: Dictionary = result["manifest"]
+		var module_id := str(normalized.get("id", ""))
+		var priority := int(normalized.get("priority", DEFAULT_PRIORITY))
+		for raw in normalized.get("replaces", []):
+			var key := _replace_key(str(raw), base_owner)
+			if key.is_empty():
 				continue
-			var system := _system_of(raw)
-			if system.is_empty():
-				continue
-			if not systems.has(system):
-				systems[system] = {}
-			var by_priority: Dictionary = systems[system]
+			if not indexed.has(key):
+				indexed[key] = {}
+			var by_priority: Dictionary = indexed[key]
 			if not by_priority.has(priority):
 				by_priority[priority] = []
 			var module_ids: Array = by_priority[priority]
 			if not module_ids.has(module_id):
 				module_ids.append(module_id)
 
-	for system in systems:
-		var by_priority: Dictionary = systems[system]
-		for priority in by_priority:
-			var module_ids: Array = by_priority[priority]
-			if module_ids.size() < 2:
-				continue
-			for i in range(module_ids.size()):
-				for j in range(i + 1, module_ids.size()):
-					conflicts.append(
-						"conflicto: %s sustituido por %s y %s con la misma prioridad %d"
-						% [system, module_ids[i], module_ids[j], priority]
-					)
-
-	return conflicts
+	return indexed
 
 
-static func _system_of(replace: String) -> String:
-	var parts := replace.split(":")
-	var candidate := parts[parts.size() - 1] if parts.size() > 0 else ""
-	return candidate if _matches(candidate, REPLACE_PART_PATTERN) else ""
+static func _manifest_of(entry: Variant) -> Dictionary:
+	if typeof(entry) != TYPE_DICTIONARY:
+		return {}
+	var data: Dictionary = entry
+	if data.has("manifest") and typeof(data["manifest"]) == TYPE_DICTIONARY:
+		return data["manifest"]
+	return data
+
+
+static func _replace_key(raw: String, base_owner: String) -> String:
+	var parts := raw.split(":")
+	if parts.size() == 1:
+		if not _matches(parts[0], SYSTEM_PATTERN):
+			return ""
+		return "%s:%s" % [base_owner, parts[0]]
+	if parts.size() == 2:
+		if not _matches(parts[0], ID_PATTERN) or not _matches(parts[1], SYSTEM_PATTERN):
+			return ""
+		return "%s:%s" % [parts[0], parts[1]]
+	return ""
+
+
+static func _split_key(key: String) -> Array:
+	var parts := key.split(":")
+	if parts.size() != 2:
+		return ["", ""]
+	return [parts[0], parts[1]]
+
+
+static func _highest_priority(by_priority: Dictionary) -> int:
+	var best := 0
+	var first := true
+	for priority in by_priority:
+		if first or int(priority) > best:
+			best = int(priority)
+			first = false
+	return best
 
 
 static func _matches(value: String, pattern: String) -> bool:
@@ -171,12 +227,11 @@ static func _validate_replaces(manifest: Dictionary, errors: Array) -> void:
 
 static func _is_valid_replace(value: String) -> bool:
 	var parts := value.split(":")
-	if parts.size() < 1 or parts.size() > 2:
-		return false
-	for part in parts:
-		if part.is_empty() or not _matches(part, REPLACE_PART_PATTERN):
-			return false
-	return true
+	if parts.size() == 1:
+		return _matches(parts[0], SYSTEM_PATTERN)
+	if parts.size() == 2:
+		return _matches(parts[0], ID_PATTERN) and _matches(parts[1], SYSTEM_PATTERN)
+	return false
 
 
 static func _validate_priority(manifest: Dictionary, errors: Array) -> void:
