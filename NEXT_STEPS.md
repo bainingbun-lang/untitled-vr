@@ -2,13 +2,18 @@
 
 Ejecutables en orden. Rutas absolutas desde `$HOME`.
 
-1. **Desbloquear el editor Android**: obtener permiso de instalación; instalar el APK 4.7 oficial ya verificado; comprobar la actividad y la versión instalada de `org.godotengine.editor.v4`.
-2. **JDK 17**: instalarlo y validar una exportación Gradle (el actual es OpenJDK 21.0.13; compatibilidad NO VERIFICADA).
-3. **R1 (S25 FE)**: instalar el APK de prueba y medir Mobile vs Compatibility. Para Quest falta un dispositivo verificado.
-4. **Resolver el conflicto documental** Mobile/Compatibility para XR con los datos de R1.
-5. **Protección del núcleo**: diseñar un PCK base y cargarlo antes que los PCK de mods (`replace_files=false` solo protege lo ya cargado desde otro PCK). Referencia: `spikes/m1/`.
-6. **ModManager**: definir el esquema del cargador (orden de carga, rutas de PCK, detección de fallo con `load_resource_pack` → `false`, archivos nuevos del mod).
-7. **Sandbox de mods en Godot Android**: probar Lua/wasm/gdextension dentro de Godot en el teléfono (M2 solo validó las VMs en Termux).
-8. **Esqueleto del juego**: escena principal y controlador FPS.
-9. **Rendimiento**: medir hasta el objetivo de 60 FPS en S25 FE (sujeto a medición; N1 es solo tendencia).
-10. **Cierre de migración**: verificar hashes y decidir cuándo retirar `/sdcard/Documents/UNTITLED`.
+## No bloqueadas
+
+1. **Protección del núcleo con PCK base (tarea 8)** — primera tarea no bloqueada. Construir un PCK base con los archivos críticos, cargarlo antes que cualquier pack de mod y comprobar con el arnés de `spikes/m1/` que un mod no puede sobrescribirlo. Documentar el resultado y añadir una prueba automatizada.
+2. **Sandbox de mods dentro de Godot (tarea 10, parte Linux)** — integrar una prueba mínima de Lua o WASM como módulo del motor en Linux arm64 headless, medir el coste y verificar el corte de bucles. La ejecución en Android queda para cuando haya dispositivo.
+3. **Integración del cargador en el arranque** — definir el directorio de mods por plataforma (`user://` u otra ruta), crear el autoload que construye `ModEventBus` + `ModRegistry` y ejecutar `scan`/`load_all` al iniciar. No requiere escenas de juego.
+4. **Cierre de la migración (tarea 13)** — verificar de nuevo los hashes contra `$HOME/untitled-control/manifest-src.sha256` y decidir la retirada de `/sdcard/Documents/UNTITLED`.
+
+## Bloqueadas
+
+5. **Editor Android**: obtener permiso de instalación, instalar el APK 4.7 oficial ya verificado y comprobar la actividad y la versión real de `org.godotengine.editor.v4` (tareas 1–3).
+6. **JDK 17**: instalarlo y validar una exportación Gradle; el actual es OpenJDK 21.0.13 y la compatibilidad no está verificada (tarea 4).
+7. **Esqueleto del juego**: escena principal y controlador FPS; depende del editor operativo (tarea 11).
+8. **R1**: medir Mobile vs Compatibility en S25 FE y, si hay dispositivo verificado, en Quest; después resolver el conflicto documental para XR (tareas 5–7).
+9. **Rendimiento**: medir hasta 60 FPS en S25 FE sobre el esqueleto del juego (tarea 12).
+10. **Sandbox en Android**: repetir la prueba de Lua/WASM/GDExtension en el teléfono cuando el editor y la instalación estén disponibles (resto de la tarea 10).

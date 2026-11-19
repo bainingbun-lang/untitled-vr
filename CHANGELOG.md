@@ -13,4 +13,13 @@
 - **Herramientas** — Editor Godot Linux arm64 4.7.stable verificado (`--version`, `--headless --import`); plantillas de exportación 4.7.stable instaladas con SHA-512 verificado; APK editor Android 4.7 descargado y verificado (no instalado).
 - **PARTE 7 (diseño)** — Propuesta de arquitectura de plataforma en `docs/PLATFORM_ARCHITECTURE.md`. Solo diseño: pendiente de aprobación, sin implementación.
 - **Aprobación de la arquitectura** — Registradas en `DECISIONS.md` las decisiones aprobadas; libertad tecnológica incorporada a la propuesta como requisito pendiente.
-- **Núcleo: validador de `mod.json`** — `core/mod_manifest.gd` (parseo, valores por defecto, campos desconocidos conservados, detección de conflictos por prioridad igual). Implementado con OpenCode (`deepseek-v4.1-flash-free`), revisado y probado: `tests/test_mod_manifest.gd` → `TEST_OK`, código 0. Limitación: los conflictos se agrupan por nombre de sistema e ignoran el prefijo `modulo:`.
+- **Núcleo: validador de `mod.json`** — `core/mod_manifest.gd` (parseo, valores por defecto, campos desconocidos conservados, detección de conflictos por prioridad igual). Implementado con OpenCode (`deepseek-v4.1-flash-free`), revisado y probado: `tests/test_mod_manifest.gd` → `TEST_OK`, código 0. La distinción de propietario `modulo:sistema` se añadió en `08e8abd`.
+
+## 2026-11-19
+
+- **`c85d736` — Checkpoint Fase B** — Fijado en la rama `checkpoint/fase-b-core-manifest`: arquitectura aprobada, validador de `mod.json` y prueba headless.
+- **`08e8abd` — Conflictos con propietario** — El validador distingue `sistema` de `modulo:sistema`; gana la prioridad mayor y el empate en la prioridad máxima es conflicto de carga. Añadido `tests/run_all.sh`.
+- **`a3bed28` — Dependencias y eventos** — `core/mod_resolver.gd` resuelve rangos, ciclos y orden de carga; `core/event_bus.gd` añade prioridad, snapshot y corte de propagación. Pruebas propias para ambos.
+- **`d808b94` — Registro y API** — `core/mod_api.gd` y `core/mod_registry.gd`: escaneo, carga de PCK, `_mod_init`, descarga con `_mod_shutdown` y liberación de suscripciones. Prueba de registro.
+- **`de457b2` — Mod de ejemplo** — `untitled.example-hello` empaquetado como PCK de 1336 bytes con `tools/build_example_mod.sh`; la prueba carga el pack, ejecuta el handler de `game.started` y comprueba la desactivación al descargar.
+- **Documentación de mods** — Creada `docs/MOD_SYSTEM.md` y actualizados los documentos de estado; contenido contrastado con `core/` y `git log`. `bash tests/run_all.sh` sigue en código 0.

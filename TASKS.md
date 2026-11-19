@@ -11,9 +11,17 @@ Orden de ejecución. Estado: `PENDIENTE` / `BLOQUEADA` / `HECHA`.
 | 5 | Ejecutar R1: Mobile vs Compatibility en S25 FE | BLOQUEADA | APK de prueba instalado en el teléfono |
 | 6 | Ejecutar R1 en Quest | BLOQUEADA | dispositivo Quest no verificado |
 | 7 | Resolver el conflicto documental Mobile/Compatibility para XR | PENDIENTE | tarea 5 (R1) |
-| 8 | Diseñar protección del núcleo mediante PCK base | PENDIENTE | spike M1 (hecho) |
-| 9 | Diseñar esquema del cargador ModManager | PENDIENTE | tarea 8 |
-| 10 | Definir e implementar sandbox de mods en Godot Android (Lua/wasm/gdextension) | PENDIENTE | tarea 9; M2 solo probó las VMs fuera de Godot |
+| 8 | Diseñar y probar la protección del núcleo mediante PCK base | PENDIENTE | spike M1 (hecho) |
+| 9 | Diseñar el esquema del cargador ModManager (implementado como `ModRegistry`) | HECHA | `core/mod_registry.gd` (d808b94) |
+| 10 | Definir e implementar sandbox de mods en Godot (Lua/WASM/GDExtension) | PENDIENTE | tarea 9; M2 solo probó las VMs fuera de Godot |
 | 11 | Crear esqueleto del juego (escena principal, controlador FPS) | PENDIENTE | editor operativo (tarea 3) |
 | 12 | Medir rendimiento hasta 60 FPS en S25 FE | PENDIENTE | tarea 11; objetivo sujeto a medición |
 | 13 | Decidir ubicación definitiva y retirar el origen `/sdcard` cuando la migración esté confirmada | PENDIENTE | verificación final de hashes |
+| 14 | Validar estructura y campos de `mod.json`, incluidos valores por defecto y campos desconocidos | HECHA | `core/mod_manifest.gd` (c85d736) |
+| 15 | Validar conflictos de `replaces` con propietario explícito y prioridad | HECHA | `core/mod_manifest.gd` (08e8abd) |
+| 16 | Resolver dependencias, rangos semver, ciclos y orden de carga | HECHA | `core/mod_resolver.gd` (a3bed28) |
+| 17 | Implementar bus de eventos con prioridad, snapshot y corte de propagación | HECHA | `core/event_bus.gd` (a3bed28) |
+| 18 | Implementar registro, API por módulo, carga y descarga | HECHA | `core/mod_api.gd`, `core/mod_registry.gd` (d808b94) |
+| 19 | Crear mod de ejemplo PCK y probar handler y desactivación al descargar | HECHA | `mods/example.hello/`, `tools/build_example_mod.sh` (de457b2) |
+| 20 | Automatizar las pruebas del núcleo y del ejemplo | HECHA | `tests/run_all.sh` (de457b2) |
+| 21 | Actualizar documentos de estado y crear la guía de mods | HECHA | `docs/MOD_SYSTEM.md` (T6) |
