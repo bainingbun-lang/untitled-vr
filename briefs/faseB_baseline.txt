@@ -1,0 +1,56 @@
+libfontconfig.so.1: cannot open shared object file: No such file or directory
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+ERROR: Unable to load fontconfig, system font support is disabled.
+   at: get_system_font_path (platform/linuxbsd/os_linuxbsd.cpp:843)
+ERROR: Unable to load fontconfig, system font support is disabled.
+   at: get_system_font_path (platform/linuxbsd/os_linuxbsd.cpp:843)
+ERROR: Unable to load fontconfig, system font support is disabled.
+   at: get_system_font_path (platform/linuxbsd/os_linuxbsd.cpp:843)
+ERROR: Unable to load fontconfig, system font support is disabled.
+   at: get_system_font_path (platform/linuxbsd/os_linuxbsd.cpp:843)
+ERROR: Unable to load fontconfig, system font support is disabled.
+   at: get_system_font_path (platform/linuxbsd/os_linuxbsd.cpp:843)
+ERROR: Unable to load fontconfig, system font support is disabled.
+   at: get_system_font_path (platform/linuxbsd/os_linuxbsd.cpp:843)
+ERROR: Unable to load fontconfig, system font support is disabled.
+   at: get_system_font_path (platform/linuxbsd/os_linuxbsd.cpp:843)
+ERROR: Unable to load fontconfig, system font support is disabled.
+   at: get_system_font_path (platform/linuxbsd/os_linuxbsd.cpp:843)
+ERROR: Unable to load fontconfig, system font support is disabled.
+   at: get_system_font_path (platform/linuxbsd/os_linuxbsd.cpp:843)
+ERROR: Unable to load fontconfig, system font support is disabled.
+   at: get_system_font_path (platform/linuxbsd/os_linuxbsd.cpp:843)
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Started Project initialization (5 steps)[39m[0m
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Scanning file structure...[39m[0m
+[  16% ] [90m[1mfirst_scan_filesystem[22m | Loading global class names...[39m[0m
+[  33% ] [90m[1mfirst_scan_filesystem[22m | Verifying GDExtensions...[39m[0m
+[  50% ] [90m[1mfirst_scan_filesystem[22m | Creating autoload scripts...[39m[0m
+[  66% ] [90m[1mfirst_scan_filesystem[22m | Initializing plugins...[39m[0m
+[  83% ] [90m[1mfirst_scan_filesystem[22m | Starting file scan...[39m[0m
+[92m[ DONE ][39m [1mfirst_scan_filesystem[22m
+[0m
+[   0% ] [90m[1msavepack[22m | Started Packing (102 steps)[39m[0m
+[   1% ] [90m[1msavepack[22m | Storing File: res://example_hello/main.gdc[39m[0m
+[  50% ] [90m[1msavepack[22m | Storing File: res://mod.json[39m[0m
+[  50% ] [90m[1msavepack[22m | Storing File: res://example_hello/main.gd.remap[39m[0m
+[  50% ] [90m[1msavepack[22m | Storing File: res://.godot/global_script_class_cache.cfg[39m[0m
+[  50% ] [90m[1msavepack[22m | Storing File: res://.godot/uid_cache.bin[39m[0m
+ERROR: Couldn't save project.binary at '/tmp/tmpproject.binary'.
+   at: _save_settings_binary (core/config/project_settings.cpp:1080)
+ERROR: Can't open file from path '/tmp/tmpproject.binary'.
+   at: get_file_as_bytes (core/io/file_access.cpp:907)
+ERROR: Cannot remove non-existent file or directory: '/tmp/tmpproject.binary'.
+   at: remove_file_or_error (./core/io/dir_access.h:129)
+[  50% ] [90m[1msavepack[22m | Storing File: res://project.binary[39m[0m
+[92m[ DONE ][39m [1msavepack[22m
+[0m
+BUILD_OK
+PASS test_event_bus.gd
+PASS test_example_mod.gd
+PASS test_mod_backup.gd
+PASS test_mod_capabilities.gd
+PASS test_mod_manifest.gd
+PASS test_mod_profile.gd
+PASS test_mod_registry.gd
+PASS test_mod_resolver.gd

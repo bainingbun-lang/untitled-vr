@@ -9,11 +9,14 @@ const SYSTEM_PATTERN := "^[a-z0-9_-]+$"
 const VALID_PLATFORMS := ["android", "pc", "vr"]
 
 
+const VALID_RUNTIMES := ["gdscript", "lua", "wasm"]
+
 static func parse(data: Dictionary) -> Dictionary:
 	var errors: Array = []
 	var manifest: Dictionary = data.duplicate(true)
 
 	_validate_schema_version(manifest, errors)
+	_validate_runtime(manifest, errors)
 	_validate_id(manifest, errors)
 	_validate_version(manifest, errors)
 	_validate_engine(manifest, errors)
@@ -149,6 +152,16 @@ static func _matches(value: String, pattern: String) -> bool:
 	var regex := RegEx.create_from_string(pattern)
 	return regex.search(value) != null
 
+
+static func _validate_runtime(manifest: Dictionary, errors: Array) -> void:
+	if not manifest.has("runtime"):
+		manifest["runtime"] = "gdscript"
+		return
+	var value: Variant = manifest["runtime"]
+	if typeof(value) != TYPE_STRING:
+		errors.append("runtime: se esperaba String, se recibio %s" % type_string(typeof(value)))
+	elif not VALID_RUNTIMES.has(value):
+		errors.append("runtime: valor invalido '%s' (permitidos: gdscript, lua, wasm)" % value)
 
 static func _validate_schema_version(manifest: Dictionary, errors: Array) -> void:
 	if not manifest.has("schema_version"):
@@ -295,7 +308,10 @@ static func _validate_pack(manifest: Dictionary, errors: Array) -> void:
 
 
 static func _validate_entry(manifest: Dictionary, errors: Array) -> void:
+	var runtime: String = str(manifest.get("runtime", "gdscript"))
 	if not manifest.has("entry"):
+		if runtime != "gdscript":
+			errors.append("entry: campo obligatorio cuando runtime es %s" % runtime)
 		return
 	var value: Variant = manifest["entry"]
 	if typeof(value) != TYPE_STRING:

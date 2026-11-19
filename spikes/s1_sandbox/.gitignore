@@ -1,0 +1,4 @@
+.godot/
+.sconsign.dblite
+bin/
+src/*.os

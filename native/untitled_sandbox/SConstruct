@@ -1,0 +1,67 @@
+#!/usr/bin/env python
+
+import os
+
+root = Dir("#").abspath
+godot_cpp = "/data/data/com.termux/files/home/tools/godot-cpp"
+lua_vendor = os.path.abspath(os.path.join(root, "..", "..", "spikes", "s2_lua", "vendor", "lua-5.4.9", "src"))
+wasm_vendor = os.path.abspath(os.path.join(root, "..", "..", "spikes", "s3_wasm", "vendor", "wasmtime-v50.0.2-aarch64-linux-c-api"))
+
+env = Environment(ENV=os.environ)
+env["SHLIBPREFIX"] = ""
+env["SHLIBSUFFIX"] = ".so"
+
+env.Append(CXXFLAGS=["-std=c++17", "-fPIC", "-O2", "-fno-exceptions"])
+env.Append(CPPDEFINES=[
+    "DEBUG_ENABLED",
+    "NDEBUG",
+    "THREADS_ENABLED",
+    "HOT_RELOAD_ENABLED",
+    "LINUX_ENABLED",
+    "UNIX_ENABLED",
+])
+
+env.Append(CPPPATH=[
+    os.path.join(lua_vendor),
+    os.path.join(wasm_vendor, "include"),
+    os.path.join(godot_cpp, "include"),
+    os.path.join(godot_cpp, "gen", "include"),
+    os.path.join(godot_cpp, "gdextension"),
+    os.path.abspath(os.path.join(root, "..", "..", "spikes", "s1_sandbox", "src")),
+    os.path.abspath(os.path.join(root, "..", "..", "spikes", "s2_lua", "src")),
+    os.path.abspath(os.path.join(root, "..", "..", "spikes", "s3_wasm", "src")),
+])
+
+env.Append(LIBPATH=[
+    lua_vendor, 
+    os.path.join(godot_cpp, "bin"), 
+    "/data/data/com.termux/files/usr/glibc/lib"
+])
+
+env.Append(LIBS=[
+    File(os.path.join(wasm_vendor, "lib", "libwasmtime.a")), 
+    "lua", 
+    "godot-cpp.linux.template_debug.arm64", 
+    "pthread", 
+    "dl", 
+    "m", 
+    "rt"
+])
+
+env.Append(LINKFLAGS=["-static-libgcc", "-static-libstdc++", "-pthread", "-Wl,--as-needed"])
+
+sources = [
+    "src/register_types.cpp",
+    "../../spikes/s1_sandbox/src/probe.cpp",
+    "../../spikes/s2_lua/src/lua_sandbox.cpp",
+    "../../spikes/s3_wasm/src/wasm_sandbox.cpp",
+    "../../spikes/s3_wasm/src/pthread_atfork_shim.cpp",
+]
+
+library = env.SharedLibrary(
+    "bin/libuntitled_sandbox.linux.template_debug.arm64.so",
+    source=sources,
+)
+
+env.NoCache(library)
+Default(library)

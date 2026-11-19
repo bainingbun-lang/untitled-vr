@@ -1,0 +1,12 @@
+{
+  "id": "boot.map",
+  "version": "1.0.0",
+  "author": "fixture",
+  "license": "MIT",
+  "scale": 1.0,
+  "has_collisions": true,
+  "has_navigation": true,
+  "spawn_points": [[0, 0, 0]],
+  "forbidden_zones": [],
+  "zones": []
+}

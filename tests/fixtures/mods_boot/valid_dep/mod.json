@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "boot.dep",
+  "version": "1.0.0",
+  "engine": "4.7",
+  "depends": {"boot.base": "^1.0.0"},
+  "entry": "res://tests/fixtures/mods_boot/valid_dep/entry.gd"
+}

@@ -1,0 +1,5 @@
+.godot/
+.sconsign.dblite
+bin/
+src/*.os
+vendor/lua-5.4.9/

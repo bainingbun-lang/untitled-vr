@@ -1,0 +1,8 @@
+; Minimal project for the S1 GDExtension load test.
+
+config_version=5
+
+[application]
+
+config/name="S1 Sandbox Probe"
+config/features=PackedStringArray("4.7")

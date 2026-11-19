@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "id": "boot.base",
+  "version": "1.0.0",
+  "engine": "4.7",
+  "entry": "res://tests/fixtures/mods_boot/valid_base/entry.gd"
+}

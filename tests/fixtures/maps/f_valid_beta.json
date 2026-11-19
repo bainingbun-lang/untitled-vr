@@ -1,0 +1,7 @@
+{
+  "id": "map_beta",
+  "license": "Apache-2.0",
+  "has_navigation": true,
+  "has_collisions": true,
+  "spawn_points": [{"x": 1, "y": 2, "z": 3}]
+}

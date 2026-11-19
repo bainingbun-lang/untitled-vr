@@ -12,6 +12,9 @@ extends RefCounted
 
 const ModManifestScript = preload("res://core/mod_manifest.gd")
 const ModApiScript = preload("res://core/mod_api.gd")
+const RuntimeGDScript = preload("res://core/runtime_gdscript.gd")
+const RuntimeLua = preload("res://core/runtime_lua.gd")
+const RuntimeWasm = preload("res://core/runtime_wasm.gd")
 
 const RESOLVER_PATH := "res://core/mod_resolver.gd"
 const DEFAULT_PRIORITY := 100
@@ -112,6 +115,7 @@ func load_all(candidates: Array) -> Dictionary:
 		var candidate: Dictionary = by_id[id]
 		var manifest: Dictionary = candidate["manifest"]
 		var dir := str(candidate.get("dir", ""))
+		var runtime_type := str(manifest.get("runtime", "gdscript"))
 
 		var blocked := _failed_dependency(manifest, failed)
 		if not blocked.is_empty():
@@ -119,41 +123,41 @@ func load_all(candidates: Array) -> Dictionary:
 			errors.append("%s no se carga porque su dependencia %s fallo" % [id, blocked])
 			continue
 
-		if manifest.has("pack"):
-			var pack := str(manifest["pack"])
-			var pack_path := _absolute_path(dir.path_join(pack))
-			if not ProjectSettings.load_resource_pack(pack_path, true):
-				failed[id] = "no se pudo cargar el pack '%s'" % pack
-				errors.append("%s: no se pudo cargar el pack '%s'" % [id, pack])
+		var adapter: RuntimeAdapter = null
+		match runtime_type:
+			"gdscript":
+				adapter = RuntimeGDScript.new()
+			"lua":
+				adapter = RuntimeLua.new()
+			"wasm":
+				adapter = RuntimeWasm.new()
+			_:
+				failed[id] = "runtime desconocido: %s" % runtime_type
+				errors.append("%s: runtime desconocido %s" % [id, runtime_type])
 				continue
 
-		var instance: Object = null
-		if manifest.has("entry"):
-			var entry := str(manifest["entry"])
-			var script: Variant = load(entry)
-			if script == null or not (script is Script) or not script.can_instantiate():
-				failed[id] = "no se pudo cargar la entrada '%s'" % entry
-				errors.append("%s: no se pudo cargar la entrada '%s'" % [id, entry])
-				continue
-			instance = script.new()
-			if instance == null or not instance.has_method("_mod_init"):
-				failed[id] = "la entrada '%s' no implementa _mod_init" % entry
-				errors.append("%s: la entrada '%s' no implementa _mod_init" % [id, entry])
-				instance = null
-				continue
+		var load_err: String = adapter.load(manifest, dir)
+		if load_err != "":
+			failed[id] = load_err
+			errors.append("%s: %s" % [id, load_err])
+			continue
 
-		var api = ModApiScript.new(id, _bus)
+		var permissions: Array = manifest.get("permissions", [])
+		var api = ModApiScript.new(id, _bus, permissions)
+		var init_err: String = adapter.init(api)
+		if init_err != "":
+			failed[id] = init_err
+			errors.append("%s: %s" % [id, init_err])
+			continue
+
 		_loaded[id] = {
 			"manifest": manifest,
 			"dir": dir,
-			"instance": instance,
+			"adapter": adapter,
 			"api": api,
 		}
 		_order.append(id)
 		loaded_now.append(id)
-
-		if instance != null:
-			instance._mod_init(api)
 
 	for candidate in candidates:
 		var manifest := _manifest_of(candidate)
@@ -186,9 +190,9 @@ func unload(module_id: String) -> Dictionary:
 		return {"ok": false, "errors": errors}
 
 	var record: Dictionary = _loaded[module_id]
-	var instance: Object = record.get("instance", null)
-	if instance != null and instance.has_method("_mod_shutdown"):
-		instance._mod_shutdown()
+	var adapter: RuntimeAdapter = record.get("adapter", null)
+	if adapter != null:
+		adapter.unload()
 	var api: Variant = record.get("api", null)
 	if api != null:
 		api._release()
@@ -209,7 +213,8 @@ func loaded_ids() -> Array:
 func get_instance(module_id: String) -> Object:
 	if not _loaded.has(module_id):
 		return null
-	return _loaded[module_id].get("instance", null)
+	var adapter = _loaded[module_id].get("adapter", null)
+	return adapter.get_instance() if adapter != null else null
 
 
 # JSON.parse_string devuelve todos los numeros como float. ModManifest exige

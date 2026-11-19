@@ -1,0 +1,6 @@
+.godot/
+.sconsign.dblite
+bin/
+src/*.os
+vendor/wasmtime-v50.0.2-aarch64-linux-c-api/
+vendor/*.tar.xz

@@ -1,0 +1,8 @@
+; Minimal project for the S2 Lua sandbox GDExtension test.
+
+config_version=5
+
+[application]
+
+config/name="S2 Lua Sandbox"
+config/features=PackedStringArray("4.7")

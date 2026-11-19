@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "id": "cyc.a",
+  "version": "1.0.0",
+  "engine": "4.7",
+  "depends": {"cyc.b": "*"}
+}

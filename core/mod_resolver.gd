@@ -5,7 +5,7 @@ const DEFAULT_PRIORITY := 100
 
 
 static func is_valid_version(v: String) -> bool:
-	var parts := v.split(".")
+	var parts: Variant = v.split(".")
 	if parts.size() != 3:
 		return false
 	for part in parts:
@@ -18,8 +18,8 @@ static func is_valid_version(v: String) -> bool:
 
 
 static func compare(a: String, b: String) -> int:
-	var pa := _parse_version(a)
-	var pb := _parse_version(b)
+	var pa: Variant = _parse_version(a)
+	var pb: Variant = _parse_version(b)
 	if pa.is_empty() or pb.is_empty():
 		return 0
 	for i in 3:
@@ -31,7 +31,7 @@ static func compare(a: String, b: String) -> int:
 
 
 static func is_valid_range(range: String) -> bool:
-	var tokens := _range_tokens(range)
+	var tokens: Variant = _range_tokens(range)
 	if tokens.is_empty():
 		return false
 	for token in tokens:
@@ -41,7 +41,7 @@ static func is_valid_range(range: String) -> bool:
 			if not is_valid_version(token.substr(1)):
 				return false
 			continue
-		var rest := token
+		var rest: Variant = token
 		for candidate in [">=", "<=", ">", "<", "="]:
 			if token.begins_with(candidate):
 				rest = token.substr(candidate.length())
@@ -58,11 +58,11 @@ static func satisfies(version: String, range: String) -> bool:
 		if token == "*":
 			continue
 		if token.begins_with("^"):
-			var base_text := token.substr(1)
-			var base := _parse_version(base_text)
+			var base_text: Variant = token.substr(1)
+			var base: Variant = _parse_version(base_text)
 			if compare(version, base_text) < 0:
 				return false
-			var upper := ""
+			var upper: Variant = ""
 			if base[0] > 0:
 				upper = "%d.0.0" % (base[0] + 1)
 			else:
@@ -70,14 +70,14 @@ static func satisfies(version: String, range: String) -> bool:
 			if compare(version, upper) >= 0:
 				return false
 			continue
-		var op := ""
-		var rest := token
+		var op: Variant = ""
+		var rest: Variant = token
 		for candidate in [">=", "<=", ">", "<", "="]:
 			if token.begins_with(candidate):
 				op = candidate
 				rest = token.substr(candidate.length())
 				break
-		var result := compare(version, rest)
+		var result: Variant = compare(version, rest)
 		if op == ">=" and result < 0:
 			return false
 		elif op == ">" and result <= 0:
@@ -96,22 +96,22 @@ static func resolve(manifests: Array) -> Dictionary:
 	var raw: Array = []
 
 	for entry in manifests:
-		var manifest := _manifest_of(entry)
+		var manifest: Variant = _manifest_of(entry)
 		if manifest.is_empty():
 			errors.append("manifiesto inválido: se esperaba un Dictionary con id")
 			continue
-		var id := str(manifest.get("id", ""))
+		var id: Variant = str(manifest.get("id", ""))
 		if not _is_valid_id(id):
 			errors.append("manifiesto ignorado: id inválido '%s'" % id)
 			continue
 		raw.append(manifest)
 
-	var counts := {}
+	var counts: Variant = {}
 	for manifest in raw:
-		var id := str(manifest.get("id", ""))
+		var id: Variant = str(manifest.get("id", ""))
 		counts[id] = int(counts.get(id, 0)) + 1
 
-	var duplicate_ids := {}
+	var duplicate_ids: Variant = {}
 	var count_keys: Array = counts.keys()
 	count_keys.sort()
 	for id in count_keys:
@@ -119,9 +119,9 @@ static func resolve(manifests: Array) -> Dictionary:
 			duplicate_ids[id] = true
 			errors.append("id duplicado '%s' (%d manifiestos)" % [id, int(counts[id])])
 
-	var records := {}
+	var records: Variant = {}
 	for manifest in raw:
-		var id := str(manifest.get("id", ""))
+		var id: Variant = str(manifest.get("id", ""))
 		if duplicate_ids.has(id):
 			continue
 		var depends: Dictionary = {}
@@ -134,8 +134,8 @@ static func resolve(manifests: Array) -> Dictionary:
 			"depends": depends,
 		}
 
-	var failed := {}
-	var fail_reason := {}
+	var failed: Variant = {}
+	var fail_reason: Variant = {}
 	for id in duplicate_ids:
 		failed[id] = true
 		fail_reason[id] = "id duplicado"
@@ -155,8 +155,8 @@ static func resolve(manifests: Array) -> Dictionary:
 		var dep_keys: Array = depends.keys()
 		dep_keys.sort()
 		for dep_key in dep_keys:
-			var dep_id := str(dep_key)
-			var raw_range := str(depends[dep_key])
+			var dep_id: Variant = str(dep_key)
+			var raw_range: Variant = str(depends[dep_key])
 			if not is_valid_range(raw_range):
 				errors.append(
 					"%s: rango de dependencia inválido '%s' para %s" % [id, raw_range, dep_id]
@@ -169,7 +169,7 @@ static func resolve(manifests: Array) -> Dictionary:
 				errors.append("%s requiere %s %s, no está instalado" % [id, dep_id, raw_range])
 				_mark_failed(failed, fail_reason, str(id), "dependencia inexistente")
 				continue
-			var installed := str(records[dep_id]["version"])
+			var installed: Variant = str(records[dep_id]["version"])
 			if not is_valid_version(installed):
 				continue
 			if not satisfies(installed, raw_range):
@@ -178,11 +178,11 @@ static func resolve(manifests: Array) -> Dictionary:
 				)
 				_mark_failed(failed, fail_reason, str(id), "versión incompatible")
 
-	var graph := {}
+	var graph: Variant = {}
 	for id in ids_sorted:
 		var deps: Array = []
 		for dep_key in records[id]["depends"].keys():
-			var dep_id := str(dep_key)
+			var dep_id: Variant = str(dep_key)
 			if records.has(dep_id):
 				deps.append(dep_id)
 		graph[id] = deps
@@ -194,24 +194,24 @@ static func resolve(manifests: Array) -> Dictionary:
 		for id in component_ids:
 			_mark_failed(failed, fail_reason, str(id), "dependencia circular")
 
-	var dependents := {}
+	var dependents: Variant = {}
 	for id in ids_sorted:
 		for dep_key in records[id]["depends"].keys():
-			var dep_id := str(dep_key)
+			var dep_id: Variant = str(dep_key)
 			if not dependents.has(dep_id):
 				dependents[dep_id] = []
 			dependents[dep_id].append(str(id))
 
 	var pending: Array = failed.keys()
 	pending.sort()
-	var head := 0
+	var head: Variant = 0
 	while head < pending.size():
-		var bad := str(pending[head])
+		var bad: Variant = str(pending[head])
 		head += 1
 		if not dependents.has(bad):
 			continue
 		for dependent in dependents[bad]:
-			var dependent_id := str(dependent)
+			var dependent_id: Variant = str(dependent)
 			if failed.has(dependent_id):
 				continue
 			failed[dependent_id] = true
@@ -221,24 +221,24 @@ static func resolve(manifests: Array) -> Dictionary:
 			)
 			pending.append(dependent_id)
 
-	var priorities := {}
-	var indegree := {}
+	var priorities: Variant = {}
+	var indegree: Variant = {}
 	for id in ids_sorted:
 		if failed.has(id):
 			continue
 		priorities[id] = int(records[id]["priority"])
-		var count := 0
+		var count: Variant = 0
 		for dep_key in records[id]["depends"].keys():
 			if not failed.has(str(dep_key)):
 				count += 1
 		indegree[id] = count
 
-	var reverse := {}
+	var reverse: Variant = {}
 	for id in ids_sorted:
 		if failed.has(id):
 			continue
 		for dep_key in records[id]["depends"].keys():
-			var dep_id := str(dep_key)
+			var dep_id: Variant = str(dep_key)
 			if failed.has(dep_id):
 				continue
 			if not reverse.has(dep_id):
@@ -252,12 +252,12 @@ static func resolve(manifests: Array) -> Dictionary:
 
 	var order: Array[String] = []
 	while not ready.is_empty():
-		var id := str(ready.pop_front())
+		var id: Variant = str(ready.pop_front())
 		order.append(id)
 		if not reverse.has(id):
 			continue
 		for dependent in reverse[id]:
-			var dependent_id := str(dependent)
+			var dependent_id: Variant = str(dependent)
 			indegree[dependent_id] = int(indegree[dependent_id]) - 1
 			if int(indegree[dependent_id]) == 0:
 				_insert_ready(ready, dependent_id, priorities)
@@ -267,7 +267,7 @@ static func resolve(manifests: Array) -> Dictionary:
 			if not failed.has(id) and not order.has(id):
 				order.append(str(id))
 
-	var versions := {}
+	var versions: Variant = {}
 	for id in order:
 		versions[id] = str(records[id]["version"])
 
@@ -282,18 +282,18 @@ static func resolve(manifests: Array) -> Dictionary:
 static func _parse_version(v: String) -> Array:
 	if not is_valid_version(v):
 		return []
-	var parts := v.split(".")
+	var parts: Variant = v.split(".")
 	return [int(parts[0]), int(parts[1]), int(parts[2])]
 
 
 static func _range_tokens(range: String) -> Array:
-	var text := range.strip_edges()
+	var text: Variant = range.strip_edges()
 	text = text.replace("\t", " ").replace("\n", " ").replace("\r", " ")
 	return text.split(" ", false)
 
 
 static func _is_valid_id(id: String) -> bool:
-	var parts := id.split(".")
+	var parts: Variant = id.split(".")
 	if parts.size() != 2:
 		return false
 	for part in parts:
@@ -323,11 +323,11 @@ static func _mark_failed(
 
 
 static func _insert_ready(queue: Array, id: String, priorities: Dictionary) -> void:
-	var index := 0
-	var my_priority := int(priorities[id])
+	var index: Variant = 0
+	var my_priority: Variant = int(priorities[id])
 	while index < queue.size():
-		var other := str(queue[index])
-		var other_priority := int(priorities[other])
+		var other: Variant = str(queue[index])
+		var other_priority: Variant = int(priorities[other])
 		if my_priority < other_priority:
 			break
 		if my_priority == other_priority and id < other:
@@ -337,7 +337,7 @@ static func _insert_ready(queue: Array, id: String, priorities: Dictionary) -> v
 
 
 static func _find_cycles(ids: Array, graph: Dictionary) -> Array:
-	var state := {
+	var state: Variant = {
 		"index": 0,
 		"indices": {},
 		"low": {},
@@ -364,7 +364,7 @@ static func _strongconnect(v: String, graph: Dictionary, state: Dictionary) -> v
 	on_stack[v] = true
 
 	for neighbor in graph.get(v, []):
-		var w := str(neighbor)
+		var w: Variant = str(neighbor)
 		if not indices.has(w):
 			_strongconnect(w, graph, state)
 			if int(low[w]) < int(low[v]):
@@ -376,11 +376,11 @@ static func _strongconnect(v: String, graph: Dictionary, state: Dictionary) -> v
 	if int(low[v]) == int(indices[v]):
 		var component: Array = []
 		while true:
-			var w := str(stack.pop_back())
+			var w: Variant = str(stack.pop_back())
 			on_stack[w] = false
 			component.append(w)
 			if w == v:
 				break
-		var self_loop := component.size() == 1 and graph.get(v, []).has(v)
+		var self_loop: Variant = component.size() == 1 and graph.get(v, []).has(v)
 		if component.size() > 1 or self_loop:
 			state["cycles"].append(component)

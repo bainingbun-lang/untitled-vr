@@ -1,0 +1,7 @@
+{
+  "id": "map_no_nav",
+  "license": "MIT",
+  "has_navigation": false,
+  "has_collisions": true,
+  "spawn_points": [[0, 0, 0]]
+}
