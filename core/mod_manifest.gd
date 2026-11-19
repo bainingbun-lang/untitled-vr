@@ -22,6 +22,8 @@ static func parse(data: Dictionary) -> Dictionary:
 	_validate_priority(manifest, errors)
 	_validate_platforms(manifest, errors)
 	_validate_permissions(manifest, errors)
+	_validate_pack(manifest, errors)
+	_validate_entry(manifest, errors)
 
 	return {
 		"ok": errors.is_empty(),
@@ -273,3 +275,39 @@ static func _validate_permissions(manifest: Dictionary, errors: Array) -> void:
 			errors.append(
 				"permissions: se esperaba String, se recibio %s" % type_string(typeof(item))
 			)
+
+
+static func _validate_pack(manifest: Dictionary, errors: Array) -> void:
+	if not manifest.has("pack"):
+		return
+	var value: Variant = manifest["pack"]
+	if typeof(value) != TYPE_STRING:
+		errors.append("pack: se esperaba String, se recibio %s" % type_string(typeof(value)))
+		return
+	var pack_name: String = value
+	if pack_name.contains("/") or pack_name.contains("\\"):
+		errors.append(
+			"pack: formato invalido '%s' (se esperaba un nombre de archivo sin ruta)" % pack_name
+		)
+		return
+	if not pack_name.ends_with(".pck"):
+		errors.append("pack: formato invalido '%s' (se esperaba un archivo .pck)" % pack_name)
+
+
+static func _validate_entry(manifest: Dictionary, errors: Array) -> void:
+	if not manifest.has("entry"):
+		return
+	var value: Variant = manifest["entry"]
+	if typeof(value) != TYPE_STRING:
+		errors.append("entry: se esperaba String, se recibio %s" % type_string(typeof(value)))
+		return
+	var entry: String = value
+	if not entry.begins_with("res://"):
+		errors.append(
+			"entry: formato invalido '%s' (se esperaba una ruta res://)" % entry
+		)
+		return
+	if not entry.ends_with(".gd"):
+		errors.append(
+			"entry: formato invalido '%s' (se esperaba un script .gd)" % entry
+		)

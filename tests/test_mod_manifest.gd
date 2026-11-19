@@ -58,6 +58,21 @@ func _init() -> void:
 	_case = "lista vacia"
 	_test_empty_list()
 
+	_case = "pack y entry validos"
+	_test_valid_pack_entry()
+
+	_case = "pack con ruta"
+	_test_pack_with_path()
+
+	_case = "entry sin res"
+	_test_entry_without_res()
+
+	_case = "pack sin extension pck"
+	_test_pack_without_extension()
+
+	_case = "tipos incorrectos de pack y entry"
+	_test_invalid_pack_entry_types()
+
 	if _failures.is_empty():
 		print("TEST_OK")
 		quit(0)
@@ -307,3 +322,85 @@ func _test_invalid_manifest_ignored() -> void:
 
 func _test_empty_list() -> void:
 	_expect(ModManifestScript.find_conflicts([]).is_empty(), "la lista vacia no debe tener conflictos")
+
+
+func _test_valid_pack_entry() -> void:
+	var data := {
+		"schema_version": 1,
+		"id": "a.b",
+		"version": "1.0.0",
+		"engine": "4.7",
+		"pack": "contenido.pck",
+		"entry": "res://mods/a/entry.gd",
+	}
+	var result := ModManifestScript.parse(data)
+	_expect(result["ok"], "errores inesperados: %s" % _errors_text(result))
+	_expect(result["manifest"]["pack"] == "contenido.pck", "pack no se conservo")
+	_expect(result["manifest"]["entry"] == "res://mods/a/entry.gd", "entry no se conservo")
+
+
+func _test_pack_with_path() -> void:
+	var result := ModManifestScript.parse({
+		"schema_version": 1,
+		"id": "a.b",
+		"version": "1.0.0",
+		"engine": "4.7",
+		"pack": "sub/contenido.pck",
+	})
+	_expect_error(result, "pack")
+
+	var backslash := ModManifestScript.parse({
+		"schema_version": 1,
+		"id": "a.b",
+		"version": "1.0.0",
+		"engine": "4.7",
+		"pack": "sub\\contenido.pck",
+	})
+	_expect_error(backslash, "pack")
+
+
+func _test_entry_without_res() -> void:
+	for entry in ["user://mods/entry.gd", "entry.gd", "/entry.gd", "res://mods/entry.txt"]:
+		var result := ModManifestScript.parse({
+			"schema_version": 1,
+			"id": "a.b",
+			"version": "1.0.0",
+			"engine": "4.7",
+			"entry": entry,
+		})
+		_expect(not result["ok"], "'%s' deberia ser invalido" % entry)
+		_expect(
+			_errors_text(result).contains("entry"),
+			"'%s' deberia reportar un error de entry" % entry
+		)
+
+
+func _test_pack_without_extension() -> void:
+	var result := ModManifestScript.parse({
+		"schema_version": 1,
+		"id": "a.b",
+		"version": "1.0.0",
+		"engine": "4.7",
+		"pack": "contenido.zip",
+	})
+	_expect_error(result, "pack")
+
+
+func _test_invalid_pack_entry_types() -> void:
+	var bad_pack := ModManifestScript.parse({
+		"schema_version": 1,
+		"id": "a.b",
+		"version": "1.0.0",
+		"engine": "4.7",
+		"pack": 42,
+	})
+	_expect_error(bad_pack, "pack")
+
+	var bad_entry := ModManifestScript.parse({
+		"schema_version": 1,
+		"id": "a.b",
+		"version": "1.0.0",
+		"engine": "4.7",
+		"entry": ["res://a.gd"],
+	})
+	_expect_error(bad_entry, "entry")
