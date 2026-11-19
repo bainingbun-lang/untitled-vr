@@ -212,5 +212,7 @@ Nota: `grun` muestra un aviso `libfontconfig.so.1` que no afecta al resultado.
 
 ## 19. Qué no se ha guardado
 
-- Credenciales, tokens y claves: no se incluyen en Git ni en documentos. El backup excluye la configuración de OpenCode que pueda contenerlas (ver `UNTITLED` backup manifest).
+- Credenciales, tokens y claves: no se incluyen en Git ni en documentos.
+- `~/.config/opencode/service.json` contiene una contraseña: EXCLUIDO de cualquier copia de seguridad. Si se necesita restaurar la configuración de OpenCode, hay que reintroducir ese valor a mano.
+- `~/.config/opencode/node_modules`, `package-lock.json` y `package.json` son dependencias regenerables: no se copian.
 - Archivos grandes de herramientas (`~/tools/godot-4.7-stable/`, APK y plantillas de exportación): viven fuera del proyecto y no se copian en el backup del proyecto. Se verifican por SHA-512 en `~/tools/godot-4.7-stable/SHA512-SUMS.txt`.
