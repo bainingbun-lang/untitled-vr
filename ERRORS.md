@@ -4,7 +4,7 @@
 |---|---|---|---|
 | Godot no puede escribir en `/tmp` desde Termux | `/tmp` no escribible en Termux | Ejecutar con glibc-runner (`grun`) y proot con bind de `$HOME/tmp` a `/tmp` | RESUELTO (verificado con M1 y export) |
 | PCK del mod con `project.godot` del proyecto base | Error de copia al preparar el mod | Corregido y reexportado; sin errores de fontconfig después | RESUELTO |
-| `replace_files=false` no protege archivos de `res://` del proyecto | Comportamiento real de `load_resource_pack`: solo protege archivos ya cargados desde otro PCK | Cargar primero el PCK base (conserva BASE v1); usar `replace_files=true` solo cuando se quiera sobrescribir | ABIERTO (mitigación conocida, falta diseño del PCK base) |
+| `replace_files=false` no impide sobrescribir archivos de `res://` del proyecto | Comportamiento real de `load_resource_pack`: solo conserva archivos ya cargados desde otro PCK | No es un fallo: el núcleo es modificable. Usar `replace_files=true` cuando se quiera sustituir y asumir que un script ya cargado requiere reinicio o `CACHE_MODE_IGNORE` (M1, M3) | RESUELTA POR DISEÑO |
 | `pm install` denegado | Falta de permiso en el teléfono | Ninguna aplicada | ABIERTO |
 | Aviso de fontconfig | Entorno Termux/proot sin configuración de fuentes | Sin acción registrada | NO VERIFICADO |
 | Autoload `res://mod_manager.gd` en errores de export | `project.godot` mal copiado | Corregido (ver T-EXPORT-TRIAGE); era el único error real del export | RESUELTO |
@@ -17,3 +17,5 @@
 | `TASKS.md` mantenía pendiente el esquema del cargador | `core/mod_registry.gd` ya implementa `scan`, `load_all` y `unload` | Marcada HECHA la tarea 9 (`d808b94`) | RESUELTO |
 | `T-STATE-DOCS` decía que había 10 modelos `-free` | Recuento anterior de `opencode models` | `TOKEN_BUDGET.md` usa el recuento verificado: 11 `-free` + `big-pickle` (12) | RESUELTO |
 | `build_example_mod.sh` emite `Couldn't save project.binary at '/tmp/...'` | `grun` sin bind de `/tmp` escribible; el PCK se genera igual | Ignorable para el PCK; si se necesita `project.binary`, ejecutar con `proot -b $HOME/tmp:/tmp` | ABIERTO (sin efecto en las pruebas) |
+| Sustitución de script del núcleo sin efecto en instancias ya creadas | Caché de `ResourceLoader` e instancias existentes: el script ya resuelto, la instancia y el autoload conservan la versión anterior (M3) | Reiniciar el proceso o usar `ResourceLoader.load(..., CACHE_MODE_IGNORE)` para cargas nuevas; `load()` con caché por defecto sigue devolviendo la versión antigua | RESUELTA POR DISEÑO (limitación documentada, M3) |
+| Las pruebas de spike generaban `.pck` versionables | `spikes/*/out/` no estaba en `.gitignore` | Añadido `spikes/*/out/` a `.gitignore`; los packs se regeneran con `run.sh` | RESUELTA |

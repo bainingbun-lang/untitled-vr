@@ -35,7 +35,9 @@ Regla: el núcleo no conoce ningún sistema de juego concreto (cámara, IA, arma
 
 ## 2. Separación núcleo / módulos
 
-| Núcleo (no reemplazable) | Módulos (reemplazables) |
+El núcleo reúne los servicios mínimos de arranque y coordinación. Está separado de los sistemas de juego, pero es **modificable por los mods**: no hay una barrera que impida sustituirlo.
+
+| Núcleo (modificable por mods) | Módulos (sustituibles) |
 |---|---|
 | Registro de módulos y dependencias | Cámara, movimiento, controles |
 | Bus de eventos y señales | Física de objetos, colisiones |
@@ -46,7 +48,55 @@ Regla: el núcleo no conoce ningún sistema de juego concreto (cámara, IA, arma
 
 **[PROPUESTA]** El juego base UNTITLED es un módulo más (`untitled.base`), con prioridad mínima. Así el modo "videojuego" y el modo "plataforma" usan el mismo mecanismo.
 
-**[PENDIENTE]** Protección del núcleo: el PCK base debe cargarse antes que los mods (TASKS #8). El spike M1 mostró que `replace_files=false` **no** protege `res://` del proyecto; solo protege archivos ya cargados desde otro PCK (ERRORS.md).
+**[VERIFICADO: M3] Límites técnicos reales, no barreras de protección:**
+
+- Un script del núcleo sustituido por un PCK solo se usa si se resuelve por primera vez después de cargar el pack o al reiniciar. Un script ya cargado, una instancia existente y un autoload ya instanciado conservan la versión anterior. `load()` con caché por defecto devuelve la versión antigua; `ResourceLoader.load(..., CACHE_MODE_IGNORE)` devuelve la nueva para cargas nuevas.
+- El cargador de mods (`core/mod_registry.gd`) ya está en uso al arrancar. Sustituirlo de forma efectiva exige reemplazarlo antes del arranque.
+
+Estas limitaciones son de recarga (ver "Niveles de modificación" y `ERRORS.md`), no mecanismos que impidan modificar el núcleo.
+
+### 2.1 Niveles de modificación
+
+Fuente: `core/mod_capabilities.gd` (`ModCapabilities.describe`). Las notas y los estados se reproducen tal como los devuelve el código; no se añaden combinaciones no medidas.
+
+| Nivel (`kind`) | Qué puede hacer el mod | Requisito | PC (`pc`) | Android | VR |
+|---|---|---|---|---|---|
+| `config` | Cambiar configuración | Ninguno | `ALLOWED` | `UNVERIFIED` | `UNVERIFIED` |
+| `resource` | Sustituir recursos | Ninguno | `ALLOWED` (M1: carga de PCK con recursos) | `UNVERIFIED` | `UNVERIFIED` |
+| `script` | Añadir o sustituir scripts | Aceptar que no hay sandbox (`RISK_NO_SANDBOX`) | `ALLOWED` (M1) | `UNVERIFIED` | `UNVERIFIED` |
+| `system` | Sustituir un sistema completo | Sin prueba registrada | `UNVERIFIED` | `UNVERIFIED` | `UNVERIFIED` |
+| `core_script` | Sustituir un script del núcleo | Reinicio o primera resolución tras el pack | `ALLOWED_AFTER_RESTART` + `STABILITY_WARNING` (M3) | `UNVERIFIED` | `UNVERIFIED` |
+| `autoload` | Sustituir un autoload | Reinicio; la instancia existente no cambia | `ALLOWED_AFTER_RESTART` + `STABILITY_WARNING` (M3) | `UNVERIFIED` | `UNVERIFIED` |
+| `loader` | Sustituir el cargador de mods | Reemplazarlo antes del arranque | `ALLOWED_AFTER_RESTART` + `STABILITY_WARNING` | `UNVERIFIED` | `UNVERIFIED` |
+| `native_extension` | Añadir código nativo | Permiso y recompilar por ABI y plataforma | `REQUIRES_RECOMPILE` + `NEEDS_PERMISSION` + `RISK_NATIVE_CODE` (NO PROBADO) | `UNVERIFIED` + `RISK_NATIVE_CODE` | `UNVERIFIED` + `RISK_NATIVE_CODE` |
+
+### 2.2 Transparencia
+
+`ModCapabilities` clasifica cada combinación de nivel y plataforma con uno de estos estados:
+
+| Estado | Significado |
+|---|---|
+| `ALLOWED` | Permitido y medido en esa plataforma. |
+| `ALLOWED_AFTER_RESTART` | Permitido, pero el cambio efectivo requiere reinicio o primera resolución tras cargar el pack. |
+| `NEEDS_PERMISSION` | Requiere un permiso del usuario. En el código actual aparece como flag de `native_extension` en PC. |
+| `REQUIRES_RECOMPILE` | Exige recompilar por ABI y plataforma. |
+| `IMPOSSIBLE_ON_PLATFORM` | Definido en la lista de estados, pero no se asigna a ninguna combinación: no se ha demostrado que algo sea imposible en una plataforma. |
+| `UNVERIFIED` | No hay prueba registrada en esa plataforma. |
+| `UNKNOWN_INPUT` | El `kind` o la `platform` no existen en `all_kinds()` / `all_platforms()`. |
+
+Flags asociados: `RISK_NO_SANDBOX` (código sin aislamiento), `RISK_NATIVE_CODE` (código nativo), `STABILITY_WARNING` (cambio que puede dejar el proceso en un estado distinto hasta reiniciar). `NEEDS_PERMISSION` también se usa como flag en `native_extension`.
+
+La tabla es informativa: no impide cargar un mod. `IMPOSSIBLE_ON_PLATFORM` no se usa porque no hay medición que lo justifique.
+
+### 2.3 Protección de datos
+
+La protección se limita a los datos del usuario, no al código del juego.
+
+- **Copias**: `ModBackup.snapshot(source_dir, label)` copia un directorio a `user://backups` y escribe `manifest.json` con un SHA-256 por archivo. Devuelve `{ok, errors, id, files}`.
+- **Restauración con copia previa**: `ModBackup.restore(id, target_dir)` verifica el snapshot; si el destino existe, crea antes una copia `pre-restore` y devuelve su id en `pre_restore_id`.
+- **Integridad**: `ModBackup.verify(id)` y `check_manifest(dir, manifest)` informan de `mismatched`, `missing` y `extra`. No bloquean la modificación; `restore` sí exige que el snapshot verifique antes de restaurar.
+- **Perfiles independientes**: `ModProfile` guarda en `user://profiles` un conjunto de mods activos (`make`, `save`, `load_profile`, `list`, `diff`). `mark_last_good(name)` y `last_good()` registran un perfil de último estado bueno para recuperación.
+- **Confirmación obligatoria**: `ModBackup.delete(id, confirm)` y `ModProfile.delete(name, confirm)` exigen `confirm = true`; sin él devuelven error y no borran.
 
 ## 3. Sistema de extensiones
 
@@ -57,7 +107,7 @@ Puntos de extensión propuestos:
 | Nuevo tipo de objeto | Registro por `id` con `Resource` base | PROPUESTA |
 | Sustituir comportamiento | Módulo declara `replaces: [id]`; el núcleo elige el de mayor prioridad | PROPUESTA |
 | Añadir estado/evento | Bus de eventos con nombres `namespace.evento` | PROPUESTA |
-| Sustituir escena/script | Override de ruta `res://` tras carga de PCK | VERIFICADO con `replace_files=true`; semántica de conflicto PENDIENTE |
+| Sustituir escena/script | Override de ruta `res://` tras carga de PCK | VERIFICADO con `replace_files=true` (M1); scripts ya cargados requieren reinicio o `CACHE_MODE_IGNORE` (M3) |
 | Lógica en Lua/wasm | Host sandbox que expone API limitada | NO PROBADO en Godot |
 
 **[PROPUESTA]** Módulos declaran qué sustituyen. Dos módulos sobre el mismo `id` sin prioridad explícita producen **error de carga**, no comportamiento indefinido.
@@ -160,7 +210,7 @@ Ninguna etapa empieza sin aprobación.
 | Etapa | Contenido | Depende de |
 |---|---|---|
 | E0 | Verificar editor Android y JDK 17 (TASKS #1–#4) | Acceso al teléfono |
-| E1 | PCK base + carga ordenada (TASKS #8) | E0 |
+| E1 | Carga ordenada de módulos y cargador de arranque reemplazable | E0 |
 | E2 | Núcleo: registro, bus de eventos, manifiesto, dependencias | E1 |
 | E3 | Módulo de referencia `untitled.base` con cámara y controles | E2 |
 | E4 | SDK mínimo: plantilla, validador, empaquetador | E2 |
@@ -234,7 +284,7 @@ Requisito del usuario, incorporado como propuesta (no aprobado todavía como dec
 ## Riesgos técnicos
 
 - Sandbox Lua/wasm dentro de Godot en Android: NO PROBADO. Puede no ser viable.
-- Override de `res://` sin garantía de protección del núcleo sin PCK base.
+- Recarga en caliente de componentes del núcleo: requiere reinicio o `CACHE_MODE_IGNORE` para cargas nuevas (M3). El cargador de arranque debe reemplazarse antes de arrancar.
 - C# en Android: NO VERIFICADO.
 - Renderizador XR sin decidir (R1 bloqueado).
 - Carga de PCK en Android: NO VERIFICADO (solo Linux arm64).

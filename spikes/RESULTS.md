@@ -50,3 +50,27 @@ Fuente: `spikes/m2/`.
 ## R1 — Mobile vs Compatibility (S25 FE y Quest)
 
 PENDIENTE / BLOQUEADO: sin GPU ni display accesible desde Termux; requiere instalar el APK de prueba en el teléfono y, para Quest, un dispositivo no verificado.
+
+## M3 — Sustitución de scripts del núcleo por PCK
+
+Medido en Termux (Linux arm64, Godot 4.7 headless), un proceso Godot nuevo por caso. PCK del mod exportado con `--export-pack "Mod"` y cargado con `ProjectSettings.load_resource_pack(pck, true)` (`replace_files=true`). Base y mod en `spikes/m3/`; medidas en `spikes/m3/out/m3_medidas.txt`.
+
+| Caso | Resultado |
+|---|---|
+| A. Base sin pack (`load("res://core_demo.gd").new()`) | `BASE_V1` |
+| B. Script cargado antes del pack; tras el pack, `load()` con caché por defecto | `BASE_V1` (la instancia previa ya devolvía `BASE_V1`) |
+| C. Primera carga tras el pack (sin carga previa), caché por defecto | `MOD_V1` |
+| D. Tras el pack, `ResourceLoader.load(..., ResourceLoader.CACHE_MODE_IGNORE)` | `MOD_V1` |
+| E. Instancia creada antes del pack, consultada después | `BASE_V1` (no cambia) |
+| F. `class_name CoreDemo` usado antes del pack | antes `BASE_V1` → después `BASE_V1` |
+| F. `class_name CoreDemo` usado solo después del pack | `MOD_V1` |
+| G. Autoload tras el pack | instancia existente `AUTO_BASE` → `AUTO_BASE`; nueva `load()` `AUTO_MOD` |
+| H. Tiempo de carga del pack (`Time.get_ticks_usec()`) | 0.342–0.356 ms (3 ejecuciones) |
+
+Conclusión:
+- Un script ya resuelto o cargado antes del pack queda fijado en la caché de `ResourceLoader`: las nuevas `load()` por defecto, las instancias existentes y `CoreDemo.new()` siguen usando la versión base.
+- El contenido del PCK solo se usa cuando el script se resuelve por primera vez después de cargar el pack, o cuando se fuerza `CACHE_MODE_IGNORE`.
+- Un autoload ya instanciado tampoco se sustituye; el pack solo afecta a una carga nueva de su script.
+- Para recargar en caliente un componente del núcleo sustituido por un mod no basta con cargar el PCK: hace falta reiniciar el proceso o forzar la recarga ignorando la caché.
+
+Reproducir: `bash spikes/m3/run.sh`.

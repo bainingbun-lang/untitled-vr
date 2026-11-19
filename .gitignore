@@ -2,3 +2,5 @@
 .godot/
 /android/
 build/
+# PCK de salida de los spikes (reproducibles con run.sh)
+spikes/*/out/

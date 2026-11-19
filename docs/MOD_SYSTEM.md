@@ -1,6 +1,6 @@
 # Sistema de mods
 
-Guía técnica para crear mods de UNTITLED. Todo lo descrito aquí corresponde al código de `core/` en la rama `feature/mod-system` (HEAD `de457b2`).
+Guía técnica para crear mods de UNTITLED. Todo lo descrito aquí corresponde al código de `core/` en la rama `feature/mod-system` (HEAD `b4cdaa5`; copias, perfiles y transparencia aún sin commit).
 
 Estado de verificación: el sistema se ha ejecutado y probado solo en Linux arm64 headless (Termux, Godot 4.7). En Android, PC y VR no se ha ejecutado: NO VERIFICADO.
 
@@ -164,6 +164,56 @@ Secuencia de carga de cada módulo: se carga el pack con `ProjectSettings.load_r
 
 `unload` no hace cascada: si otro módulo cargado depende del solicitado, devuelve error y no descarga nada. La decisión y el orden quedan en manos del llamador.
 
+## Niveles de modificación
+
+No hay un núcleo cerrado a los mods: cualquier componente puede modificarse o sustituirse. `ModCapabilities.describe(kind, platform)` devuelve `{status, flags, note}` para cada nivel y plataforma; `all_kinds()` y `all_platforms()` listan los valores aceptados.
+
+| `kind` | Qué modifica | Estado en PC | Nota del código |
+|---|---|---|---|
+| `config` | Configuración | `ALLOWED` | — |
+| `resource` | Recursos | `ALLOWED` | verificado M1 |
+| `script` | Scripts | `ALLOWED` + `RISK_NO_SANDBOX` | verificado M1 |
+| `system` | Sistema completo | `UNVERIFIED` | sin prueba registrada |
+| `core_script` | Script del núcleo | `ALLOWED_AFTER_RESTART` + `STABILITY_WARNING` | verificado M3 |
+| `autoload` | Autoload | `ALLOWED_AFTER_RESTART` + `STABILITY_WARNING` | verificado M3 |
+| `loader` | Cargador de mods | `ALLOWED_AFTER_RESTART` + `STABILITY_WARNING` | reemplazar antes del arranque |
+| `native_extension` | Código nativo | `REQUIRES_RECOMPILE` + `NEEDS_PERMISSION` + `RISK_NATIVE_CODE` | NO PROBADO |
+
+En Android y VR todas las combinaciones devuelven `UNVERIFIED` (`native_extension` añade `RISK_NATIVE_CODE`), salvo `UNKNOWN_INPUT` cuando el `kind` o la plataforma no existen.
+
+## Copias de seguridad
+
+`ModBackup` trabaja sobre un directorio raíz configurable (`user://backups` por defecto).
+
+| Método | Efecto |
+|---|---|
+| `snapshot(source_dir, label)` | Copia el directorio y escribe `manifest.json` con SHA-256 por archivo; devuelve `{ok, errors, id, files}` |
+| `verify(id)` | Compara el snapshot con su manifiesto; devuelve `{ok, mismatched, missing, extra, errors}` |
+| `restore(id, target_dir)` | Verifica y restaura; si el destino existe, crea antes una copia `pre-restore` y la devuelve en `pre_restore_id` |
+| `list()` | Ids de snapshots con `manifest.json` |
+| `delete(id, confirm)` | Borra solo con `confirm = true` |
+
+## Perfiles
+
+`ModProfile` guarda perfiles independientes en `user://profiles` (un JSON por perfil). Un perfil es `{name, mods, experimental}` con ids únicos y ordenados.
+
+| Método | Efecto |
+|---|---|
+| `validate_name(name)` | `[a-z0-9-]{1,40}` |
+| `make(name, mods, experimental = false)` | Normaliza y valida sin escribir |
+| `diff(loaded, profile)` | Devuelve `{to_load, to_unload}` |
+| `save(profile)` / `load_profile(name)` | Escribe o lee un perfil |
+| `list()` / `delete(name, confirm)` | Lista o borra (borrado solo con `confirm = true`) |
+| `mark_last_good(name)` / `last_good()` | Perfil de último estado bueno para recuperación |
+
+## Integridad
+
+`ModBackup.make_manifest(dir)` y `ModBackup.check_manifest(dir, manifest)` calculan y comparan SHA-256 por archivo. `verify` devuelve las listas `mismatched`, `missing` y `extra`. La verificación es informativa y no impide modificar archivos; `restore` sí se niega a restaurar un snapshot que no verifica.
+
+## Transparencia
+
+`ModCapabilities` usa los estados `ALLOWED`, `ALLOWED_AFTER_RESTART`, `NEEDS_PERMISSION`, `REQUIRES_RECOMPILE`, `IMPOSSIBLE_ON_PLATFORM`, `UNVERIFIED` y `UNKNOWN_INPUT`. `IMPOSSIBLE_ON_PLATFORM` está definido pero no se asigna a ninguna combinación porque no se ha demostrado. Flags: `RISK_NO_SANDBOX`, `RISK_NATIVE_CODE`, `STABILITY_WARNING` y `NEEDS_PERMISSION` (también usado como flag). La tabla no bloquea la carga; solo informa del estado medido o no medido.
+
 ## Construir el ejemplo
 
 ```bash
@@ -183,7 +233,10 @@ El script construye el mod de ejemplo y ejecuta cada `tests/test_*.gd` en headle
 ```
 PASS test_event_bus.gd
 PASS test_example_mod.gd
+PASS test_mod_backup.gd
+PASS test_mod_capabilities.gd
 PASS test_mod_manifest.gd
+PASS test_mod_profile.gd
 PASS test_mod_registry.gd
 PASS test_mod_resolver.gd
 ```
@@ -218,6 +271,8 @@ Código de salida `0`. La prueba del ejemplo carga el mod por `load_resource_pac
 ## Limitaciones y compatibilidad
 
 - Verificado solo en Linux arm64 headless. Android, PC y VR: NO VERIFICADO.
+- Un script del núcleo ya cargado, una instancia existente o un autoload ya instanciado no cambian al cargar el PCK. La sustitución solo se aplica si el script se resuelve por primera vez después del pack o al reiniciar; `load()` con caché por defecto devuelve la versión antigua y `ResourceLoader.load(..., CACHE_MODE_IGNORE)` la nueva para cargas nuevas (M3).
+- El cargador de mods ya está en uso al arrancar; sustituirlo exige reemplazarlo antes del arranque (M3).
 - Godot no puede descargar un PCK ya cargado. `unload` desactiva el módulo (shutdown y suscripciones), pero sus recursos siguen en memoria hasta reiniciar el proceso.
 - Los conflictos de `replaces` son error de carga, no una sustitución parcial.
 - `unload` no descarga dependientes de forma automática.

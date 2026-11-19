@@ -13,7 +13,7 @@
 | Límites de uso de los modelos `-free` | DESCONOCIDO |
 | Modelo usado en T-EXPORT-TRIAGE | `deepseek-v4.1-flash-free` |
 
-## Delegación a OpenCode (T1–T6)
+## Delegación a OpenCode (T1–T8)
 
 | Tarea | Contenido | Modelo | Resultado | Verificación |
 |---|---|---|---|---|
@@ -23,8 +23,10 @@
 | T4 | Registro, API por módulo, carga y descarga | `opencode/deepseek-v4.1-flash-free` | ACEPTADA (`d808b94`) | `test_mod_registry.gd` PASS |
 | T5 | Mod de ejemplo PCK y prueba de carga/descarga | `opencode/deepseek-v4.1-flash-free` | ACEPTADA (`de457b2`) | `test_example_mod.gd` PASS |
 | T6 | Documentos de estado y guía `docs/MOD_SYSTEM.md` | `opencode/deepseek-v4.1-flash-free` | EJECUTADA, pendiente de revisión | `bash tests/run_all.sh` PASS |
+| T7 | Spike M3: sustitución de scripts del núcleo por PCK | `opencode/deepseek-v4.1-flash-free` | ACEPTADA, revisada y probada | `spikes/RESULTS.md`, `bash spikes/m3/run.sh` |
+| T8 | Copias, perfiles, transparencia y sus pruebas | `opencode/deepseek-v4.1-flash-free` | ACEPTADA, revisada y probada | `test_mod_backup.gd`, `test_mod_profile.gd`, `test_mod_capabilities.gd` PASS |
 
-Coste de T1–T6: DESCONOCIDO. El catálogo declara 0 en input/output para el modelo, no verificado contra facturación. No se usó `opencode/big-pickle`.
+Coste de T1–T8: DESCONOCIDO. El catálogo declara 0 en input/output para el modelo, no verificado contra facturación. No se usó `opencode/big-pickle`.
 
 ## Estrategia
 

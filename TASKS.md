@@ -11,7 +11,7 @@ Orden de ejecución. Estado: `PENDIENTE` / `BLOQUEADA` / `HECHA`.
 | 5 | Ejecutar R1: Mobile vs Compatibility en S25 FE | BLOQUEADA | APK de prueba instalado en el teléfono |
 | 6 | Ejecutar R1 en Quest | BLOQUEADA | dispositivo Quest no verificado |
 | 7 | Resolver el conflicto documental Mobile/Compatibility para XR | PENDIENTE | tarea 5 (R1) |
-| 8 | Diseñar y probar la protección del núcleo mediante PCK base | PENDIENTE | spike M1 (hecho) |
+| 8 | PCK base como barrera del núcleo (propuesta) | CANCELADA | Decisión del usuario 2026-11-19: no existe barrera; el núcleo es modificable (ver `DECISIONS.md`) |
 | 9 | Diseñar el esquema del cargador ModManager (implementado como `ModRegistry`) | HECHA | `core/mod_registry.gd` (d808b94) |
 | 10 | Definir e implementar sandbox de mods en Godot (Lua/WASM/GDExtension) | PENDIENTE | tarea 9; M2 solo probó las VMs fuera de Godot |
 | 11 | Crear esqueleto del juego (escena principal, controlador FPS) | PENDIENTE | editor operativo (tarea 3) |
@@ -25,3 +25,9 @@ Orden de ejecución. Estado: `PENDIENTE` / `BLOQUEADA` / `HECHA`.
 | 19 | Crear mod de ejemplo PCK y probar handler y desactivación al descargar | HECHA | `mods/example.hello/`, `tools/build_example_mod.sh` (de457b2) |
 | 20 | Automatizar las pruebas del núcleo y del ejemplo | HECHA | `tests/run_all.sh` (de457b2) |
 | 21 | Actualizar documentos de estado y crear la guía de mods | HECHA | `docs/MOD_SYSTEM.md` (T6) |
+| 22 | Copias, perfiles e integridad (`ModBackup`, `ModProfile`) | HECHA (pendiente de commit) | `core/mod_backup.gd`, `core/mod_profile.gd` (T8) |
+| 23 | Transparencia, niveles y protección de datos en la documentación | HECHA | esta tarea (T9) |
+| 24 | Recarga en caliente de componentes del núcleo | PENDIENTE | decidir el mecanismo de reinicio o recarga (M3) |
+| 25 | Cargador de arranque reemplazable | PENDIENTE | decisión del usuario |
+| 26 | Sandbox Lua/WASM dentro de Godot | PENDIENTE | tarea 10 |
+| 27 | Probar el sistema de mods en Android | BLOQUEADA | dispositivo y permisos (tareas 1–3) |
