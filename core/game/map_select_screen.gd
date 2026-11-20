@@ -2,13 +2,22 @@ class_name MapSelectScreen
 extends Control
 
 const GeneratorScript = preload("res://core/maps/map_generator.gd")
+const ThemesScript = preload("res://core/maps/map_themes.gd")
 const LoaderScript = preload("res://core/maps/map_loader.gd")
 const RegistryScript = preload("res://core/maps/map_registry.gd")
 const SessionScript = preload("res://core/game/game_session.gd")
 
 const MAPS_DIR: String = "res://maps"
 const DEFAULT_SEEDS: Array = [1001, 2002, 3003]
-const DEFAULT_DENSITIES: Array = [0.12, 0.18, 0.26]
+const DEFAULT_DENSITIES: Array = [0.55, 0.55, 0.55]
+const DEFAULT_THEMES: Array = ["urbano", "industrial", "rural"]
+const THEME_OPTIONS: Array = [
+	{"value": "", "label": "Arena de pruebas"},
+	{"value": "urbano", "label": "Ciudad"},
+	{"value": "industrial", "label": "Zona industrial"},
+	{"value": "rural", "label": "Pueblo rural"},
+]
+const TIME_OPTIONS: Array = ["dia", "atardecer", "noche"]
 const SIZE_PRESETS: Array = [
 	{"label": "Pequeño", "width": 12, "height": 10},
 	{"label": "Mediano", "width": 24, "height": 18},
@@ -27,6 +36,8 @@ var last_seed: int = 0
 var _map_buttons: Array = []
 var _random_check: CheckButton = null
 var _seed_spin: SpinBox = null
+var _theme_option: OptionButton = null
+var _time_option: OptionButton = null
 var _size_option: OptionButton = null
 var _density_slider: HSlider = null
 var _status_label: Label = null
@@ -46,11 +57,14 @@ func _ready() -> void:
 func default_maps() -> Array:
 	var result: Array = []
 	for index in DEFAULT_SEEDS.size():
-		var preset: Dictionary = SIZE_PRESETS[mini(index, SIZE_PRESETS.size() - 1)]
-		var meta: Dictionary = GeneratorScript.generate(int(DEFAULT_SEEDS[index]), {
+		var preset: Dictionary = SIZE_PRESETS[mini(1, SIZE_PRESETS.size() - 1)]
+		var meta: Dictionary = ThemesScript.generate(int(DEFAULT_SEEDS[index]), {
+			"theme": str(DEFAULT_THEMES[index]),
+			"time_of_day": "atardecer",
+			"theme_density": float(DEFAULT_DENSITIES[index]),
 			"width": int(preset["width"]),
 			"height": int(preset["height"]),
-			"obstacle_density": float(DEFAULT_DENSITIES[index]),
+			"obstacle_density": 0.12,
 			"spawn_count": 4,
 		})
 		if bool(meta.get("ok", false)):
@@ -62,19 +76,35 @@ func generate_meta(seed_value: int) -> Dictionary:
 	var index: int = clampi(_size_option.selected if _size_option != null else 1, 0, SIZE_PRESETS.size() - 1)
 	var preset: Dictionary = SIZE_PRESETS[index]
 	var density: float = _density_slider.value if _density_slider != null else GeneratorScript.DEFAULT_DENSITY
-	var meta: Dictionary = GeneratorScript.generate(seed_value, {
+	var theme: String = ""
+	if _theme_option != null and _theme_option.selected >= 0 and _theme_option.selected < THEME_OPTIONS.size():
+		theme = str((THEME_OPTIONS[_theme_option.selected] as Dictionary)["value"])
+	var time_of_day: String = "atardecer"
+	if _time_option != null and _time_option.selected >= 0 and _time_option.selected < TIME_OPTIONS.size():
+		time_of_day = str(TIME_OPTIONS[_time_option.selected])
+	var params: Dictionary = {
 		"width": int(preset["width"]),
 		"height": int(preset["height"]),
 		"obstacle_density": density,
 		"spawn_count": 4,
-	})
+	}
+	var meta: Dictionary
+	if theme.is_empty():
+		meta = GeneratorScript.generate(seed_value, params)
+	else:
+		params["theme"] = theme
+		params["theme_density"] = 0.55
+		params["time_of_day"] = time_of_day
+		meta = ThemesScript.generate(seed_value, params)
 	if not bool(meta.get("ok", false)):
 		_set_status("No se pudo generar: " + str(meta.get("errors", [])))
 		return {}
 	last_seed = seed_value
 	generated_meta = meta
 	selected_meta = meta.duplicate(true)
-	_set_status("Generado: %s (semilla %d)" % [str(meta.get("id", "")), seed_value])
+	_set_status("Generado: %s [%s/%s] (semilla %d)" % [
+		str(meta.get("id", "")), str(meta.get("theme", "arena")), time_of_day, seed_value
+	])
 	return meta
 
 
@@ -177,6 +207,24 @@ func _build_ui() -> void:
 	_seed_spin.add_theme_font_size_override("font_size", FONT_SIZE)
 	generator.add_child(_seed_spin)
 
+	_theme_option = OptionButton.new()
+	_theme_option.name = "ThemeOption"
+	for option in THEME_OPTIONS:
+		_theme_option.add_item(str((option as Dictionary)["label"]))
+	_theme_option.selected = 1
+	_theme_option.custom_minimum_size = Vector2(0, 120.0)
+	_theme_option.add_theme_font_size_override("font_size", FONT_SIZE)
+	generator.add_child(_theme_option)
+
+	_time_option = OptionButton.new()
+	_time_option.name = "TimeOption"
+	for value in TIME_OPTIONS:
+		_time_option.add_item(str(value))
+	_time_option.selected = 1
+	_time_option.custom_minimum_size = Vector2(0, 120.0)
+	_time_option.add_theme_font_size_override("font_size", FONT_SIZE)
+	generator.add_child(_time_option)
+
 	_size_option = OptionButton.new()
 	_size_option.name = "SizeOption"
 	for preset in SIZE_PRESETS:
@@ -241,11 +289,12 @@ func _refresh_map_list() -> void:
 
 func _map_label(meta: Dictionary) -> String:
 	var id := str(meta.get("id", "mapa"))
+	var theme := str(meta.get("theme", "arena"))
 	var width := int(meta.get("width", 0))
 	var height := int(meta.get("height", 0))
 	if width > 0 and height > 0:
-		return "%s  (%dx%d)" % [id, width, height]
-	return id
+		return "%s [%s] (%dx%d)" % [id, theme, width, height]
+	return "%s [%s]" % [id, theme]
 
 
 func _mark_selected(index: int) -> void:

@@ -2,9 +2,10 @@ class_name MapWorldBuilder
 extends RefCounted
 
 const WorldMaterialsScript = preload("res://core/maps/world_materials.gd")
+const BuildingScript = preload("res://core/maps/building_generator.gd")
 
 const MAX_NODES: int = 180
-const MAX_OBSTACLES: int = 32
+const MAX_OBSTACLES: int = 8
 const MAX_PROPS: int = 6
 const MAX_SPAWN_MARKERS: int = 16
 const GAMEPLAY_NODES: int = 60
@@ -14,6 +15,12 @@ const WALL_THICKNESS: float = 0.5
 const OBSTACLE_SIZE: float = 0.8
 const OBSTACLE_HEIGHT: float = 1.2
 const PROP_INSET: float = 1.5
+const MODEL_ROAD_TILE: String = "res://assets/models/maps/city-roads/tile-low.glb"
+const MODEL_GROUND_GRASS: String = "res://assets/models/maps/nature/ground_grass.glb"
+const MODEL_BARREL: String = "res://assets/models/props/barrel_01/model.gltf"
+const MODEL_CRATE: String = "res://assets/models/props/wooden_crate_02/model.gltf"
+const MODEL_ROCK: String = "res://assets/models/maps/nature/rock_largeA.glb"
+const MODEL_TANK: String = "res://assets/models/maps/city-industrial/detail-tank.glb"
 const GEOMETRY_CONVENTION: String = (
 	"1 celda = 1 unidad * scale; grid[y][x] -> (x+0.5, 0, y+0.5); "
 	+ "suelo caminable en y=0 (caja de 0.5 de grosor centrada en y=-0.25); "
@@ -66,10 +73,13 @@ static func build(meta: Dictionary, parent: Node3D) -> Dictionary:
 	]
 	var obstacle_surfaces := ["concrete", "wood", "metal"]
 
+	var theme_name := str(meta.get("theme", ""))
+	var time_of_day := str(meta.get("time_of_day", "atardecer"))
 	_build_floor(root, bounds, ground_material)
+	_build_real_ground(root, bounds, theme_name)
 	_build_walls(root, bounds, wall_material, "brick")
-	_build_obstacles(root, obstacle_points, obstacle_materials, obstacle_surfaces)
-	_build_environment(root)
+	_build_obstacles(root, obstacle_points, obstacle_materials, obstacle_surfaces, theme_name)
+	_build_environment(root, time_of_day, theme_name)
 	_build_spawn_markers(root, spawn_points, marker_count)
 	var props: Array = populate_physics_props(
 		root, meta, bounds, spawn_points, prop_limit
@@ -83,6 +93,8 @@ static func build(meta: Dictionary, parent: Node3D) -> Dictionary:
 		"props": props,
 		"obstacle_count": obstacle_points.size(),
 		"node_count": count_nodes(root),
+		"time_of_day": time_of_day,
+		"theme": theme_name,
 	}
 	if meta.has("theme") and ResourceLoader.exists("res://core/maps/map_themes.gd"):
 		var theme_script: Script = load("res://core/maps/map_themes.gd") as Script
@@ -295,6 +307,7 @@ static func _build_floor(root: Node3D, bounds: AABB, material: StandardMaterial3
 	box.size = shape.size
 	mesh_instance.mesh = box
 	mesh_instance.material_override = material
+	mesh_instance.visible = false
 	body.add_child(mesh_instance)
 	body.position = Vector3(
 		bounds.position.x + bounds.size.x * 0.5,
@@ -302,6 +315,28 @@ static func _build_floor(root: Node3D, bounds: AABB, material: StandardMaterial3
 		bounds.position.z + bounds.size.z * 0.5
 	)
 	root.add_child(body)
+
+
+static func _build_real_ground(root: Node3D, bounds: AABB, theme: String) -> void:
+	var path := MODEL_GROUND_GRASS
+	if theme == "urbano" or theme == "industrial":
+		path = MODEL_ROAD_TILE
+	if not ResourceLoader.exists(path):
+		return
+	var transforms: Array = []
+	var columns: int = maxi(1, int(ceil(bounds.size.x)))
+	var rows: int = maxi(1, int(ceil(bounds.size.z)))
+	for y in range(rows):
+		for x in range(columns):
+			var position := Vector3(
+				bounds.position.x + float(x) + 0.5,
+				0.01,
+				bounds.position.z + float(y) + 0.5
+			)
+			transforms.append(BuildingScript.model_transform(path, position, 0.0, Vector3.ZERO))
+	BuildingScript.model_batch(
+		root, "GroundTiles", path, transforms, Vector3(1.02, 0.04, 1.02), 90.0
+	)
 
 
 static func _build_walls(
@@ -353,6 +388,7 @@ static func _static_box(
 	box.size = size
 	mesh_instance.mesh = box
 	mesh_instance.material_override = material
+	mesh_instance.visible = false
 	body.add_child(mesh_instance)
 	body.position = center
 	root.add_child(body)
@@ -360,8 +396,20 @@ static func _static_box(
 
 
 static func _build_obstacles(
-	root: Node3D, points: Array, materials: Array, surfaces: Array
+	root: Node3D, points: Array, materials: Array, surfaces: Array, theme: String
 ) -> void:
+	var path := MODEL_CRATE
+	var fit := Vector3(0.9, 0.9, 0.9)
+	if theme == "urbano":
+		path = MODEL_BARREL
+		fit = Vector3(0.9, 1.2, 0.9)
+	elif theme == "industrial":
+		path = MODEL_TANK
+		fit = Vector3(1.4, 1.2, 1.4)
+	elif theme == "rural":
+		path = MODEL_ROCK
+		fit = Vector3(1.3, 0.9, 1.3)
+	var transforms: Array = []
 	for i in range(points.size()):
 		var point: Vector3 = points[i]
 		var index := i % maxi(1, materials.size())
@@ -372,9 +420,15 @@ static func _build_obstacles(
 			materials[index] as StandardMaterial3D,
 			str(surfaces[index])
 		)
+		transforms.append(
+			BuildingScript.model_transform(path, point, float(i) * 0.7, fit)
+		)
+	BuildingScript.model_batch(root, "ObstacleModels", path, transforms, fit, 80.0)
 
 
-static func _build_environment(root: Node3D) -> void:
+static func _build_environment(root: Node3D, time_of_day: String, theme: String) -> void:
+	root.set_meta("time_of_day", time_of_day)
+	root.set_meta("theme", theme)
 	var mobile := WorldMaterialsScript.is_mobile()
 	var environment := WorldMaterialsScript.make_environment(mobile)
 	environment.background_mode = Environment.BG_SKY
@@ -400,10 +454,28 @@ static func _build_environment(root: Node3D) -> void:
 			fallback.sky_horizon_color = Color(0.70, 0.78, 0.86)
 			fallback.ground_bottom_color = Color(0.26, 0.25, 0.23)
 			sky.sky_material = fallback
+	var sun_color := Color(1.0, 0.72, 0.48)
+	var sun_energy := 1.25 if not mobile else 1.1
+	var sun_rotation := Vector3(-24.0, -38.0, 0.0)
+	var fog_color := Color(0.74, 0.78, 0.82)
+	var fog_density := 0.0025
+	if time_of_day == "dia":
+		sun_color = Color(1.0, 0.90, 0.78)
+		sun_energy = 1.45 if not mobile else 1.25
+		sun_rotation = Vector3(-42.0, -38.0, 0.0)
+		fog_color = Color(0.78, 0.84, 0.88)
+		fog_density = 0.0012
+	elif time_of_day == "noche":
+		sun_color = Color(0.80, 0.70, 0.58)
+		sun_energy = 0.48 if not mobile else 0.40
+		sun_rotation = Vector3(-14.0, -38.0, 0.0)
+		fog_color = Color(0.15, 0.19, 0.30)
+		fog_density = 0.006 if mobile else 0.008
 	environment.fog_enabled = true
-	environment.fog_light_color = Color(0.74, 0.78, 0.82)
-	environment.fog_density = 0.0015 if mobile else 0.0025
-	environment.fog_sun_scatter = 0.03
+	environment.fog_light_color = fog_color
+	environment.fog_density = fog_density if not mobile else fog_density * 0.7
+	environment.fog_sun_scatter = 0.03 if time_of_day != "noche" else 0.01
+	environment.ambient_light_energy = 0.35 if time_of_day == "noche" else 1.0
 	var world_environment := WorldEnvironment.new()
 	world_environment.name = "WorldEnvironment"
 	world_environment.environment = environment
@@ -411,9 +483,9 @@ static func _build_environment(root: Node3D) -> void:
 
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
-	sun.light_color = Color(1.0, 0.72, 0.48)
-	sun.light_energy = 1.25 if not mobile else 1.1
-	sun.rotation_degrees = Vector3(-24.0, -38.0, 0.0)
+	sun.light_color = sun_color
+	sun.light_energy = sun_energy
+	sun.rotation_degrees = sun_rotation
 	sun.shadow_enabled = true
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	sun.directional_shadow_max_distance = 45.0

@@ -1,0 +1,136 @@
+{
+  "version": 2,
+  "description": "W3: descarga de armas reales con piezas separadas. scale = metros reales / dimension maxima del GLB importado; grip_offset = desplazamiento local de agarre; parts = nodo real del modelo por rol (vacio = el modelo no expone esa pieza y se usa corte AABB).",
+  "weapons": {
+    "pistol": {
+      "file": "res://assets/models/weapons/v2/pistol.glb",
+      "source_model": "Glock (J-Toastie)",
+      "source_url": "https://poly.pizza/m/q3lsX3tSta",
+      "license": "CC BY 3.0",
+      "author": "J-Toastie",
+      "scale": 0.123579,
+      "length": 0.2,
+      "align_y": 90,
+      "grip_offset": [0.0, 0.0, 0.0],
+      "triangles": 5105,
+      "nodes": ["Body", "Slide", "Mag", "Chamber", "Trigger", "Bullet", "Barrel"],
+      "parts": {
+        "slide": "Slide",
+        "magazine": "Mag",
+        "trigger": "Trigger",
+        "hammer": "",
+        "bolt": "Chamber"
+      }
+    },
+    "submachine_gun": {
+      "file": "res://assets/models/weapons/v2/submachine_gun.glb",
+      "source_model": "MPX (austincford)",
+      "source_url": "https://poly.pizza/m/p7sAqeuUWR",
+      "license": "CC BY 3.0",
+      "author": "austincford",
+      "scale": 2.019699,
+      "length": 0.56,
+      "align_y": 0,
+      "grip_offset": [0.0, 0.0, 0.0],
+      "triangles": 6869,
+      "nodes": ["Barrel", "Flashhider", "Bolt", "Bolt_Firing", "Charging_Handle", "Magazine_Standard", "Trigger", "Receiver_Upper", "Stock_Mount", "MPX_Handguard"],
+      "parts": {
+        "bolt": "Bolt",
+        "magazine": "Magazine_Standard",
+        "charging_handle": "Charging_Handle",
+        "trigger": "Trigger"
+      }
+    },
+    "assault_rifle": {
+      "file": "res://assets/models/weapons/v2/assault_rifle.glb",
+      "source_model": "AKM (J-Toastie)",
+      "source_url": "https://poly.pizza/m/ZBBoDqAn0A",
+      "license": "CC BY 3.0",
+      "author": "J-Toastie",
+      "scale": 0.021391,
+      "length": 0.9,
+      "align_y": 90,
+      "grip_offset": [0.0, 0.0, 0.0],
+      "triangles": 5247,
+      "nodes": ["AKM_model", "Skeleton3D:Root", "Skeleton3D:Magazine", "Skeleton3D:Trigger", "Skeleton3D:Bolt"],
+      "parts": {}
+    },
+    "shotgun": {
+      "file": "res://assets/models/weapons/v2/shotgun.glb",
+      "source_model": "Shotgun Pump West (Pichuliru)",
+      "source_url": "https://poly.pizza/m/NfQETBKOiw",
+      "license": "CC0 1.0",
+      "author": "Pichuliru",
+      "scale": 1.676113,
+      "length": 1.0,
+      "align_y": 0,
+      "grip_offset": [0.0, 0.0, 0.0],
+      "triangles": 1069,
+      "nodes": ["Shotgun_Pump_West", "Skeleton3D:Body", "Skeleton3D:Pump", "Skeleton3D:Shell", "Skeleton3D:Lifter", "Skeleton3D:Trigger"],
+      "parts": {}
+    },
+    "sniper_rifle": {
+      "file": "res://assets/models/weapons/v2/sniper_rifle.glb",
+      "source_model": "Sniper Rifle (J-Toastie)",
+      "source_url": "https://poly.pizza/m/vGAzj2Of5M",
+      "license": "CC BY 3.0",
+      "author": "J-Toastie",
+      "scale": 0.079433,
+      "length": 0.95,
+      "align_y": 90,
+      "grip_offset": [0.0, 0.0, 0.0],
+      "triangles": 4963,
+      "nodes": ["Body_Cube", "PullBack_Cylinder_003", "Bullet_Cylinder_004", "Barrel_Cube_004", "Scope_Cube_005", "Trigger_Cube_003", "Mag_Cube_007", "Bullets(Mag)_Cylinder_005"],
+      "parts": {
+        "bolt": "PullBack_Cylinder_003",
+        "magazine": "Mag_Cube_007",
+        "charging_handle": "",
+        "trigger": "Trigger_Cube_003"
+      }
+    },
+    "bat": {
+      "file": "res://assets/models/weapons/v2/bat.glb",
+      "source_model": "Baseball Bat with nails (CreativeTrio)",
+      "source_url": "https://poly.pizza/m/K24oYy6R7c",
+      "license": "CC0 1.0",
+      "author": "CreativeTrio",
+      "scale": 0.466402,
+      "length": 0.85,
+      "align_y": 180,
+      "grip_offset": [0.0, 0.0, 0.0],
+      "triangles": 1076,
+      "nodes": ["BaseballBat_nails"],
+      "parts": {
+        "body": "BaseballBat_nails"
+      }
+    }
+  },
+  "fps_arms": {
+    "file": "res://assets/models/weapons/v2/fps_arms.glb",
+    "source_model": "WRAD Arms (rigged FPS arms)",
+    "source_url": "https://github.com/wwwriks/wrad-arms",
+    "license": "CC0 1.0",
+    "author": "wwwriks",
+    "bones": 50,
+    "triangles": 1196
+  },
+  "fps_arms_animated": {
+    "file": "res://assets/models/weapons/v2/fps_arms_akm.glb",
+    "source_model": "Fps Rig AKM (Idle / Reload / Shoot)",
+    "source_url": "https://poly.pizza/m/U6l6wjxFhC",
+    "license": "CC BY 3.0",
+    "author": "J-Toastie",
+    "bones": 28,
+    "animations": ["Armature|Idle", "Armature|Reload", "Armature|Shoot"],
+    "triangles": 7679
+  },
+  "vr_hands": {
+    "left": "res://assets/models/hands/Hand_low_L.gltf",
+    "right": "res://assets/models/hands/Hand_low_R.gltf",
+    "source_model": "Godot XR Tools low-poly hand models",
+    "source_url": "https://github.com/GodotVR/godot-xr-tools/tree/master/addons/godot-xr-tools/hands",
+    "author": "DigitalN8m4r3 (Miodrag Sejic)",
+    "license": "CC0 1.0",
+    "bones": 26
+  }
+}

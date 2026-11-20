@@ -17,8 +17,19 @@ const PERCEPTION_PATH: String = "res://core/npc/npc_perception.gd"
 const NAVIGATION_PATH: String = "res://core/npc/npc_navigation.gd"
 const RELATIONS_PATH: String = "res://core/npc/npc_relations.gd"
 const FACTIONS_PATH: String = "res://core/npc/npc_factions.gd"
+const LOD_PATH: String = "res://core/npc/npc_lod.gd"
+const WEAPON_VIEWMODEL_PATH: String = "res://core/game/weapon_viewmodel.gd"
+const MUZZLE_FX_PATH: String = "res://core/game/muzzle_fx.gd"
+const RECORDED_SFX_PATH: String = "res://core/game/recorded_sfx.gd"
+const SFX_BANK_PATH: String = "res://core/game/sfx_bank.gd"
+const AUDIO_SYNTH_PATH: String = "res://core/game/audio_synth.gd"
 
-const PLATFORM_LIMITS: Dictionary = {"android": 8, "pc": 32, "vr": 16}
+const MAX_TRACERS: int = 12
+const TRACER_LIFE: float = 0.09
+const MELEE_RANGE: float = 1.8
+const MELEE_DAMAGE: float = 32.0
+
+const PLATFORM_LIMITS: Dictionary = {"android": 8, "pc": 16, "vr": 10}
 const DEFAULT_LIMIT: int = 8
 const PLATFORM_ALIASES: Dictionary = {
 	"android": "android", "mobile": "android", "movil": "android", "celular": "android",
@@ -28,6 +39,9 @@ const PLATFORM_ALIASES: Dictionary = {
 
 static var _active: Array = []
 static var limits_override: Dictionary = {}
+static var _tracers: Array = []
+static var _tracer_material: StandardMaterial3D = null
+static var _tracer_mesh: BoxMesh = null
 
 @export var npc_id: String = "npc"
 @export var faction_id: String = ""
@@ -74,6 +88,30 @@ var _head_material: StandardMaterial3D = null
 var _goal: Vector3 = Vector3.ZERO
 var _moving: bool = false
 var _last_action: String = ""
+var lod = null
+var observer: Node = null
+var fx_parent: Node = null
+var world_bounds: AABB = AABB()
+var has_world_bounds: bool = false
+var nav_cell_size: float = 1.0
+var tick_rate: float = 12.0
+var _tick_accumulator: float = 0.0
+var _sim_time: float = 0.0
+var _path: Array = []
+var _path_index: int = 0
+var _last_position: Vector3 = Vector3.ZERO
+var _stuck_time: float = 0.0
+var _repath_cooldown: float = 0.0
+var _neighbors: Array = []
+var _threat_memory: float = 0.0
+var _threat_position: Vector3 = Vector3.ZERO
+var _melee_cooldown: float = 0.0
+var _weapon_model: Node3D = null
+var _weapon_model_id: String = ""
+var _fx_script: Script = null
+var _recorded_sfx_script: Script = null
+var _sfx_bank_script: Script = null
+var _rng := RandomNumberGenerator.new()
 
 
 static func detect_platform() -> String:
@@ -213,6 +251,21 @@ func apply_options(p_options: Dictionary) -> void:
 	drop_weapon_on_death = bool(p_options.get("drop_weapon_on_death", drop_weapon_on_death))
 	if p_options.has("platform"):
 		platform = str(p_options["platform"])
+	tick_rate = clampf(float(p_options.get("tick_rate", tick_rate)), 10.0, 15.0)
+	var observer_value: Variant = p_options.get("observer", null)
+	if observer_value is Node:
+		observer = observer_value as Node
+	var fx_value: Variant = p_options.get("fx_parent", null)
+	if fx_value is Node:
+		fx_parent = fx_value as Node
+	var bounds_value: Variant = p_options.get("bounds", null)
+	if bounds_value is AABB:
+		world_bounds = bounds_value as AABB
+		has_world_bounds = world_bounds.size.x > 0.0 and world_bounds.size.z > 0.0
+	nav_cell_size = maxf(0.25, float(p_options.get("nav_cell_size", nav_cell_size)))
+	var lod_value: Variant = p_options.get("lod", null)
+	if lod_value != null:
+		lod = lod_value
 	if _built:
 		_apply_pending_options()
 
@@ -322,9 +375,25 @@ func _build() -> void:
 	if ResourceLoader.exists(PERCEPTION_PATH):
 		perception = _new_script_instance(PERCEPTION_PATH)
 		if perception != null and perception.has_method("configure"):
-			perception.call("configure", {"vision_range": vision_range, "vision_half_angle_deg": 95.0})
+			perception.call("configure", {
+				"vision_range": vision_range,
+				"vision_half_angle_deg": 95.0,
+				"line_of_sight": Callable(self, "_has_line_of_sight"),
+			})
+	if navigation == null and ResourceLoader.exists(NAVIGATION_PATH):
+		navigation = _new_script_instance(NAVIGATION_PATH)
+	if lod == null and ResourceLoader.exists(LOD_PATH):
+		lod = _new_script_instance(LOD_PATH)
+	if ResourceLoader.exists(MUZZLE_FX_PATH):
+		_fx_script = load(MUZZLE_FX_PATH) as Script
+	if ResourceLoader.exists(RECORDED_SFX_PATH):
+		_recorded_sfx_script = load(RECORDED_SFX_PATH) as Script
+	if ResourceLoader.exists(SFX_BANK_PATH):
+		_sfx_bank_script = load(SFX_BANK_PATH) as Script
+	_rng.seed = absi(seed_value) ^ 0xA5A5
 
 	_apply_weapon_definition()
+	_attach_weapon_model()
 
 
 func _new_script_instance(path: String):
@@ -334,6 +403,91 @@ func _new_script_instance(path: String):
 	if script == null:
 		return null
 	return script.new()
+
+
+func _has_line_of_sight(from_value: Variant, to_value: Variant) -> bool:
+	var world := get_world_3d()
+	if world == null:
+		return true
+	var space: PhysicsDirectSpaceState3D = world.direct_space_state
+	if space == null:
+		return true
+	var from: Vector3 = _as_position(from_value)
+	var to: Vector3 = _as_position(to_value)
+	var delta: Vector3 = to - from
+	if delta.length_squared() < 0.0001:
+		return true
+	var exclude: Array[RID] = []
+	if self is CollisionObject3D:
+		exclude.append((self as CollisionObject3D).get_rid())
+	if target is CollisionObject3D:
+		exclude.append((target as CollisionObject3D).get_rid())
+	var query := PhysicsRayQueryParameters3D.create(from + Vector3.UP * 1.4, to + Vector3.UP * 1.2, 1, exclude)
+	query.collide_with_areas = false
+	return space.intersect_ray(query).is_empty()
+
+
+func _as_position(value: Variant) -> Vector3:
+	if value is Vector3:
+		return value as Vector3
+	if value is Vector2:
+		var vector: Vector2 = value
+		return Vector3(vector.x, 0.0, vector.y)
+	return Vector3.ZERO
+
+
+func _attach_weapon_model() -> void:
+	if weapon_mount == null or (_weapon_model != null and _weapon_model_id == weapon_id):
+		return
+	if _weapon_model != null and is_instance_valid(_weapon_model):
+		_weapon_model.queue_free()
+	_weapon_model = null
+	_weapon_model_id = weapon_id
+	if not ResourceLoader.exists(WEAPON_VIEWMODEL_PATH):
+		return
+	var view: Script = load(WEAPON_VIEWMODEL_PATH) as Script
+	if view == null or not view.has_method("model_path_for"):
+		return
+	var path: String = str(view.call("model_path_for", weapon_id))
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return
+	var packed := load(path) as PackedScene
+	if packed == null:
+		return
+	var model := packed.instantiate() as Node3D
+	if model == null:
+		return
+	weapon_mount.add_child(model)
+	var box := _combined_aabb(model)
+	if not box.size.is_zero_approx():
+		var longest: float = maxf(box.size.x, maxf(box.size.y, box.size.z))
+		if longest > 0.0001:
+			var factor: float = 0.72 / longest
+			model.scale = Vector3(factor, factor, factor)
+		if box.size.x > box.size.z:
+			model.rotation.y = PI * 0.5
+		model.position = -box.get_center() * maxf(model.scale.x, 0.0001)
+	_weapon_model = model
+	if weapon_visual != null:
+		weapon_visual.visible = false
+
+
+func _combined_aabb(node: Node) -> AABB:
+	var result := AABB()
+	var found: bool = false
+	for child in node.find_children("*", "MeshInstance3D", true, true):
+		var mesh := child as MeshInstance3D
+		if mesh == null or mesh.mesh == null:
+			continue
+		var local_box: AABB = mesh.mesh.get_aabb()
+		local_box.size *= mesh.scale
+		local_box.position += mesh.position
+		if not found:
+			result = local_box
+			found = true
+		else:
+			result = result.merge(local_box)
+	return result
 
 
 func _apply_weapon_definition() -> void:
@@ -367,6 +521,23 @@ func _apply_pending_options() -> void:
 	combat.set("cover_points", _pending_options.get("cover_points", []))
 	combat.set("attack_points", _pending_options.get("attack_points", []))
 	combat.set("patrol_points", _pending_options.get("patrol_points", []))
+	var nav_value: Variant = _pending_options.get("navigation", null)
+	if nav_value != null:
+		set_navigation(nav_value)
+	var lod_value: Variant = _pending_options.get("lod", null)
+	if lod_value != null:
+		lod = lod_value
+	var observer_value: Variant = _pending_options.get("observer", null)
+	if observer_value is Node:
+		observer = observer_value as Node
+	var fx_value: Variant = _pending_options.get("fx_parent", null)
+	if fx_value is Node:
+		fx_parent = fx_value as Node
+	var bounds_value: Variant = _pending_options.get("bounds", null)
+	if bounds_value is AABB:
+		world_bounds = bounds_value as AABB
+		has_world_bounds = world_bounds.size.x > 0.0 and world_bounds.size.z > 0.0
+	nav_cell_size = maxf(0.25, float(_pending_options.get("nav_cell_size", nav_cell_size)))
 	if _pending_options.has("health_ratio") and damageable != null:
 		var ratio: float = clampf(float(_pending_options["health_ratio"]), 0.0, 1.0)
 		damageable.set("health", max_health * ratio)
@@ -392,6 +563,7 @@ func _apply_pending_options() -> void:
 		_material.albedo_color = _role_color()
 	if _head_material != null:
 		_head_material.albedo_color = _role_color().lightened(0.2)
+	_attach_weapon_model()
 
 
 func pending_target_id() -> String:
@@ -491,10 +663,15 @@ func tick(delta: float) -> Dictionary:
 		action_changed.emit(action)
 	var goal: Variant = combat.call("goal_for", action, ctx)
 	_goal = goal if goal is Vector3 else Vector3.ZERO
+	_sanitize_goal(action)
 	if action == "reload" and not bool(combat.call("is_reloading")):
 		combat.call("start_reload")
-	if action == "attack" and bool(combat.call("can_fire")):
-		fire()
+	if action == "attack":
+		if role == "zombie":
+			_melee_attack()
+		elif bool(combat.call("can_fire")):
+			fire()
+	_replan_path()
 	return result
 
 
@@ -537,6 +714,7 @@ func fire() -> Dictionary:
 	var shot: Dictionary = result
 	shot["npc_id"] = npc_id
 	shot["spread"] = spread
+	_play_shot_fx(origin, direction, shot)
 	fired.emit(shot)
 	return shot
 
@@ -554,7 +732,8 @@ func take_damage(amount: float, point: Vector3 = Vector3.ZERO, normal: Vector3 =
 		source_id = str(source.name)
 	damageable.call("take_damage", amount, point, normal, source)
 	if combat != null:
-		combat.call("note_hit", source_id, clampf(amount / 60.0, 0.1, 1.0))
+		combat.call("note_hit", source_id, clampf(amount / 60.0, 0.1, 1.0), point)
+	_remember_threat(point, source_id, 3.0)
 	_alert_allies(source_id)
 
 
@@ -567,7 +746,8 @@ func take_zone_damage(zone: String, amount: float, point: Vector3, normal: Vecto
 		_last_impact_force = clampf(4.0 + amount * 0.16, 4.0, 24.0)
 		damageable.call("take_zone_damage", zone, amount, point, normal, source)
 		if combat != null:
-			combat.call("note_hit", str(source.name) if source != null else "unknown", clampf(amount / 60.0, 0.1, 1.0))
+			combat.call("note_hit", str(source.name) if source != null else "unknown", clampf(amount / 60.0, 0.1, 1.0), point)
+		_remember_threat(point, str(source.name) if source != null else "unknown", 3.0)
 	else:
 		take_damage(amount, point, normal, source)
 
@@ -580,64 +760,232 @@ func request_help(source_id: String) -> void:
 func _physics_process(delta: float) -> void:
 	if not auto_tick:
 		return
+	var step: float = maxf(delta, 0.0)
+	_melee_cooldown = maxf(0.0, _melee_cooldown - step)
+	_threat_memory = maxf(0.0, _threat_memory - step)
 	if _dead:
 		velocity = Vector3.ZERO
 		return
-	tick(delta)
-	_move_toward_goal(delta)
+	_tick_accumulator += step
+	var interval: float = 1.0 / maxf(tick_rate, 1.0)
+	if _tick_accumulator + _hash01(npc_id) * interval >= interval:
+		var decision_delta: float = _tick_accumulator
+		_tick_accumulator = 0.0
+		tick(decision_delta)
+	_move_toward_goal(step)
 
 
 func _move_toward_goal(delta: float) -> void:
-	var offset: Vector3 = _goal - global_position
+	var destination: Vector3 = _goal
+	if _path_index < _path.size():
+		destination = _path[_path_index]
+	var offset: Vector3 = destination - global_position
 	offset.y = 0.0
-	_moving = offset.length() > 0.6
-	var speed: float = run_speed if current_action() == "flee" else patrol_speed
+	var remaining: float = offset.length()
+	if _path_index < _path.size() and remaining < 0.55:
+		_path_index += 1
+		if _path_index < _path.size():
+			destination = _path[_path_index]
+			offset = destination - global_position
+			offset.y = 0.0
+			remaining = offset.length()
+	_moving = remaining > 0.45
+	var action: String = current_action()
+	var speed: float = patrol_speed
+	if action == "flee" or action == "run" or (role == "zombie" and action == "attack"):
+		speed = run_speed
+	elif action == "attack" or action == "investigate":
+		speed = maxf(patrol_speed, run_speed * 0.55)
 	if _moving:
 		var direction: Vector3 = offset.normalized()
+		var avoidance: Vector3 = Vector3.ZERO
+		for ally in _active:
+			if ally == self or not is_instance_valid(ally):
+				continue
+			var other: Node3D = ally as Node3D
+			if other == null or (other.has_method("is_dead") and bool(other.call("is_dead"))):
+				continue
+			var separation: Vector3 = global_position - other.global_position
+			separation.y = 0.0
+			var distance: float = separation.length()
+			if distance > 0.001 and distance < 1.4:
+				avoidance += (separation / distance) * ((1.4 - distance) / 1.4)
+		if avoidance.length_squared() > 0.0001:
+			direction = (direction + avoidance * 0.65).normalized()
 		velocity.x = direction.x * speed
 		velocity.z = direction.z * speed
-		if target != null and current_action() != "flee":
-			_face_target()
-		else:
-			_face_direction(direction)
+		_face_direction_smooth(direction, delta)
 	else:
 		velocity.x = 0.0
 		velocity.z = 0.0
+		if target != null and action != "flee":
+			_face_target()
 	if not is_on_floor():
-		velocity.y -= 18.0 * maxf(delta, 0.0)
+		velocity.y -= 18.0 * delta
 	else:
 		velocity.y = 0.0
+	var previous: Vector3 = global_position
 	move_and_slide()
+	if navigation != null and not bool(navigation.call("is_walkable_world", global_position, nav_cell_size)):
+		global_position = previous
+		velocity.x = 0.0
+		velocity.z = 0.0
+		_stuck_time += delta
+		_path.clear()
+	if has_world_bounds:
+		var inset: float = 0.6
+		var x: float = clampf(global_position.x, world_bounds.position.x + inset, world_bounds.end.x - inset)
+		var z: float = clampf(global_position.z, world_bounds.position.z + inset, world_bounds.end.z - inset)
+		if x != global_position.x or z != global_position.z:
+			global_position = Vector3(x, global_position.y, z)
+	var travelled: float = global_position.distance_to(previous)
+	if _moving and travelled < maxf(0.001, speed * delta * 0.08):
+		_stuck_time += delta
+	else:
+		_stuck_time = maxf(0.0, _stuck_time - delta * 0.5)
 
 
 func _context() -> Dictionary:
 	var visible: bool = false
 	var distance: float = 100.0
-	var target_position: Vector3 = aim_point if has_explicit_aim else Vector3.ZERO
+	var target_position: Vector3 = aim_point if has_explicit_aim else _threat_position
 	if target != null and is_instance_valid(target):
 		target_position = target.global_position
 		distance = maxf(global_position.distance_to(target_position), 0.0)
 		var facing: Vector3 = _forward()
 		if perception != null and perception.has_method("can_see"):
-			var sight: Dictionary = perception.call("can_see", global_position, Vector2(facing.x, facing.z), Vector2(target_position.x, target_position.z), {"vision_range": vision_range})
+			var sight: Dictionary = perception.call(
+				"can_see", global_position,
+				Vector2(facing.x, facing.z),
+				Vector2(target_position.x, target_position.z),
+				{"vision_range": vision_range}
+			)
 			visible = bool(sight.get("visible", false))
 		else:
 			visible = distance <= vision_range
 	elif has_explicit_aim:
 		distance = global_position.distance_to(aim_point)
 		visible = distance <= vision_range
-	if combat != null and float(combat.get("alert_level")) > 0.0 and distance < vision_range:
+	if combat != null and _threat_memory > 0.0:
+		combat.set("last_threat_position", _threat_position)
+	if role == "civilian" and _threat_memory > 0.0:
 		visible = true
-	var path: Array = []
-	if navigation != null and not _goal.is_equal_approx(Vector3.ZERO):
-		path = combat.call("path_to", _goal, {"position": global_position, "target_position": target_position})
+		target_position = _threat_position
+		distance = minf(distance, maxf(global_position.distance_to(_threat_position), 0.0))
 	return {
 		"visible": visible,
 		"distance": distance,
 		"target_position": target_position,
 		"position": global_position,
-		"path": path,
+		"path": _path,
 	}
+
+
+func _sanitize_goal(action: String) -> void:
+	if navigation == null or _goal.length_squared() <= 0.0001:
+		return
+	var target: Vector3 = _goal
+	if has_world_bounds:
+		target.x = clampf(target.x, world_bounds.position.x + 1.0, world_bounds.end.x - 1.0)
+		target.z = clampf(target.z, world_bounds.position.z + 1.0, world_bounds.end.z - 1.0)
+	if action == "flee" and _threat_position.length_squared() > 0.0001:
+		var flee_point: Vector3 = Vector3.ZERO
+		var flee_score: float = -INF
+		var grid_width: int = int(navigation.get("width"))
+		var grid_height: int = int(navigation.get("height"))
+		for y in range(grid_height):
+			for x in range(grid_width):
+				var cell_candidate := Vector2i(x, y)
+				if bool(navigation.call("is_blocked", cell_candidate)):
+					continue
+				var world_point: Vector3 = navigation.call(
+					"cell_to_world", cell_candidate, nav_cell_size, global_position.y
+				)
+				var score: float = world_point.distance_squared_to(_threat_position)
+				score -= world_point.distance_squared_to(global_position) * 0.05
+				if score > flee_score:
+					flee_score = score
+					flee_point = world_point
+		if flee_score > -INF:
+			_goal = flee_point
+			return
+	if bool(navigation.call("is_walkable_world", target, nav_cell_size)):
+		_goal = target
+		return
+	var from_cell: Vector2i = navigation.call("world_to_cell_2d", Vector2(global_position.x, global_position.z), nav_cell_size)
+	var cell: Vector2i = navigation.call("world_to_cell_2d", Vector2(target.x, target.z), nav_cell_size)
+	for skip_current in [true, false]:
+		var best: Vector3 = Vector3.ZERO
+		var best_distance: float = INF
+		for radius in range(0, 7):
+			for dy in range(-radius, radius + 1):
+				for dx in range(-radius, radius + 1):
+					if maxi(absi(dx), absi(dy)) != radius:
+						continue
+					var candidate: Vector2i = cell + Vector2i(dx, dy)
+					if not bool(navigation.call("is_inside", candidate)):
+						continue
+					if bool(navigation.call("is_blocked", candidate)):
+						continue
+					if skip_current and candidate == from_cell:
+						continue
+					var world_point: Vector3 = navigation.call("cell_to_world", candidate, nav_cell_size, _goal.y)
+					var distance: float = world_point.distance_squared_to(target)
+					if distance < best_distance:
+						best_distance = distance
+						best = world_point
+			if best_distance < INF:
+				break
+		if best_distance < INF:
+			_goal = best
+			return
+
+
+func _replan_path() -> void:
+	_repath_cooldown = maxf(0.0, _repath_cooldown - 1.0 / maxf(tick_rate, 1.0))
+	if navigation == null or _goal.length_squared() < 0.0001:
+		return
+	var moved: float = global_position.distance_to(_last_position)
+	_last_position = global_position
+	if _moving and moved < 0.02:
+		_stuck_time += 1.0 / maxf(tick_rate, 1.0)
+	var need_path: bool = _repath_cooldown <= 0.0 and (
+		_stuck_time > 0.85 or _path.is_empty() or _path_index >= _path.size()
+	)
+	if not need_path:
+		return
+	var start_cell: Vector2i = navigation.call(
+		"world_to_cell_2d", Vector2(global_position.x, global_position.z), nav_cell_size
+	)
+	var goal_cell: Vector2i = navigation.call(
+		"world_to_cell_2d", Vector2(_goal.x, _goal.z), nav_cell_size
+	)
+	var result: Variant = navigation.call("find_path", start_cell, goal_cell, {
+		"position": global_position,
+		"target_position": _goal,
+		"cell_size": nav_cell_size,
+	})
+	if not result is Dictionary or not bool((result as Dictionary).get("ok", false)):
+		_repath_cooldown = 0.5
+		return
+	_path.clear()
+	for cell in (result as Dictionary).get("path", []):
+		_path.append(_cell_to_world(cell))
+	_path_index = 0
+	_repath_cooldown = 0.45 if _stuck_time <= 0.85 else 0.25
+	_stuck_time = 0.0
+
+
+func _cell_to_world(cell: Variant) -> Vector3:
+	if cell is Vector3:
+		return cell as Vector3
+	if navigation == null:
+		return Vector3.ZERO
+	if cell is Vector2i:
+		return navigation.call("cell_to_world", cell, nav_cell_size, global_position.y)
+	if cell is Vector2:
+		return navigation.call("cell_to_world", cell, nav_cell_size, global_position.y)
+	return Vector3.ZERO
 
 
 func _muzzle_position() -> Vector3:
@@ -663,6 +1011,106 @@ func _face_target() -> void:
 func _face_direction(direction: Vector3) -> void:
 	var yaw: float = atan2(-direction.x, -direction.z)
 	rotation.y = yaw
+
+
+func _face_direction_smooth(direction: Vector3, delta: float) -> void:
+	var yaw: float = atan2(-direction.x, -direction.z)
+	rotation.y = lerp_angle(rotation.y, yaw, clampf(delta * 8.0, 0.0, 1.0))
+
+
+func _hash01(value: String) -> float:
+	return float(absi(value.hash()) % 1000) / 1000.0
+
+
+func _remember_threat(position: Vector3, source_id: String, duration: float) -> void:
+	if position.length_squared() <= 0.0001:
+		return
+	_threat_position = position
+	_threat_memory = maxf(_threat_memory, maxf(0.2, duration))
+	if combat != null:
+		combat.call("note_threat", source_id, 0.8, position)
+
+
+func _melee_attack() -> void:
+	if _melee_cooldown > 0.0 or target == null or not is_instance_valid(target):
+		return
+	var distance: float = global_position.distance_to(target.global_position)
+	if distance > MELEE_RANGE + 0.4:
+		return
+	_melee_cooldown = 0.85
+	var hit_point: Vector3 = target.global_position + Vector3.UP * 1.0
+	var direction: Vector3 = (target.global_position - global_position).normalized()
+	if target.has_method("take_zone_damage"):
+		target.call("take_zone_damage", "torso", MELEE_DAMAGE, hit_point, -direction, self)
+	elif target.has_method("take_damage"):
+		target.call("take_damage", MELEE_DAMAGE, hit_point, -direction, self)
+	_spawn_tracer(_muzzle_position(), hit_point, true)
+
+
+func _play_shot_fx(origin: Vector3, direction: Vector3, shot: Dictionary) -> void:
+	var parent: Node = fx_parent if fx_parent != null and is_instance_valid(fx_parent) else get_parent()
+	if parent == null:
+		return
+	if _fx_script != null:
+		_fx_script.call("spawn_flash", parent, origin, direction, 1.0)
+		_fx_script.call("spawn_smoke", parent, origin, direction, 0.8)
+	var end: Vector3 = origin + direction * maxf(4.0, float(shot.get("distance", 20.0)))
+	if shot.has("position") and shot["position"] is Vector3:
+		end = shot["position"] as Vector3
+	_spawn_tracer(origin, end, false)
+	if _recorded_sfx_script != null:
+		_recorded_sfx_script.call("play", weapon_id, "fire", parent, origin, _rng)
+	elif _sfx_bank_script != null:
+		_sfx_bank_script.call("play_synth", parent, "shot", weapon_id, origin, "sfx", seed_value)
+
+
+func _spawn_tracer(from: Vector3, to: Vector3, melee: bool) -> void:
+	var parent: Node = fx_parent if fx_parent != null and is_instance_valid(fx_parent) else get_parent()
+	if parent == null:
+		return
+	var delta: Vector3 = to - from
+	var length: float = delta.length()
+	if length < 0.05:
+		return
+	if _tracer_mesh == null:
+		_tracer_mesh = BoxMesh.new()
+		_tracer_mesh.size = Vector3(0.035, 0.035, 1.0)
+	if _tracer_material == null:
+		_tracer_material = StandardMaterial3D.new()
+		_tracer_material.albedo_color = Color(1.0, 0.76, 0.32)
+		_tracer_material.emission_enabled = true
+		_tracer_material.emission = Color(1.0, 0.6, 0.18)
+		_tracer_material.emission_energy_multiplier = 3.0
+	var tracer := MeshInstance3D.new()
+	tracer.name = "NpcTracer"
+	tracer.mesh = _tracer_mesh
+	tracer.material_override = _tracer_material
+	parent.add_child(tracer)
+	tracer.global_position = (from + to) * 0.5
+	tracer.look_at(to, Vector3.UP)
+	tracer.scale.z = length if not melee else minf(length, 1.6)
+	tracer.set_meta("life", TRACER_LIFE * (1.4 if melee else 1.0))
+	_tracers.append(tracer)
+	while _tracers.size() > MAX_TRACERS:
+		var old: Variant = _tracers.pop_front()
+		if old is Node and is_instance_valid(old):
+			(old as Node).queue_free()
+
+
+static func advance_fx(delta: float) -> void:
+	if _tracers.is_empty():
+		return
+	for i in range(_tracers.size() - 1, -1, -1):
+		var tracer: Variant = _tracers[i]
+		if not is_instance_valid(tracer):
+			_tracers.remove_at(i)
+			continue
+		var life: float = float((tracer as Node).get_meta("life", 0.0)) - maxf(delta, 0.0)
+		if life <= 0.0:
+			(tracer as Node).queue_free()
+			_tracers.remove_at(i)
+		else:
+			(tracer as Node).set_meta("life", life)
 
 
 func _on_damaged(amount: float, point: Vector3, normal: Vector3) -> void:
@@ -788,16 +1236,28 @@ func _alert_allies(source_id: String) -> void:
 
 
 func hear_alert(source_id: String, position: Vector3) -> void:
+	hear_gunshot(position, 0.7, source_id)
+
+
+func hear_gunshot(position: Vector3, loudness: float = 1.0, source_id: String = "player") -> void:
 	if _dead or combat == null:
 		return
+	var radius: float = vision_range + 12.0
 	if perception != null and perception.has_method("can_hear"):
-		var stimulus: Dictionary = {"position": position, "noise": 1.0, "radius": vision_range + 12.0}
+		var stimulus: Dictionary = {"position": position, "noise": loudness, "radius": radius}
 		var heard: Dictionary = perception.call("can_hear", stimulus, global_position, {})
 		if not bool(heard.get("heard", false)):
 			return
-	combat.call("note_threat", source_id, 0.7)
-	if current_action() == "patrol" and role != "civilian":
-		combat.call("decide", {"visible": true, "distance": global_position.distance_to(position), "target_position": position})
+	elif global_position.distance_to(position) > radius:
+		return
+	_remember_threat(position, source_id, 4.0)
+
+
+func notice_weapon(position: Vector3) -> void:
+	if role != "civilian" or _dead:
+		return
+	if global_position.distance_to(position) <= vision_range:
+		_remember_threat(position, "weapon", 3.5)
 
 
 func _initial_affinity() -> float:
@@ -816,6 +1276,8 @@ func _role_color() -> Color:
 			return Color(0.24, 0.48, 0.78)
 		"defender":
 			return Color(0.22, 0.62, 0.36)
+		"zombie":
+			return Color(0.45, 0.58, 0.25)
 		_:
 			return Color(0.72, 0.24, 0.18)
 
@@ -827,4 +1289,7 @@ func snapshot() -> Dictionary:
 	base["dead"] = _dead
 	base["spawn_accepted"] = spawn_accepted
 	base["platform"] = platform
+	base["tick_rate"] = tick_rate
+	base["path_length"] = _path.size()
+	base["lod_interval"] = lod.call("get_update_interval", 0.0) if lod != null else 0.0
 	return base

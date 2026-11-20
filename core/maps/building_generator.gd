@@ -22,6 +22,102 @@ const STYLE_SURFACES: Dictionary = {
 }
 
 static var _unit_box: BoxMesh = null
+static var _model_parts_cache: Dictionary = {}
+static var _model_bounds_cache: Dictionary = {}
+
+
+static func model_parts(path: String) -> Array:
+	if _model_parts_cache.has(path):
+		return _model_parts_cache[path]
+	var parts: Array = []
+	if not path.is_empty() and ResourceLoader.exists(path):
+		var packed := load(path) as PackedScene
+		if packed != null:
+			var instance: Node = packed.instantiate()
+			if instance != null:
+				_collect_model_parts(instance, Transform3D.IDENTITY, parts)
+				instance.free()
+	_model_parts_cache[path] = parts
+	return parts
+
+
+static func model_bounds(path: String) -> AABB:
+	if _model_bounds_cache.has(path):
+		return _model_bounds_cache[path]
+	var bounds := AABB()
+	var found := false
+	for part in model_parts(path):
+		var entry: Dictionary = part
+		var mesh: Mesh = entry.get("mesh", null)
+		if mesh == null:
+			continue
+		var box: AABB = (entry.get("xform", Transform3D.IDENTITY) as Transform3D) * mesh.get_aabb()
+		if found:
+			bounds = bounds.merge(box)
+		else:
+			bounds = box
+			found = true
+	_model_bounds_cache[path] = bounds
+	return bounds
+
+
+static func model_transform(
+	path: String, position: Vector3, yaw: float, fit: Vector3, center: bool = true
+) -> Transform3D:
+	var basis := Basis().rotated(Vector3.UP, yaw)
+	if fit == Vector3.ZERO:
+		return Transform3D(basis, position)
+	var bounds: AABB = model_bounds(path)
+	if bounds.size.x <= 0.0001 or bounds.size.y <= 0.0001 or bounds.size.z <= 0.0001:
+		return Transform3D(basis, position)
+	var scale := Vector3(
+		fit.x / bounds.size.x, fit.y / bounds.size.y, fit.z / bounds.size.z
+	)
+	basis = basis.scaled(scale)
+	var origin := position
+	if center:
+		origin += basis * (-bounds.get_center())
+	return Transform3D(basis, origin)
+
+
+static func model_batch(
+	parent: Node3D, node_name: String, path: String, transforms: Array,
+	fit: Vector3 = Vector3.ZERO, visibility_end: float = 0.0
+) -> Node3D:
+	var root := Node3D.new()
+	root.name = node_name
+	root.set_meta("model_path", path)
+	root.set_meta("model_instances", transforms.size())
+	if parent != null:
+		parent.add_child(root)
+	if transforms.is_empty():
+		return root
+	var parts: Array = model_parts(path)
+	for index in range(parts.size()):
+		var entry: Dictionary = parts[index]
+		var mesh: Mesh = entry.get("mesh", null)
+		if mesh == null:
+			continue
+		var local: Transform3D = entry.get("xform", Transform3D.IDENTITY)
+		var visual := MultiMeshInstance3D.new()
+		visual.name = "Mesh_%d" % index
+		var multimesh := MultiMesh.new()
+		multimesh.transform_format = MultiMesh.TRANSFORM_3D
+		multimesh.mesh = mesh
+		multimesh.instance_count = transforms.size()
+		for i in range(transforms.size()):
+			var transform: Transform3D = transforms[i]
+			multimesh.set_instance_transform(i, transform * local)
+		visual.multimesh = multimesh
+		var material: Material = entry.get("material", null)
+		if material != null:
+			visual.material_override = material
+		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		if visibility_end > 0.0:
+			visual.visibility_range_end = visibility_end
+			visual.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+		root.add_child(visual)
+	return root
 
 
 static func generate(seed: int, params: Dictionary) -> Dictionary:
@@ -355,6 +451,22 @@ static func unit_box() -> BoxMesh:
 		_unit_box = BoxMesh.new()
 		_unit_box.size = Vector3.ONE
 	return _unit_box
+
+
+static func _collect_model_parts(node: Node, parent: Transform3D, parts: Array) -> void:
+	var current := parent
+	if node is Node3D:
+		current = parent * (node as Node3D).transform
+	if node is MeshInstance3D:
+		var mesh: Mesh = (node as MeshInstance3D).mesh
+		if mesh != null:
+			parts.append({
+				"mesh": mesh,
+				"xform": current,
+				"material": (node as MeshInstance3D).material_override,
+			})
+	for child in node.get_children():
+		_collect_model_parts(child, current, parts)
 
 
 static func count_nodes(node: Node) -> int:

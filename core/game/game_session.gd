@@ -3,6 +3,7 @@ extends RefCounted
 
 const WORLD_SCENE: String = "res://scenes/world/game_world.tscn"
 const VR_GAME_MODE_PATH: String = "res://core/vr/vr_game_mode.gd"
+const VrBootstrapScript = preload("res://core/vr/vr_bootstrap.gd")
 
 static var map_meta: Dictionary = {}
 static var platform: String = ""
@@ -16,10 +17,9 @@ static var vr_menu_confirmed: bool = false
 static func detect_platform() -> String:
 	if not platform_override.is_empty():
 		return platform_override
-	var xr := Engine.get_singleton("XRServer")
-	if xr != null and xr.has_method("get_interface_count"):
-		if int(xr.call("get_interface_count")) > 0:
-			return "vr"
+	# La interfaz OpenXR existe aunque no haya casco: solo cuenta si VrBootstrap la inicializo.
+	if VrBootstrapScript.is_xr_active():
+		return "vr"
 	if OS.get_name() == "Android":
 		return "android"
 	return "pc"

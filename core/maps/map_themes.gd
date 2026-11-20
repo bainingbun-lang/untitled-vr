@@ -12,14 +12,48 @@ const THEME_ALIASES: Dictionary = {
 	"factory": "industrial", "fabrica": "industrial", "nave": "industrial",
 	"campo": "rural", "village": "rural", "campestre": "rural",
 }
-const THEME_PARAMS: Array = ["theme", "theme_density", "building_count", "theme_style"]
+const THEME_PARAMS: Array = [
+	"theme", "theme_density", "building_count", "theme_style", "time_of_day"
+]
+const TIME_OF_DAY: Array = ["dia", "atardecer", "noche"]
 const THEME_SIZES: Dictionary = {
 	"urbano": [[4, 4], [5, 4], [4, 5]],
 	"industrial": [[6, 4], [5, 5], [7, 4]],
 	"rural": [[3, 3], [4, 3], [3, 4]],
 }
 const MAX_BUILDINGS: int = 6
-const MAX_THEME_NODES: int = 64
+const MAX_THEME_NODES: int = 72
+const MODEL_ROAD_CROSS: String = "res://assets/models/maps/city-roads/road-crossroad.glb"
+const MODEL_ROAD_CROSSING: String = "res://assets/models/maps/city-roads/road-crossing.glb"
+const MODEL_ROAD_STRAIGHT: String = "res://assets/models/maps/city-roads/road-straight.glb"
+const MODEL_ROAD_SIDE: String = "res://assets/models/maps/city-roads/road-side.glb"
+const MODEL_SIDEWALK: String = "res://assets/models/maps/city-roads/tile-high.glb"
+const MODEL_COMMERCIAL: String = "res://assets/models/maps/city-commercial/building-a.glb"
+const MODEL_COMMERCIAL_ALT: String = "res://assets/models/maps/city-commercial/building-c.glb"
+const MODEL_INDUSTRIAL: String = "res://assets/models/maps/city-industrial/building-a.glb"
+const MODEL_INDUSTRIAL_ALT: String = "res://assets/models/maps/city-industrial/building-c.glb"
+const MODEL_RURAL_HOUSE: String = "res://assets/models/maps/building/wall.glb"
+const MODEL_CAR: String = "res://assets/models/maps/car/sedan.glb"
+const MODEL_POLICE: String = "res://assets/models/maps/car/police.glb"
+const MODEL_TAXI: String = "res://assets/models/maps/car/taxi.glb"
+const MODEL_LAMP: String = "res://assets/models/maps/city-roads/light-square.glb"
+const MODEL_FENCE: String = "res://assets/models/maps/nature/fence_simple.glb"
+const MODEL_PIPE: String = "res://assets/models/maps/city-industrial/detail-tank.glb"
+const MODEL_TREE: String = "res://assets/models/maps/nature/tree_default.glb"
+const MODEL_ROCK: String = "res://assets/models/maps/nature/rock_largeA.glb"
+const MODEL_OFFICE_FLOOR: String = "res://assets/models/maps/furniture/floorFull.glb"
+const MODEL_OFFICE_WALL: String = "res://assets/models/maps/furniture/wall.glb"
+const MODEL_OFFICE_DOOR: String = "res://assets/models/maps/furniture/wallDoorwayWide.glb"
+const MODEL_OFFICE_WINDOW: String = "res://assets/models/maps/furniture/wallWindow.glb"
+const MODEL_OFFICE_ROOF: String = "res://assets/models/maps/building/roof-flat-center.glb"
+const MODEL_DESK: String = "res://assets/models/maps/furniture/desk.glb"
+const MODEL_CHAIR: String = "res://assets/models/maps/furniture/chairDesk.glb"
+const MODEL_COMPUTER: String = "res://assets/models/maps/furniture/computerScreen.glb"
+const MODEL_SHELF: String = "res://assets/models/maps/furniture/bookcaseOpen.glb"
+const MODEL_SOFA: String = "res://assets/models/maps/furniture/loungeSofa.glb"
+const MODEL_PLANT: String = "res://assets/models/maps/furniture/pottedPlant.glb"
+const MODEL_COUNTER: String = "res://assets/models/maps/furniture/kitchenBar.glb"
+const MODEL_CEILING_LAMP: String = "res://assets/models/maps/furniture/lampSquareCeiling.glb"
 const NAVIGATION_DECISION: String = (
 	"Se reutiliza NPCNavigation en vez de NavigationRegion3D: el juego ya consume su A* "
 	+ "desde NpcCombat/ArmedNpc, no requiere horneado en headless/Android y permite marcar "
@@ -136,7 +170,19 @@ static func apply_theme(meta: Dictionary, seed: int = -1, params: Dictionary = {
 				placed = true
 				break
 
-	while buildings.size() > 0 and not _spawns_connected(
+	var office: Dictionary = {}
+	if theme == "urbano":
+		office = _office_spec(seed_value, width, height, reserved, buildings, street_cells)
+		if not office.is_empty():
+			buildings.append(office)
+			for occupied in _footprint(
+				office.get("cell", Vector2i.ZERO),
+				int(office.get("width", 4)),
+				int(office.get("depth", 4))
+			):
+				reserved[occupied] = true
+
+	while buildings.size() > 1 and not _spawns_connected(
 		width, height, spawn_cells, _navigation_obstacles(meta, buildings)
 	):
 		buildings.remove_at(buildings.size() - 1)
@@ -145,9 +191,13 @@ static func apply_theme(meta: Dictionary, seed: int = -1, params: Dictionary = {
 		theme, buildings, street_cells, spawn_cells, width, height, reserved, rng
 	)
 	var free_spawns: Array = _free_spawn_cells(reserved, street_cells, spawn_cells, width, height)
+	var time_of_day: String = str(params.get("time_of_day", meta.get("time_of_day", "atardecer")))
+	if not TIME_OF_DAY.has(time_of_day):
+		time_of_day = "atardecer"
 	var theme_data: Dictionary = {
 		"theme": theme,
 		"density": density,
+		"time_of_day": time_of_day,
 		"roads": streets["road_cells"],
 		"sidewalks": streets["sidewalk_cells"],
 		"buildings": buildings,
@@ -156,7 +206,10 @@ static func apply_theme(meta: Dictionary, seed: int = -1, params: Dictionary = {
 		"navigation_obstacles": _navigation_obstacles(meta, buildings),
 		"navigation_decision": NAVIGATION_DECISION,
 		"node_estimate": buildings.size() * BuildingScript.MAX_BUILDING_NODES + MAX_THEME_NODES,
+		"landmarks": _landmarks(theme, buildings, streets, width, height),
+		"office": office,
 	}
+	result["time_of_day"] = time_of_day
 	result["theme"] = theme
 	result["theme_data"] = theme_data
 	result["has_navigation"] = true
@@ -191,14 +244,19 @@ static func build_world(parent: Node3D, meta: Dictionary) -> Dictionary:
 	root.set_meta("theme", theme)
 	parent.add_child(root)
 
+	var time_of_day: String = str(theme_data.get("time_of_day", meta.get("time_of_day", "atardecer")))
+	root.set_meta("time_of_day", time_of_day)
 	_build_streets(root, theme_data)
 	var building_reports: Array = []
 	var doors: Array = []
+	var office_report: Dictionary = {}
 	for spec in theme_data.get("buildings", []):
-		var report: Dictionary = BuildingScript.build(root, spec)
+		var report: Dictionary = _build_building(root, spec, theme, time_of_day)
 		building_reports.append(report)
 		for door in report.get("doors", []):
 			doors.append(door)
+		if bool((spec as Dictionary).get("is_office", false)):
+			office_report = report
 	var prop_report: Dictionary = _build_props(root, theme_data)
 
 	return {
@@ -206,12 +264,15 @@ static func build_world(parent: Node3D, meta: Dictionary) -> Dictionary:
 		"built": true,
 		"root": root,
 		"theme": theme,
+		"time_of_day": time_of_day,
 		"buildings": building_reports,
 		"doors": doors,
 		"props": prop_report.get("props", []),
 		"collision_count": int(prop_report.get("collision_count", 0)),
 		"navigation": navigation_for(meta, theme_data),
 		"node_count": BuildingScript.count_nodes(root),
+		"landmarks": theme_data.get("landmarks", []),
+		"office": office_report,
 		"errors": [],
 	}
 
@@ -227,6 +288,9 @@ static func decorate_builder_report(parent: Node3D, meta: Dictionary, report: Di
 		result["doors"] = decoration.get("doors", [])
 		result["navigation"] = decoration.get("navigation", null)
 		result["node_count"] = BuildingScript.count_nodes(parent)
+		result["time_of_day"] = decoration.get("time_of_day", "atardecer")
+		result["landmarks"] = decoration.get("landmarks", [])
+		result["office"] = decoration.get("office", {})
 	return result
 
 
@@ -285,33 +349,44 @@ static func _streets(theme: String, width: int, height: int) -> Dictionary:
 
 static func _build_streets(root: Node3D, theme_data: Dictionary) -> void:
 	var theme: String = normalize(theme_data.get("theme", ""))
-	var road_surface: String = "asphalt" if theme == "urbano" else ("concrete" if theme == "industrial" else "ground")
-	var groups: Dictionary = {
-		road_surface: (theme_data.get("roads", []) as Array).duplicate(),
-		"concrete": [],
-	}
+	var roads: Array = theme_data.get("roads", [])
+	var sidewalks: Array = theme_data.get("sidewalks", [])
+	var road_set: Dictionary = {}
+	for value in roads:
+		road_set[value] = true
+	var placements: Array = []
+	for value in roads:
+		var cell: Vector2i = value
+		var horizontal: bool = (
+			road_set.has(cell + Vector2i(-1, 0)) or road_set.has(cell + Vector2i(1, 0))
+		)
+		var vertical: bool = (
+			road_set.has(cell + Vector2i(0, -1)) or road_set.has(cell + Vector2i(0, 1))
+		)
+		var neighbors: int = int(horizontal) + int(vertical)
+		var path: String = MODEL_ROAD_STRAIGHT
+		if theme == "rural":
+			path = "res://assets/models/maps/nature/ground_pathStraight.glb"
+		if neighbors >= 3:
+			path = MODEL_ROAD_CROSS if neighbors >= 4 else MODEL_ROAD_CROSSING
+		elif neighbors == 1:
+			path = MODEL_ROAD_SIDE
+			if not vertical:
+				horizontal = true
+		var yaw: float = PI * 0.5 if vertical and not horizontal else 0.0
+		placements.append([path, BuildingScript.cell_center(cell), yaw])
+	_add_model_group(
+		root, "StreetModels", placements, Vector3(1.0, 0.04, 1.0), 90.0, true
+	)
 	if theme == "urbano":
-		groups["concrete"] = (theme_data.get("sidewalks", []) as Array).duplicate()
-	for surface in groups.keys():
-		var cells: Array = groups[surface]
-		if cells.is_empty():
-			continue
-		var visual := MultiMeshInstance3D.new()
-		visual.name = "Street_%s" % surface
-		var multimesh := MultiMesh.new()
-		multimesh.transform_format = MultiMesh.TRANSFORM_3D
-		multimesh.mesh = BuildingScript.unit_box()
-		multimesh.instance_count = cells.size()
-		for i in range(cells.size()):
-			var center: Vector3 = BuildingScript.cell_center(cells[i])
-			center.y = 0.015 if str(surface) == road_surface else 0.03
-			multimesh.set_instance_transform(
-				i, Transform3D(Basis().scaled(Vector3(1.0, 0.03, 1.0)), center)
+		var walk_placements: Array = []
+		for value in sidewalks:
+			walk_placements.append(
+				[MODEL_SIDEWALK, BuildingScript.cell_center(value), 0.0]
 			)
-		visual.multimesh = multimesh
-		visual.material_override = WorldMaterialsScript.surface_material(str(surface))
-		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		root.add_child(visual)
+		_add_model_group(
+			root, "SidewalkModels", walk_placements, Vector3(1.0, 0.08, 1.0), 80.0, true
+		)
 
 
 static func _generate_props(
@@ -344,67 +419,53 @@ static func _generate_props(
 
 
 static func _build_props(root: Node3D, theme_data: Dictionary) -> Dictionary:
-	var queues: Dictionary = {}
+	var placements: Array = []
 	var collision_boxes: Array = []
 	var props: Array = []
 	for value in theme_data.get("props", []):
-		var prop: Dictionary = value
+		var prop: Dictionary = (value as Dictionary).duplicate()
 		var kind: String = str(prop.get("kind", "crate"))
 		var position: Vector3 = prop.get("position", Vector3.ZERO)
 		var rotation: float = float(prop.get("rotation", 0.0))
-		var basis := Basis().rotated(Vector3.UP, rotation)
-		props.append(prop)
+		var path: String = MODEL_ROCK
+		var fit := Vector3(1.2, 0.8, 1.2)
+		var collision_center := position + Vector3(0.0, 0.3, 0.0)
+		var collision_size := Vector3(0.9, 0.6, 0.8)
 		match kind:
 			"car":
-				_queue(queues, "metal", "box", Transform3D(basis, position + Vector3(0.0, 0.52, 0.0)), Vector3(1.5, 0.62, 2.8))
-				_queue(queues, "metal", "box", Transform3D(basis, position + Vector3(0.0, 1.05, -0.2)), Vector3(1.2, 0.45, 1.4))
-				for offset_x in [-0.72, 0.72]:
-					for offset_z in [-0.9, 0.9]:
-						_queue(
-							queues, "concrete", "cylinder",
-							Transform3D(basis * Basis().rotated(Vector3.FORWARD, PI * 0.5), position + Vector3(offset_x, 0.28, offset_z)),
-							Vector3(0.27, 0.16, 0.27)
-						)
-				collision_boxes.append({"center": position + Vector3(0.0, 0.5, 0.0), "size": Vector3(1.5, 1.0, 2.8)})
+				var cars: Array = [MODEL_CAR, MODEL_POLICE, MODEL_TAXI]
+				path = str(cars[int(absf(rotation)) % cars.size()])
+				fit = Vector3(2.0, 1.6, 3.2)
+				collision_center = position + Vector3(0.0, 0.5, 0.0)
+				collision_size = Vector3(1.8, 1.0, 3.0)
 			"lamp":
-				_queue(queues, "metal", "cylinder", Transform3D(Basis(), position + Vector3(0.0, 1.6, 0.0)), Vector3(0.07, 1.6, 0.07))
-				_queue(queues, "metal", "box", Transform3D(basis, position + Vector3(0.0, 3.25, 0.0)), Vector3(0.5, 0.22, 0.5))
-				collision_boxes.append({"center": position + Vector3(0.0, 1.4, 0.0), "size": Vector3(0.22, 2.8, 0.22)})
+				path = MODEL_LAMP
+				fit = Vector3(0.35, 3.2, 0.35)
+				collision_center = position + Vector3(0.0, 1.4, 0.0)
+				collision_size = Vector3(0.22, 2.8, 0.22)
 			"fence":
-				_queue(queues, "metal", "box", Transform3D(basis, position + Vector3(0.0, 0.6, 0.0)), Vector3(2.4, 1.0, 0.12))
-				collision_boxes.append({"center": position + Vector3(0.0, 0.6, 0.0), "size": Vector3(2.4, 1.2, 0.2)})
+				path = MODEL_FENCE
+				fit = Vector3(2.4, 1.2, 0.3)
+				collision_center = position + Vector3(0.0, 0.6, 0.0)
+				collision_size = Vector3(2.4, 1.2, 0.2)
 			"pipe":
-				_queue(
-					queues, "metal", "cylinder",
-					Transform3D(basis * Basis().rotated(Vector3.FORWARD, PI * 0.5), position + Vector3(0.0, 0.45, 0.0)),
-					Vector3(0.16, 1.2, 0.16)
-				)
-				collision_boxes.append({"center": position + Vector3(0.0, 0.45, 0.0), "size": Vector3(2.4, 0.4, 0.4)})
+				path = MODEL_PIPE
+				fit = Vector3(1.6, 1.2, 1.6)
+				collision_center = position + Vector3(0.0, 0.6, 0.0)
+				collision_size = Vector3(1.6, 1.2, 1.6)
 			"tree":
-				_queue(queues, "wood", "cylinder", Transform3D(Basis(), position + Vector3(0.0, 1.2, 0.0)), Vector3(0.17, 1.2, 0.17))
-				_queue(queues, "ground", "sphere", Transform3D(Basis(), position + Vector3(0.0, 2.65, 0.0)), Vector3(0.95, 0.75, 0.95))
-				collision_boxes.append({"center": position + Vector3(0.0, 1.0, 0.0), "size": Vector3(0.45, 2.0, 0.45)})
-			_:
-				_queue(queues, "concrete", "sphere", Transform3D(Basis(), position + Vector3(0.0, 0.28, 0.0)), Vector3(0.55, 0.36, 0.48))
-				collision_boxes.append({"center": position + Vector3(0.0, 0.3, 0.0), "size": Vector3(0.9, 0.6, 0.8)})
+				path = MODEL_TREE
+				fit = Vector3(1.6, 3.0, 1.6)
+				collision_center = position + Vector3(0.0, 1.0, 0.0)
+				collision_size = Vector3(0.45, 2.0, 0.45)
+		prop["model"] = path
+		props.append(prop)
+		placements.append([
+			path, position + Vector3(0.0, fit.y * 0.5, 0.0), rotation, fit,
+		])
+		collision_boxes.append({"center": collision_center, "size": collision_size})
 
-	for key in queues.keys():
-		var entry: Dictionary = queues[key]
-		var primitive: String = str(entry["primitive"])
-		var transforms: Array = entry["transforms"]
-		var visual := MultiMeshInstance3D.new()
-		visual.name = "Decor_%s" % str(key).replace("|", "_")
-		var multimesh := MultiMesh.new()
-		multimesh.transform_format = MultiMesh.TRANSFORM_3D
-		multimesh.mesh = _mesh_for(primitive)
-		multimesh.instance_count = transforms.size()
-		for i in range(transforms.size()):
-			multimesh.set_instance_transform(i, transforms[i])
-		visual.multimesh = multimesh
-		visual.material_override = WorldMaterialsScript.surface_material(str(entry["surface"]))
-		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-		root.add_child(visual)
-
+	_add_model_group(root, "DecorModels", placements, Vector3.ZERO, 90.0, true)
 	if not collision_boxes.is_empty():
 		var body := StaticBody3D.new()
 		body.name = "DecorCollision"
@@ -418,6 +479,441 @@ static func _build_props(root: Node3D, theme_data: Dictionary) -> Dictionary:
 		root.add_child(body)
 
 	return {"props": props, "collision_count": collision_boxes.size()}
+
+
+static func _add_model_group(
+	parent: Node3D, node_name: String, placements: Array,
+	default_fit: Vector3, visibility_end: float, center: bool
+) -> Node3D:
+	var group := Node3D.new()
+	group.name = node_name
+	parent.add_child(group)
+	var grouped: Dictionary = {}
+	for value in placements:
+		var placement: Array = value
+		if placement.size() < 3:
+			continue
+		var path: String = str(placement[0])
+		if not ResourceLoader.exists(path):
+			continue
+		var fit: Vector3 = default_fit
+		if placement.size() >= 4:
+			fit = placement[3]
+		var transform := BuildingScript.model_transform(
+			path, placement[1], float(placement[2]), fit, center
+		)
+		if not grouped.has(path):
+			grouped[path] = []
+		(grouped[path] as Array).append(transform)
+	var index: int = 0
+	for path in grouped.keys():
+		BuildingScript.model_batch(
+			group, "Batch_%d" % index, str(path), grouped[path], Vector3.ZERO, visibility_end
+		)
+		index += 1
+	return group
+
+
+static func _build_building(
+	root: Node3D, spec: Dictionary, theme: String, time_of_day: String
+) -> Dictionary:
+	if bool(spec.get("is_office", false)):
+		return _build_office(root, spec, theme, time_of_day)
+	return _build_facade(root, spec, theme)
+
+
+static func _build_facade(root: Node3D, spec: Dictionary, theme: String) -> Dictionary:
+	var cell: Vector2i = spec.get("cell", Vector2i.ZERO)
+	var width: int = int(spec.get("width", 4))
+	var depth: int = int(spec.get("depth", 4))
+	var floors: int = maxi(1, int(spec.get("floors", 1)))
+	var center: Vector3 = BuildingScript.cell_center(cell)
+	var side: String = str(spec.get("door_side", "south"))
+	var yaw: float = 0.0
+	match side:
+		"north":
+			yaw = PI
+		"east":
+			yaw = PI * 0.5
+		"west":
+			yaw = -PI * 0.5
+	var group := Node3D.new()
+	group.name = "Building_%d_%d" % [cell.x, cell.y]
+	group.set_meta("style", str(spec.get("style", "")))
+	group.set_meta("model_kind", theme)
+	root.add_child(group)
+
+	var placements: Array = []
+	if theme == "rural":
+		var x0: float = float(cell.x)
+		var z0: float = float(cell.y)
+		placements.append([
+			MODEL_OFFICE_WALL, Vector3(x0 + float(width) * 0.5, 1.2, z0 + 0.06),
+			0.0, Vector3(float(width), 2.4, 0.12),
+		])
+		placements.append([
+			MODEL_OFFICE_WALL, Vector3(x0 + float(width) * 0.5, 1.2, z0 + float(depth) - 0.06),
+			0.0, Vector3(float(width), 2.4, 0.12),
+		])
+		placements.append([
+			MODEL_OFFICE_WALL, Vector3(x0 + 0.06, 1.2, z0 + float(depth) * 0.5),
+			PI * 0.5, Vector3(float(depth), 2.4, 0.12),
+		])
+		placements.append([
+			MODEL_OFFICE_WALL, Vector3(x0 + float(width) - 0.06, 1.2, z0 + float(depth) * 0.5),
+			PI * 0.5, Vector3(float(depth), 2.4, 0.12),
+		])
+		placements.append([
+			MODEL_OFFICE_ROOF, Vector3(center.x, 2.5, center.z),
+			0.0, Vector3(float(width), 0.12, float(depth)),
+		])
+	else:
+		var path: String = MODEL_COMMERCIAL
+		if theme == "industrial":
+			path = MODEL_INDUSTRIAL
+			if rng_boolean(cell.x + cell.y + floors):
+				path = MODEL_INDUSTRIAL_ALT
+		elif rng_boolean(cell.x * 3 + cell.y + floors):
+			path = MODEL_COMMERCIAL_ALT
+		placements.append([
+			path, center, yaw,
+			Vector3(float(width) * 0.98, float(floors) * 2.6, float(depth) * 0.98),
+		])
+	_add_model_group(group, "BuildingModels", placements, Vector3.ZERO, 110.0, false)
+
+	var body := StaticBody3D.new()
+	body.name = "BuildingCollision"
+	body.collision_layer = 1
+	body.collision_mask = 0
+	body.set_meta("surface", "concrete")
+	var shape := CollisionShape3D.new()
+	shape.shape = BuildingScript.collision_shape(spec.get("boxes", []))
+	body.add_child(shape)
+	group.add_child(body)
+
+	var doors: Array = []
+	var door_index: int = 0
+	for value in spec.get("doors", []):
+		var door: Dictionary = value
+		var marker := Marker3D.new()
+		marker.name = "Door_%d" % door_index
+		marker.position = door.get("world_center", door.get("position", center))
+		marker.add_to_group("building_door")
+		marker.set_meta("building_cell", cell)
+		group.add_child(marker)
+		doors.append(marker)
+		door_index += 1
+
+	return {
+		"ok": true,
+		"root": group,
+		"style": str(spec.get("style", "")),
+		"doors": doors,
+		"node_count": BuildingScript.count_nodes(group),
+	}
+
+
+static func _build_office(
+	root: Node3D, spec: Dictionary, theme: String, time_of_day: String
+) -> Dictionary:
+	var cell: Vector2i = spec.get("cell", Vector2i.ZERO)
+	var width: int = maxi(4, int(spec.get("width", 5)))
+	var depth: int = maxi(4, int(spec.get("depth", 5)))
+	var x0: float = float(cell.x)
+	var z0: float = float(cell.y)
+	var group := Node3D.new()
+	group.name = "Office_%d_%d" % [cell.x, cell.y]
+	group.set_meta("surface", "wood")
+	group.set_meta("is_office", true)
+	group.set_meta("time_of_day", time_of_day)
+	root.add_child(group)
+
+	var side: String = str(spec.get("door_side", "south"))
+	var entrance: Vector3 = Vector3(x0 + float(width) * 0.5, 1.0, z0)
+	var spec_doors: Array = spec.get("doors", [])
+	if not spec_doors.is_empty():
+		var first_door: Dictionary = spec_doors[0]
+		side = str(first_door.get("side", side))
+		entrance = (first_door.get("world_center", entrance) as Vector3)
+		entrance.y = 1.0
+	var floors: Array = []
+	var walls: Array = []
+	var roofs: Array = []
+	var furniture: Array = []
+	var boxes: Array = []
+	for z in range(depth):
+		for x in range(width):
+			var point := Vector3(x0 + float(x) + 0.5, 0.02, z0 + float(z) + 0.5)
+			floors.append([MODEL_OFFICE_FLOOR, point, 0.0])
+			roofs.append([MODEL_OFFICE_ROOF, Vector3(point.x, 2.48, point.z), 0.0])
+
+	for x in range(width):
+		var south := Vector3(x0 + float(x) + 0.5, 1.2, z0 + 0.06)
+		var north := Vector3(x0 + float(x) + 0.5, 1.2, z0 + float(depth) - 0.06)
+		var south_door: bool = side == "south" and _near_xz(south, entrance, 0.6)
+		var north_door: bool = side == "north" and _near_xz(north, entrance, 0.6)
+		_office_wall_segment(walls, boxes,
+			MODEL_OFFICE_DOOR if south_door else MODEL_OFFICE_WALL,
+			south, 0.0, Vector3(1.0, 2.4, 0.12), south_door)
+		_office_wall_segment(walls, boxes,
+			MODEL_OFFICE_DOOR if north_door else MODEL_OFFICE_WINDOW,
+			north, 0.0, Vector3(1.0, 2.4, 0.12), north_door)
+	for z in range(depth):
+		var west := Vector3(x0 + 0.06, 1.2, z0 + float(z) + 0.5)
+		var east := Vector3(x0 + float(width) - 0.06, 1.2, z0 + float(z) + 0.5)
+		var west_door: bool = side == "west" and _near_xz(west, entrance, 0.6)
+		var east_door: bool = side == "east" and _near_xz(east, entrance, 0.6)
+		_office_wall_segment(walls, boxes,
+			MODEL_OFFICE_DOOR if west_door else MODEL_OFFICE_WINDOW,
+			west, PI * 0.5, Vector3(1.0, 2.4, 0.12), west_door)
+		_office_wall_segment(walls, boxes,
+			MODEL_OFFICE_DOOR if east_door else MODEL_OFFICE_WALL,
+			east, PI * 0.5, Vector3(1.0, 2.4, 0.12), east_door)
+
+	for x in range(1, width - 1):
+		var x_center: float = x0 + float(x) + 0.5
+		var partition_door: bool = (
+			absf(x_center - (x0 + 1.5)) < 0.55 or absf(x_center - (x0 + float(width) - 1.5)) < 0.55
+		)
+		_office_wall_segment(walls, boxes,
+			MODEL_OFFICE_DOOR if partition_door else MODEL_OFFICE_WALL,
+			Vector3(x_center, 1.2, z0 + 2.0), 0.0,
+			Vector3(1.0, 2.4, 0.12), partition_door)
+	var split_x: float = x0 + float(width - 2)
+	for z in range(2, depth - 1):
+		var z_center: float = z0 + float(z) + 0.5
+		var meeting_door: bool = absf(z_center - (z0 + 3.5)) < 0.55
+		_office_wall_segment(walls, boxes,
+			MODEL_OFFICE_DOOR if meeting_door else MODEL_OFFICE_WALL,
+			Vector3(split_x, 1.2, z_center), PI * 0.5,
+			Vector3(1.0, 2.4, 0.12), meeting_door)
+
+	_office_furniture(furniture, boxes, x0, z0, width, depth)
+	_add_model_group(group, "OfficeFloor", floors, Vector3(1.0, 0.04, 1.0), 70.0, true)
+	_add_model_group(group, "OfficeWalls", walls, Vector3.ZERO, 80.0, true)
+	_add_model_group(group, "OfficeFurniture", furniture, Vector3.ZERO, 70.0, true)
+	_add_model_group(group, "OfficeRoof", roofs, Vector3(1.0, 0.08, 1.0), 70.0, true)
+
+	var body := StaticBody3D.new()
+	body.name = "OfficeCollision"
+	body.collision_layer = 1
+	body.collision_mask = 0
+	body.set_meta("surface", "wood")
+	var shape := CollisionShape3D.new()
+	shape.name = "OfficeCollisionShape"
+	shape.shape = BuildingScript.collision_shape(boxes)
+	body.add_child(shape)
+	group.add_child(body)
+
+	var doors: Array = []
+	var door_positions: Array = []
+	_append_unique_point(door_positions, entrance)
+	for value in spec_doors:
+		var door_point: Vector3 = (value as Dictionary).get("world_center", entrance)
+		door_point.y = 1.0
+		_append_unique_point(door_positions, door_point)
+	_append_unique_point(door_positions, Vector3(x0 + 1.5, 1.0, z0 + 2.0))
+	_append_unique_point(door_positions, Vector3(x0 + float(width) - 1.5, 1.0, z0 + 2.0))
+	_append_unique_point(door_positions, Vector3(split_x, 1.0, z0 + minf(3.5, float(depth) - 0.5)))
+	for i in range(door_positions.size()):
+		var marker := Marker3D.new()
+		marker.name = "OfficeDoor_%d" % i
+		marker.position = door_positions[i]
+		marker.add_to_group("building_door")
+		marker.set_meta("building_cell", cell)
+		marker.set_meta("office", true)
+		group.add_child(marker)
+		doors.append(marker)
+
+	var energy: float = 0.12
+	if time_of_day == "atardecer":
+		energy = 0.55
+	elif time_of_day == "noche":
+		energy = 1.2
+	for light_point in [
+		Vector3(x0 + 1.5, 2.15, z0 + 1.3),
+		Vector3(x0 + float(width) * 0.5, 2.15, z0 + 3.0),
+		Vector3(x0 + float(width) - 1.3, 2.15, z0 + float(depth) - 1.3),
+	]:
+		var lamp := OmniLight3D.new()
+		lamp.name = "OfficeLight"
+		lamp.position = light_point
+		lamp.light_color = Color(1.0, 0.86, 0.68)
+		lamp.light_energy = energy
+		lamp.omni_range = 8.0
+		lamp.shadow_enabled = false
+		group.add_child(lamp)
+
+	return {
+		"ok": true,
+		"root": group,
+		"style": "office",
+		"doors": doors,
+		"spawns": _office_spawns(spec),
+		"node_count": BuildingScript.count_nodes(group),
+	}
+
+
+static func _near_xz(a: Vector3, b: Vector3, distance: float) -> bool:
+	return Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z)) < distance
+
+
+static func _append_unique_point(points: Array, point: Vector3) -> void:
+	for value in points:
+		if (value as Vector3).distance_to(point) < 0.6:
+			return
+	points.append(point)
+
+
+static func _office_wall_segment(
+	walls: Array, boxes: Array, path: String, center: Vector3,
+	yaw: float, fit: Vector3, transparent: bool
+) -> void:
+	if not ResourceLoader.exists(path):
+		return
+	walls.append([path, center, yaw, fit])
+	if not transparent:
+		var size := fit
+		if absf(sin(yaw)) > 0.5:
+			size = Vector3(fit.z, fit.y, fit.x)
+		boxes.append({"center": center, "size": size})
+
+
+static func _office_furniture(
+	placements: Array, boxes: Array, x0: float, z0: float, width: int, depth: int
+) -> void:
+	var counter_center := Vector3(x0 + 1.3, 0.55, z0 + 0.9)
+	placements.append([MODEL_COUNTER, counter_center, 0.0, Vector3(1.8, 1.1, 0.65)])
+	boxes.append({"center": counter_center, "size": Vector3(1.8, 1.1, 0.65)})
+	var sofa_center := Vector3(x0 + float(width) - 1.2, 0.45, z0 + 0.9)
+	placements.append([MODEL_SOFA, sofa_center, PI, Vector3(1.5, 0.9, 0.8)])
+	boxes.append({"center": sofa_center, "size": Vector3(1.5, 0.9, 0.8)})
+	var desk_points: Array = [
+		Vector3(x0 + 1.4, 0.4, z0 + minf(3.1, float(depth) - 0.9)),
+		Vector3(x0 + minf(2.5, float(width) - 0.6), 0.4, z0 + maxf(1.2, float(depth) - 1.0)),
+		Vector3(x0 + float(width) - 1.2, 0.4, z0 + 1.3),
+	]
+	for point in desk_points:
+		placements.append([MODEL_DESK, point, 0.0, Vector3(1.3, 0.8, 0.75)])
+		boxes.append({"center": point, "size": Vector3(1.3, 0.8, 0.75)})
+		placements.append([MODEL_CHAIR, point + Vector3(0.0, 0.25, 0.85), PI, Vector3(0.55, 0.9, 0.55)])
+		placements.append([MODEL_COMPUTER, point + Vector3(0.0, 0.82, -0.2), 0.0, Vector3(0.55, 0.4, 0.12)])
+	var shelf_a := Vector3(x0 + 0.35, 0.95, z0 + minf(3.2, float(depth) - 0.4))
+	var shelf_b := Vector3(x0 + float(width) - 0.35, 0.95, z0 + maxf(1.5, float(depth) - 0.4))
+	for shelf in [shelf_a, shelf_b]:
+		placements.append([MODEL_SHELF, shelf, PI * 0.5, Vector3(1.2, 1.9, 0.4)])
+		boxes.append({"center": shelf, "size": Vector3(0.4, 1.9, 1.2)})
+	placements.append([MODEL_PLANT, Vector3(x0 + 0.6, 0.5, z0 + 0.6), 0.0, Vector3(0.7, 1.0, 0.7)])
+	placements.append([MODEL_PLANT, Vector3(x0 + float(width) - 0.7, 0.5, z0 + 0.6), 0.0, Vector3(0.7, 1.0, 0.7)])
+	placements.append([MODEL_PLANT, Vector3(x0 + 1.0, 0.5, z0 + float(depth) - 0.7), 0.0, Vector3(0.7, 1.0, 0.7)])
+	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + 1.5, 2.35, z0 + 1.3), 0.0, Vector3(0.5, 0.12, 0.5)])
+	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + float(width) * 0.5, 2.35, z0 + minf(3.0, float(depth) - 0.7)), 0.0, Vector3(0.5, 0.12, 0.5)])
+	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + float(width) - 1.3, 2.35, z0 + float(depth) - 1.3), 0.0, Vector3(0.5, 0.12, 0.5)])
+
+
+static func _office_spec(
+	seed_value: int, width: int, height: int, reserved: Dictionary,
+	buildings: Array, street_cells: Dictionary
+) -> Dictionary:
+	var size: int = 5
+	var candidates: Array = []
+	for option in ([5, 4, 3] if width >= 16 and height >= 14 else [4, 3]):
+		size = int(option)
+		candidates.clear()
+		for y in range(1, maxi(2, height - size - 1)):
+			for x in range(1, maxi(2, width - size - 1)):
+				var cell := Vector2i(x, y)
+				var footprint: Array = _footprint(cell, size, size)
+				if not _cells_free(footprint, reserved) or not _separated(buildings, footprint):
+					continue
+				if _street_side(cell, size, size, street_cells).is_empty():
+					continue
+				candidates.append(cell)
+		if not candidates.is_empty():
+			break
+	if candidates.is_empty():
+		return {}
+	var center := Vector2(float(width) * 0.5, float(height) * 0.5)
+	candidates.sort_custom(func(a, b):
+		var da: float = Vector2(a).distance_to(center) + float((a.x * 17 + a.y * 31 + seed_value) % 13) * 0.01
+		var db: float = Vector2(b).distance_to(center) + float((b.x * 17 + b.y * 31 + seed_value) % 13) * 0.01
+		return da < db
+	)
+	var cell_choice: Vector2i = candidates[0]
+	var spec: Dictionary = BuildingScript.generate(
+		seed_value ^ 0x4f464643,
+		{
+			"cell": cell_choice,
+			"width": size,
+			"depth": size,
+			"floors": 1,
+			"style": "brick",
+			"door_side": _street_side(cell_choice, size, size, street_cells),
+		}
+	)
+	if not bool(spec.get("ok", false)):
+		return {}
+	spec["name"] = "Oficina Central"
+	spec["is_office"] = true
+	spec["office_role"] = "city_hall"
+	var spec_doors: Array = spec.get("doors", [])
+	if not spec_doors.is_empty():
+		spec["door_side"] = str((spec_doors[0] as Dictionary).get("side", "south"))
+	spec["spawns"] = _office_spawns(spec)
+	return spec
+
+
+static func _office_spawns(spec: Dictionary) -> Array:
+	var cell: Vector2i = spec.get("cell", Vector2i.ZERO)
+	var width: int = int(spec.get("width", 5))
+	var depth: int = int(spec.get("depth", 5))
+	var x0: float = float(cell.x)
+	var z0: float = float(cell.y)
+	return [
+		Vector3(x0 + 1.5, 0.1, z0 + 1.7),
+		Vector3(x0 + minf(1.6, float(width) - 0.7), 0.1, z0 + float(depth) - 0.9),
+		Vector3(x0 + minf(2.6, float(width) - 0.5), 0.1, z0 + float(depth) - 1.0),
+		Vector3(x0 + float(width) - 1.2, 0.1, z0 + float(depth) - 0.8),
+	]
+
+
+static func _landmarks(
+	theme: String, buildings: Array, streets: Dictionary, width: int, height: int
+) -> Array:
+	var result: Array = []
+	var roads: Array = streets.get("road_cells", [])
+	for value in buildings:
+		var spec: Dictionary = value
+		if bool(spec.get("is_office", false)):
+			var cell: Vector2i = spec.get("cell", Vector2i.ZERO)
+			var size: float = float(spec.get("width", 4))
+			result.append({
+				"id": "oficina_central",
+				"name": "Oficina Central",
+				"type": "office",
+				"position": BuildingScript.cell_center(cell) + Vector3(size * 0.5 - 0.5, 0.0, size * 0.5 - 0.5),
+			})
+			break
+	if not roads.is_empty():
+		var crossing: Vector2i = roads[mini(roads.size() / 2, roads.size() - 1)]
+		result.append({
+			"id": "plaza",
+			"name": "Plaza central" if theme == "urbano" else "Cruce principal",
+			"type": "plaza",
+			"position": BuildingScript.cell_center(crossing),
+		})
+	var marker_cell := Vector2i(clampi(width - 3, 0, width - 1), clampi(height - 3, 0, height - 1))
+	result.append({
+		"id": "zona_verde" if theme == "rural" else "mirador",
+		"name": "Arboleda" if theme == "rural" else ("Mirador industrial" if theme == "industrial" else "Mirador urbano"),
+		"type": "landmark",
+		"position": BuildingScript.cell_center(marker_cell),
+	})
+	return result
+
+
+static func rng_boolean(seed_value: int) -> bool:
+	return absi(seed_value) % 3 != 0
 
 
 static func _queue(
@@ -674,6 +1170,6 @@ static func _prop_kind(theme: String, index: int, rng: RandomNumberGenerator) ->
 		"urbano":
 			return "lamp" if index % 2 == 0 else "car"
 		"industrial":
-			return "pipe" if rng.randf() < 0.5 else "fence"
+			return "pipe" if index % 2 == 0 else "fence"
 		_:
-			return "tree" if rng.randf() < 0.65 else "rock"
+			return "tree" if index % 2 == 0 else "rock"

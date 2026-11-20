@@ -1,0 +1,14 @@
+{
+  "source": "Kenney Car Kit 3.1 (CC0 1.0), https://kenney.nl/assets/car-kit, mirror https://github.com/Arslan12216775/kenney_car-kit",
+  "license": "CC0 1.0",
+  "notes": "Ruedas separadas en el GLB (nodos wheel-*), texturas embebidas (colormap), todos <3k triangulos.",
+  "vehicles": [
+    {"id": "sedan", "file": "sedan.glb", "kind": "turismo", "triangles": 2032},
+    {"id": "pickup", "file": "truck.glb", "kind": "pickup", "triangles": 2082},
+    {"id": "sports", "file": "sedan-sports.glb", "kind": "deportivo", "triangles": 2088},
+    {"id": "van", "file": "delivery.glb", "kind": "furgoneta", "triangles": 2476},
+    {"id": "buggy", "file": "kart-oobi.glb", "kind": "buggy", "triangles": 2884},
+    {"id": "suv", "file": "suv.glb", "kind": "suv", "triangles": 2474},
+    {"id": "racer", "file": "race.glb", "kind": "carreras", "triangles": 1952}
+  ]
+}

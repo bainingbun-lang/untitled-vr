@@ -6,12 +6,15 @@ signal reload_started(weapon_id: String)
 signal reload_finished(weapon_id: String)
 signal reload_cancelled(weapon_id: String)
 signal impact(info: Dictionary)
+signal cycled(weapon_id: String)
 
 const DbScript = preload("res://core/game/weapon_db.gd")
 const GoreFxScript = preload("res://core/game/gore_fx.gd")
 const SurfaceScript = preload("res://core/game/surface_material.gd")
 const ImpactFxScript = preload("res://core/game/impact_fx.gd")
 
+const CYCLE_REASON := "montar arma"
+const CYCLE_BACK := 0.06
 const MAX_PROJECTILES := 16
 const MAX_DEBRIS := 20
 const MAX_BROKEN := 32
@@ -31,6 +34,10 @@ var _magazines: Dictionary = {}
 var _reserves: Dictionary = {}
 var _reload_ready: Dictionary = {}
 var _reload_total: Dictionary = {}
+var _manual_locks: Dictionary = {}
+var _cycle_pending: Dictionary = {}
+var _stroke_back: Dictionary = {}
+var manual_cycle: bool = false
 var _log: Array = []
 var _projectiles: Array = []
 var _projectile_events: Array = []
@@ -87,7 +94,48 @@ func set_ammo(weapon_id: String, loaded: int, reserve: int = -1) -> bool:
 
 
 func is_reloading(weapon_id: String) -> bool:
-	return _reload_ready.has(weapon_id)
+	return _reload_ready.has(weapon_id) or _manual_locks.has(weapon_id)
+
+
+# Escopeta (bombeo) y francotirador (cerrojo): con manual_cycle exigen accionar el mecanismo entre tiros.
+func needs_cycle(weapon_id: String) -> bool:
+	return _cycle_pending.has(weapon_id)
+
+
+func clear_cycle(weapon_id: String) -> void:
+	_cycle_pending.erase(weapon_id)
+	_stroke_back.erase(weapon_id)
+
+
+func cycle(weapon_id: String) -> bool:
+	if not _cycle_pending.has(weapon_id):
+		return false
+	clear_cycle(weapon_id)
+	cycled.emit(weapon_id)
+	return true
+
+
+# rel: desplazamiento de la mano libre respecto al reposo (negativo = hacia atras).
+func cycle_stroke(weapon_id: String, rel: float) -> bool:
+	if not _cycle_pending.has(weapon_id):
+		return false
+	if rel <= -CYCLE_BACK:
+		_stroke_back[weapon_id] = true
+	elif bool(_stroke_back.get(weapon_id, false)) and rel >= -CYCLE_BACK * 0.25:
+		return cycle(weapon_id)
+	return false
+
+
+func set_manual_lock(weapon_id: String, reason: String = "recargando") -> void:
+	if reason.is_empty():
+		_manual_locks.erase(weapon_id)
+	else:
+		_manual_locks[weapon_id] = reason
+
+
+func set_loaded_raw(weapon_id: String, loaded: int, reserve: int) -> void:
+	_magazines[weapon_id] = maxi(loaded, 0)
+	_reserves[weapon_id] = maxi(reserve, 0)
 
 
 func reload_progress(weapon_id: String) -> float:
@@ -104,7 +152,7 @@ func reload(weapon_id: String) -> bool:
 		return false
 	_resolve_reloads()
 	_ensure_loaded(weapon_id, def)
-	if _reload_ready.has(weapon_id):
+	if _reload_ready.has(weapon_id) or _manual_locks.has(weapon_id):
 		return false
 	var mag: int = maxi(int(def.get("mag", 0)), 0)
 	if mag <= 0 or int(_magazines[weapon_id]) >= mag or reserve(weapon_id) <= 0:
@@ -142,6 +190,10 @@ func fire_block_reason(weapon_id: String) -> String:
 		return "arma desconocida: %s" % weapon_id
 	if _reload_ready.has(weapon_id):
 		return "recargando"
+	if _manual_locks.has(weapon_id):
+		return str(_manual_locks[weapon_id])
+	if _cycle_pending.has(weapon_id):
+		return CYCLE_REASON
 	if bool(def.get("uses_ammo", true)):
 		_ensure_loaded(weapon_id, def)
 		if int(_magazines[weapon_id]) <= 0:
@@ -170,6 +222,7 @@ func ammo_info(weapon_id: String) -> Dictionary:
 		"reload_progress": reload_progress(weapon_id),
 		"can_fire": can_fire(weapon_id),
 		"block_reason": fire_block_reason(weapon_id),
+		"needs_cycle": needs_cycle(weapon_id),
 		"fire_interval": fire_interval(weapon_id),
 	}
 
@@ -200,6 +253,10 @@ func fire(weapon_id: String, origin: Vector3, direction: Vector3, space: Physics
 	if bool(def.get("uses_ammo", true)):
 		_magazines[weapon_id] = maxi(int(_magazines.get(weapon_id, 0)) - 1, 0)
 	result["fired"] = true
+	if manual_cycle and int(_magazines.get(weapon_id, 0)) > 0:
+		var tags: Array = def.get("tags", [])
+		if tags.has("shotgun") or tags.has("sniper"):
+			_cycle_pending[weapon_id] = true
 
 	var count: int = maxi(int(def.get("pellets", 1)), 1)
 	result["pellets"] = count

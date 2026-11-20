@@ -8,6 +8,7 @@ const ITEM_DB_PATH := "res://core/game/item_db.gd"
 const INVENTORY_PATH := "res://core/game/inventory.gd"
 const LOADOUT_PATH := "res://core/game/loadout.gd"
 const VIEWMODEL_PATH := "res://core/game/weapon_viewmodel.gd"
+const ReloadSystemScript = preload("res://core/game/reload_system.gd")
 const SFX_BANK_PATH := "res://core/game/sfx_bank.gd"
 const AUDIO_SYNTH_PATH := "res://core/game/audio_synth.gd"
 const TOUCH_SIGNALS := [
@@ -47,6 +48,9 @@ var inventory
 var item_db = null
 var health: float = 100.0
 var equipped_weapon: String = ""
+var manual_reload: bool = false
+var auto_cycle: bool = false
+var reload_system = null
 var vehicle: Node3D = null
 var head: Node3D
 var camera: Camera3D
@@ -468,6 +472,8 @@ func equip(item_id: String) -> bool:
 		return false
 	if inventory != null and inventory.has_method("count") and int(inventory.count(item_id)) <= 0:
 		return false
+	if reload_system != null and item_id != equipped_weapon:
+		reload_system.cancel("cambio_de_arma")
 	equipped_weapon = item_id
 	if _viewmodel_has_model(item_id) and viewmodel.has_method("set_weapon"):
 		viewmodel.call("set_weapon", item_id)
@@ -511,6 +517,7 @@ func _get_weapon_system() -> Node:
 		return null
 	add_child(node)
 	_weapon_system = node
+	node.set("manual_cycle", not auto_cycle)
 	return node
 
 
@@ -541,6 +548,10 @@ func reload() -> bool:
 	var ws := _get_weapon_system()
 	if ws == null or not ws.has_method("reload"):
 		return false
+	if ws.has_method("needs_cycle") and bool(ws.call("needs_cycle", equipped_weapon)):
+		return cycle_action()
+	if manual_reload and ws.has_method("set_manual_lock"):
+		return _manual_reload_tap(ws)
 	var started := bool(ws.call("reload", equipped_weapon))
 	if started:
 		var duration: float = maxf(float(_weapon_def(equipped_weapon).get("reload_time", 1.0)), 0.05)
@@ -554,6 +565,41 @@ func reload() -> bool:
 			synth.call("play_synth", audio_host, "reload", equipped_weapon, global_position, "sfx")
 		reloaded.emit(equipped_weapon)
 	return started
+
+
+# Montar (bombeo/cerrojo) entre disparos; el boton Recargar lo hace si hay montaje pendiente.
+func cycle_action() -> bool:
+	var ws := _get_weapon_system()
+	if _dead or ws == null or not ws.has_method("cycle") or equipped_weapon.is_empty():
+		return false
+	var done := bool(ws.call("cycle", equipped_weapon))
+	if done:
+		var synth := _safe_script(SFX_BANK_PATH)
+		var audio_host: Node3D = get_parent() as Node3D
+		if synth != null and synth.has_method("play_synth") and audio_host != null:
+			synth.call("play_synth", audio_host, "reload", equipped_weapon, global_position, "sfx")
+	return done
+
+
+func set_auto_cycle(enabled: bool) -> void:
+	auto_cycle = enabled
+	var ws := _get_weapon_system()
+	if ws != null:
+		ws.set("manual_cycle", not enabled)
+
+
+func _manual_reload_tap(ws: Node) -> bool:
+	if reload_system == null:
+		reload_system = ReloadSystemScript.new(ws)
+		reload_system.finished.connect(func(_id: String) -> void:
+			reloaded.emit(equipped_weapon)
+			_emit_ammo())
+		reload_system.phase_changed.connect(func(_id: String, _phase: String) -> void: _emit_ammo())
+	if not reload_system.active and not reload_system.begin(equipped_weapon):
+		return false
+	var done: bool = reload_system.perform_current(global_position)
+	_emit_ammo()
+	return done
 
 
 func reload_action() -> void:

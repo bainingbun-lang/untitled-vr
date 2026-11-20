@@ -158,3 +158,87 @@ Robot Vuena (22 huesos, esquema Mixamo): `mixamorig_Hips`, `mixamorig_Spine`,
 Godot importa los huesos Mixamo del robot con `_` en vez de `:`; el código acepta ambos
 prefijos. `apply_wound()` / `detach_limb()` aceptan además alias como `arm.L`, `leg.R`,
 `head`, `hand.L`, etc.
+
+---
+
+# Dependencia de build VR (V1) — licencia MIT
+
+No es un asset visual del juego: es el plugin nativo usado solo en la compilación
+Quest/OpenXR de `build/vr_project`. Se descargó a un directorio temporal vacío y se
+inspeccionó (ZIP, `plugin.gdextension`, AAR) sin ejecutar nada.
+
+| Nombre | Autor | URL | Licencia | Archivos |
+|---|---|---|---|---|
+| Godot OpenXR Vendors 5.2.0-stable | GodotVR / Godot OpenXR contributors | https://github.com/GodotVR/godot_openxr_vendors/releases/tag/5.2.0-stable | MIT | `build/vr_project/addons/godotopenxrvendors/*` (reescrito por `tools/build_vr.sh`), copia de licencia en `LICENSE-MIT.txt`; caché en `~/untitled-control/vendor/godotopenxrvendors-5.2.0-stable/` |
+
+---
+
+# Créditos de modelos 3D (W3 — armas reales, brazos y manos)
+
+Modelos descargados (no generados con primitivas ni por código) a directorios temporales
+vacíos bajo `/data/data/com.termux/files/usr/tmp/opencode/w3/`, inspeccionados como
+GLB/glTF (JSON interno, triángulos, nodos, huesos, animaciones y texturas) y copiados
+después a `res://assets/`. Ningún archivo descargado fue ejecutado. Los modelos con
+licencia CC BY 3.0 se atribuyen aquí con autor, URL y archivos; los CC0 se registran
+igualmente por trazabilidad.
+
+## Armas (`assets/models/weapons/v2/`)
+
+| Id | Modelo | Autor | URL | Licencia | Archivo | Tris |
+|---|---|---|---|---|---|---:|
+| `pistol` | Glock | J-Toastie | https://poly.pizza/m/q3lsX3tSta | CC BY 3.0 | `pistol.glb` | 5.105 |
+| `submachine_gun` | MPX | austincford | https://poly.pizza/m/p7sAqeuUWR | CC BY 3.0 | `submachine_gun.glb` | 6.869 |
+| `assault_rifle` | AKM | J-Toastie | https://poly.pizza/m/ZBBoDqAn0A | CC BY 3.0 | `assault_rifle.glb` | 5.247 |
+| `shotgun` | Shotgun Pump West | Pichuliru | https://poly.pizza/m/NfQETBKOiw | CC0 1.0 | `shotgun.glb` | 1.069 |
+| `sniper_rifle` | Sniper Rifle | J-Toastie | https://poly.pizza/m/vGAzj2Of5M | CC BY 3.0 | `sniper_rifle.glb` | 4.963 |
+| `bat` | Baseball Bat (nails) | CreativeTrio | https://poly.pizza/m/K24oYy6R7c | CC0 1.0 | `bat.glb` | 1.076 |
+
+CC BY 3.0: https://creativecommons.org/licenses/by/3.0/ — se conservan autor y URL de
+cada modelo derivado de Poly Pizza. El manifest `assets/models/weapons/v2/manifest.json`
+documenta archivo, escala, offset de agarre, longitud real, nodos y roles por pieza.
+Las mallas skinneadas (AKM, escopeta) no exponen pivotes Node3D estables: sus piezas se
+resuelven por corte AABB sobre el modelo importado; el resto usa los nodos reales del GLB.
+
+## Brazos FPS (`assets/models/weapons/v2/`)
+
+| Modelo | Autor | URL | Licencia | Archivo | Tris | Huesos/animaciones |
+|---|---|---|---|---|---:|---|
+| WRAD Arms (rigged) | wwwriks | https://github.com/wwwriks/wrad-arms | CC0 1.0 | `fps_arms.glb` | 1.196 | ~50 huesos |
+| Fps Rig AKM | J-Toastie | https://poly.pizza/m/U6l6wjxFhC | CC BY 3.0 | `fps_arms_akm.glb` | 7.679 | 28 huesos; `Armature|Idle`, `Armature|Reload`, `Armature|Shoot` |
+
+Copia local de la licencia CC0 de WRAD Arms: `assets/models/weapons/v2/licenses/WRAD_ARMS_CC0.txt`.
+
+## Manos VR (`assets/models/hands/`)
+
+| Modelo | Autor | URL | Licencia | Archivos |
+|---|---|---|---|---|
+| Godot XR Tools low-poly hands | DigitalN8m4r3 (Miodrag Sejic) | https://github.com/GodotVR/godot-xr-tools/tree/master/addons/godot-xr-tools/hands | CC0 1.0 | `Hand_low_L.gltf`, `Hand_low_R.gltf`, `caucasian_baseColor.png`, `hands_normal.png`, `hands_occlusionRoughnessMetallic.png`, `LICENSE-CC0-GODOTXR.md`, `About.md` |
+
+Manos con esqueleto de 26 huesos each (dedos completos), buffers embebidos y texturas
+1024x1024. Licencia local: `assets/models/hands/LICENSE-CC0-GODOTXR.md`.
+
+## Presupuesto móvil verificado (W3)
+
+Ningún arma supera 8.000 triángulos (máximo: SMG, 6.869). Las texturas embebidas o
+externas son <=1024px (atlas de bate 256x256; manos 1024x1024). Tamaño total añadido:
+aprox. 7 MB (3,3 MB en `weapons/v2` + 3,7 MB en `hands`).
+
+## Mapas 3D temáticos (`assets/models/maps/`)
+
+Kits Kenney descargados desde `https://raw.githubusercontent.com/shorepine/kenney/main/3d/`
+a un directorio temporal vacío, inspeccionados como GLB/JSON (AABB, triángulos y materiales)
+y copiados sin ejecutarlos. Licencia CC0 1.0; copia local:
+`assets/models/maps/LICENSE-CC0-KENNEY.txt`. Todos los GLB usan la textura compartida `colormap.png`
+de 1024x1024 o menos y están por debajo del límite de 5.000 tris por prop.
+
+| Kit | Autor | URL | Licencia | Archivos |
+|---|---|---|---|---|
+| City Roads Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/city-roads-kit | CC0 1.0 | `construction-barrier.glb`, `construction-cone.glb`, `light-square.glb`, `road-bend-sidewalk.glb`, `road-crossing.glb`, `road-crossroad.glb`, `road-side-barrier.glb`, `road-side.glb`, `road-straight.glb`, `tile-high.glb`, `tile-low.glb`, `Textures/colormap.png` |
+| City Commercial Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/city-commercial-kit | CC0 1.0 | `building-a.glb` ... `building-n.glb`, `detail-awning-wide.glb`, `Textures/colormap.png` |
+| City Industrial Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/city-industrial-kit | CC0 1.0 | `building-a.glb`, `building-b.glb`, `building-c.glb`, `building-d.glb`, `chimney-large.glb`, `detail-tank.glb`, `Textures/colormap.png` |
+| Building Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/building-kit | CC0 1.0 | `border.glb`, `column.glb`, `door-rotate-square-a.glb`, `floor.glb`, `roof-flat-center.glb`, `stairs-center.glb`, `wall-doorway-wide-square.glb`, `wall-window-square.glb`, `wall.glb`, `Textures/colormap.png` |
+| Car Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/car-kit | CC0 1.0 | `ambulance.glb`, `police.glb`, `sedan.glb`, `taxi.glb`, `truck.glb`, `van.glb`, `Textures/colormap.png` |
+| Factory Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/factory-kit | CC0 1.0 | `catwalk-straight.glb`, `structure-doorway-wide.glb`, `structure-wall.glb`, `Textures/colormap.png` |
+| Furniture Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/furniture-kit | CC0 1.0 | `bookcaseOpen.glb`, `chairDesk.glb`, `computerScreen.glb`, `desk.glb`, `floorFull.glb`, `kitchenBar.glb`, `lampSquareCeiling.glb`, `loungeSofa.glb`, `pottedPlant.glb`, `wall.glb`, `wallDoorwayWide.glb`, `wallWindow.glb` (+25 GLB del kit) |
+| Nature Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/nature-kit | CC0 1.0 | `fence_simple.glb`, `grass_large.glb`, `ground_grass.glb`, `ground_pathStraight.glb`, `plant_bush.glb`, `rock_largeA.glb`, `tree_default.glb`, `tree_oak.glb`, `tree_pineDefaultA.glb` |
+| Car Kit (vehiculos jugables G5) | Kenney (Kenney.NL), espejo https://github.com/Arslan12216775/kenney_car-kit | https://kenney.nl/assets/car-kit | CC0 1.0 | `assets/models/vehicles/`: `sedan.glb`, `truck.glb`, `sedan-sports.glb`, `delivery.glb`, `kart-oobi.glb`, `suv.glb`, `race.glb` (ruedas separadas, texturas embebidas; manifest.json) |

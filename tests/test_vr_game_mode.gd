@@ -6,6 +6,29 @@ const SessionScript = preload("res://core/game/game_session.gd")
 const VrGameModeScript = preload("res://core/vr/vr_game_mode.gd")
 const DbScript = preload("res://core/game/weapon_db.gd")
 
+class MockXR extends RefCounted:
+	signal session_begun
+	signal session_visible
+	signal session_focussed
+	signal session_stopping
+	signal session_loss_pending
+	signal pose_recentered
+	signal user_presence_changed(present: bool)
+	var initialized: bool = false
+	var display_refresh_rate: float = 0.0
+	var foveation_level: int = 0
+	var foveation_dynamic: bool = false
+
+	func initialize() -> bool:
+		initialized = true
+		return true
+
+	func is_initialized() -> bool:
+		return initialized
+
+	func get_available_display_refresh_rates() -> Array:
+		return []
+
 var _checks: int = 0
 var _failures: Array = []
 var _case: String = ""
@@ -16,6 +39,7 @@ func _initialize() -> void:
 	await _test_platform_and_build()
 	await _test_world_vr()
 	await _test_start_menu()
+	await _test_start_menu_xr()
 	await _test_pc_world()
 	_reset_state()
 	if _failures.is_empty():
@@ -88,6 +112,23 @@ func _test_world_vr() -> void:
 	state.call("refresh_hud")
 	_expect(hud.weapon_ammo_label.text.find("12/12") >= 0, "el HUD 3D muestra la municion del arma en mano")
 
+	_expect(VrGameModeScript.flat_ui_nodes(root).is_empty(), "VR: ningun GameHud/TouchControls/Hotbar en el arbol")
+	_expect(rig.left_hand.is_ancestor_of(hud.health_label) or rig.is_ancestor_of(hud.health_label), "vida diegetica en el rig (muñeca)")
+	_expect(rig.right_hand.is_ancestor_of(hud.weapon_ammo_label) or rig.right_hand.holder.is_ancestor_of(hud.weapon_ammo_label), "municion diegetica en el arma")
+	var layer := CanvasLayer.new()
+	layer.name = "HudLayer"
+	var flat_hud := Control.new()
+	flat_hud.name = "GameHud"
+	layer.add_child(flat_hud)
+	world.add_child(layer)
+	var touch = (load("res://scenes/ui/touch_controls.tscn") as PackedScene).instantiate()
+	var bar = (load("res://scenes/ui/hotbar.tscn") as PackedScene).instantiate()
+	world.add_child(touch)
+	world.add_child(bar)
+	_expect(VrGameModeScript.flat_ui_nodes(world).size() >= 3, "el detector encuentra HUD plano colado")
+	state.call("tick", 1.1)
+	_expect(VrGameModeScript.flat_ui_nodes(world).is_empty() and state.flat_ui_removed >= 3, "el guardia de VR elimina el HUD plano")
+
 	state.call("toggle_menu")
 	_expect(bool(menu.is_open), "el boton de menu abre VrMenu")
 	_expect(bool(rig.get("inputs_suspended")), "abrir menu suspende los controles del rig")
@@ -112,10 +153,28 @@ func _test_start_menu() -> void:
 	var host = root.get_node_or_null("VrStartMenu")
 	_expect(host != null, "se crea el panel de inicio 3D")
 	var menu = host.get_node_or_null("VrStartMenuPanel") if host != null else null
+	_expect(not root.use_xr, "sin XR real el menu de inicio no activa use_xr")
 	_expect(menu != null and menu.buttons.size() == 2, "menu 3D de inicio con dos opciones")
 	_expect(SessionScript.vr_menu_confirmed, "el menu de inicio queda marcado como confirmado")
 	if host != null:
 		host.free()
+	VrGameModeScript.last_start_menu = null
+	await process_frame
+
+
+func _test_start_menu_xr() -> void:
+	_case = "menu de inicio con XR"
+	var boot = preload("res://core/vr/vr_bootstrap.gd")
+	boot.interface_override = MockXR.new()
+	boot.boot(root, self)
+	var host_menu = VrGameModeScript.build_start_menu({"seed": 1, "ok": true}, self)
+	_expect(host_menu != null and root.use_xr, "con XR activo el Viewport recibe use_xr (no la camara)")
+	if host_menu != null:
+		host_menu.get_parent().free()
+	root.use_xr = false
+	boot.interface_override = null
+	boot.active = null
+	boot.last_result = {"xr_active": false, "reason": "not_run"}
 	VrGameModeScript.last_start_menu = null
 	await process_frame
 

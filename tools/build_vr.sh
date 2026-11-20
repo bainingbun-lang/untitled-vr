@@ -64,6 +64,8 @@ cp -r "$VENDOR_CACHE/addons/godotopenxrvendors" "$P/addons/" || fail "copia del 
 cp "$VENDOR_CACHE/LICENSE" "$P/addons/godotopenxrvendors/LICENSE-MIT.txt" || fail "copia de LICENSE-MIT"
 
 unzip -q "$TEMPLATE_ZIP" -d "$P/android/build" || fail "instalacion de plantilla Gradle"
+touch "$P/android/.gdignore" || fail "no se pudo ignorar android/ en el escaneo de Godot"
+find "$P/android" -name '*.import' -type f -delete
 printf '4.7.stable' > "$P/android/.build_version"
 cat >> "$P/android/build/gradle.properties" <<EOF
 
@@ -83,7 +85,7 @@ import sys
 path = sys.argv[1]
 updates = {
     "application": {
-        "run/main_scene": '"res://scenes/menu/main_menu.tscn"',
+        "run/main_scene": '"res://scenes/vr/vr_boot.tscn"',
     },
     "rendering": {
         "renderer/rendering_method": '"mobile"',
@@ -94,15 +96,16 @@ updates = {
         "shaders/enabled": "true",
         "openxr/form_factor": "0",
         "openxr/view_configuration": "1",
-        "openxr/reference_space": "1",
+        "openxr/reference_space": "2",
         "openxr/environment_blend_mode": "0",
         "openxr/startup_alert": "false",
-        "openxr/foveation_level": "3",
-        "openxr/foveation_dynamic": "false",
+        "openxr/foveation_level": "1",
+        "openxr/foveation_dynamic": "true",
         "openxr/foveation_eye_tracked": "false",
         "openxr/foveation_with_subsampled_images": "false",
         "openxr/extensions/hand_tracking": "false",
         "openxr/extensions/eye_gaze_interaction": "false",
+        "openxr/extensions/user_presence": "true",
     },
 }
 
@@ -142,6 +145,21 @@ with open(path, "w", encoding="utf-8") as handle:
             handle.write(line + "\n")
         handle.write("\n")
 PY
+
+# Verifica en la copia VR el arranque y las opciones XR (el project.godot principal no se toca).
+VR_CHECKS='run/main_scene="res://scenes/vr/vr_boot.tscn"
+openxr/enabled=true
+shaders/enabled=true
+openxr/reference_space=2
+openxr/environment_blend_mode=0
+openxr/foveation_level=1
+openxr/foveation_dynamic=true
+openxr/extensions/user_presence=true'
+while IFS= read -r want; do
+	grep -qxF "$want" "$P/project.godot" || fail "falta en build/vr_project/project.godot: $want"
+done <<< "$VR_CHECKS"
+[ -f "$P/scenes/vr/vr_boot.tscn" ] && [ -f "$P/core/vr/vr_bootstrap.gd" ] || fail "falta la escena de arranque VR en la copia"
+echo VR_PROJECT_SETTINGS_OK
 
 grun "$GODOT" --headless --path "$P" --import > "$IMPORT_LOG" 2>&1
 import_code=$?

@@ -1,6 +1,7 @@
 class_name VrGameMode
 extends RefCounted
 
+const BOOTSTRAP_PATH: String = "res://core/vr/vr_bootstrap.gd"
 const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
 const SESSION_PATH: String = "res://core/game/game_session.gd"
 const VrRigScript = preload("res://core/vr/vr_rig.gd")
@@ -38,6 +39,9 @@ class State extends Node:
 	var hands: Dictionary = {}
 	var selected_meta: Dictionary = {}
 	var current_weapon: String = ""
+	var flat_ui_removed: int = 0
+	var flat_ui_guard: Callable = Callable()
+	var _guard_time: float = 0.0
 
 
 	func configure(p_world: Node3D, p_rig: Node3D, p_ws: Node, p_meta: Dictionary) -> void:
@@ -48,6 +52,12 @@ class State extends Node:
 		bag = rig.get("bag")
 		hands["left"] = rig.get("left_hand")
 		hands["right"] = rig.get("right_hand")
+		weapon_system.set("manual_cycle", true)
+		for hand_name in hands:
+			var weapon_hand = hands[hand_name]
+			if weapon_hand != null:
+				weapon_hand.manual_gesture_reload = true
+				weapon_hand._ensure_reload_system()
 		_setup_hud()
 		_setup_menu()
 		_connect_signals()
@@ -104,6 +114,11 @@ class State extends Node:
 	func tick(delta: float) -> void:
 		if rig == null or not is_instance_valid(rig):
 			return
+		_guard_time += maxf(delta, 0.0)
+		if _guard_time >= 1.0:
+			_guard_time = 0.0
+			if flat_ui_guard.is_valid():
+				flat_ui_removed += int(flat_ui_guard.call(world))
 		rig.call("step", delta)
 		if weapon_system != null and is_instance_valid(weapon_system):
 			weapon_system.call("advance", maxf(delta, 0.0))
@@ -384,10 +399,47 @@ static func _build_player(world: Node3D) -> Node3D:
 	return camera
 
 
+const FLAT_UI_NAMES: Array = ["GameHud", "TouchControls", "Hotbar", "HudLayer", "TouchLayer"]
+const FLAT_UI_SCRIPTS: Array = [
+	"res://core/game/game_hud.gd", "res://core/game/touch_controls.gd", "res://core/game/hotbar.gd",
+]
+
+
+static func _is_flat_ui(node: Node) -> bool:
+	if not (node is Control or node is CanvasLayer):
+		return false
+	if FLAT_UI_NAMES.has(str(node.name)):
+		return true
+	var script: Script = node.get_script() as Script
+	return script != null and FLAT_UI_SCRIPTS.has(script.resource_path)
+
+
+# HUD plano (pantalla) prohibido en VR: la informacion va en VrHud (arma y muñeca).
+static func flat_ui_nodes(container: Node) -> Array:
+	var found: Array = []
+	if container == null:
+		return found
+	for node in container.find_children("*", "", true, false):
+		if _is_flat_ui(node):
+			found.append(node)
+	return found
+
+
+static func strip_flat_ui(container: Node) -> int:
+	var removed: int = 0
+	for node in flat_ui_nodes(container):
+		if is_instance_valid(node) and node.get_parent() != null:
+			node.get_parent().remove_child(node)
+			node.queue_free()
+			removed += 1
+	return removed
+
+
 static func setup(world: Node3D, rig: Node3D, meta: Dictionary) -> Dictionary:
 	var result: Dictionary = {"rig": rig, "state": null, "weapon_system": null, "hud": null, "menu": null}
 	if rig == null or not is_instance_valid(rig) or not bool(rig.call("is_active")):
 		return result
+	strip_flat_ui(world)
 	var ws := WeaponSystemScript.new()
 	ws.name = "VrWeaponSystem"
 	ws.set_process(false)
@@ -407,6 +459,7 @@ static func setup(world: Node3D, rig: Node3D, meta: Dictionary) -> Dictionary:
 
 	var state := State.new()
 	state.name = "VrGameModeState"
+	state.flat_ui_guard = strip_flat_ui
 	world.add_child(state)
 	state.configure(world, rig, ws, meta)
 
@@ -429,8 +482,8 @@ static func build_start_menu(meta: Dictionary, tree: SceneTree):
 	camera.position = Vector3(0.0, 1.6, 0.0)
 	host.add_child(camera)
 	camera.current = true
-	if "use_xr" in camera:
-		camera.set("use_xr", true)
+	# use_xr es del Viewport: lo activa el bootstrap solo si hay XR real
+	(load(BOOTSTRAP_PATH) as Script).call("enable_viewport_xr", camera.get_viewport())
 
 	var menu = VrMenuScript.new()
 	menu.name = "VrStartMenuPanel"

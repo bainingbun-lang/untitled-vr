@@ -10,13 +10,17 @@ const REQUIRED_ROLES := {
 	"bat": ["body"],
 }
 
+const MANIFEST_PATH := "res://assets/models/weapons/v2/manifest.json"
+
+static var _manifest_cache: Dictionary = {}
+
 const WEAPON_NOTES := {
-	"pistol": "planos AABB: corredera superior, cargador del grip, martillo y gatillo",
-	"submachine_gun": "planos AABB: cerrojo central, cargador bajo receptor, palanca de montaje",
-	"assault_rifle": "planos AABB: cerrojo central, cargador curvo, palanca de montaje AK",
-	"shotgun": "planos AABB: bombeo inferior delantero, cargador tubular, cerrojo",
-	"sniper_rifle": "planos AABB: cerrojo superior, cargador bajo receptor, palanca",
-	"bat": "isla unica: cuerpo rigido sin piezas moviles",
+	"pistol": "piezas nativas: corredera, cargador y gatillo del GLB; martillo sin malla propia",
+	"submachine_gun": "piezas nativas: cerrojo, cargador, palanca de montaje y gatillo",
+	"assault_rifle": "malla skinneada: piezas por corte AABB de los huesos Magazine/Bolt",
+	"shotgun": "malla skinneada: piezas por corte AABB de los huesos Pump/Shell",
+	"sniper_rifle": "piezas nativas: cerrojo, cargador y palanca del GLB",
+	"bat": "pieza nativa: unica malla rigida del GLB",
 }
 
 const ROLE_NAMES := {
@@ -112,6 +116,10 @@ static func build(root: Node3D, id: String) -> Result:
 		"islands": island_total,
 		"largest_island": largest_island,
 	}
+
+	if _build_native(root, id, result):
+		result.stats["parts"] = result.roles.size()
+		return result
 
 	var clean_islands: bool = island_total >= 2 and largest_island <= maxi(3, triangle_total / 2) and id != "shotgun"
 	if id == "bat" or (clean_islands and island_total <= 16):
@@ -262,6 +270,68 @@ static func build(root: Node3D, id: String) -> Result:
 
 	result.stats["parts"] = result.roles.size()
 	return result
+
+
+static func _manifest() -> Dictionary:
+	if not _manifest_cache.is_empty():
+		return _manifest_cache
+	if not FileAccess.file_exists(MANIFEST_PATH):
+		return _manifest_cache
+	var file := FileAccess.open(MANIFEST_PATH, FileAccess.READ)
+	if file == null:
+		return _manifest_cache
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	if parsed is Dictionary:
+		_manifest_cache = parsed as Dictionary
+	return _manifest_cache
+
+
+static func _build_native(root: Node3D, id: String, result: Result) -> bool:
+	var weapons: Dictionary = _manifest().get("weapons", {})
+	if weapons.is_empty() or not weapons.has(id):
+		return false
+	var mapping: Dictionary = (weapons[id] as Dictionary).get("parts", {})
+	if mapping.is_empty():
+		return false
+	var required: Array = REQUIRED_ROLES.get(id, [])
+	var roles: Array = []
+	for role in mapping.keys():
+		if not roles.has(str(role)):
+			roles.append(str(role))
+	for role in required:
+		if not roles.has(str(role)):
+			roles.append(str(role))
+	var used: Dictionary = {}
+	var found: Dictionary = {}
+	for role_variant in roles:
+		var role := str(role_variant)
+		var node_name := str(mapping.get(role, ""))
+		if node_name.is_empty():
+			continue
+		for candidate in root.find_children(node_name, "Node3D", true, false):
+			var n := candidate as Node3D
+			if n != null and not used.has(n.get_instance_id()):
+				used[n.get_instance_id()] = true
+				found[role] = n
+				break
+	if found.is_empty():
+		return false
+	var empty_roles: Array = []
+	for role_variant in roles:
+		var role := str(role_variant)
+		var pivot: Node3D = found.get(role, null) as Node3D
+		if pivot == null:
+			pivot = Node3D.new()
+			pivot.name = "Part_" + role
+			pivot.position = Vector3.ZERO
+			root.add_child(pivot)
+			empty_roles.append(role)
+		result.roles[role] = pivot
+		result.homes[role] = pivot.position
+	result.method = "piezas nativas"
+	result.stats["native_nodes"] = found.size()
+	result.stats["empty_roles"] = empty_roles
+	return true
 
 
 static func _role_for(point: Vector3, bounds: AABB, id: String, clean_islands: bool) -> String:

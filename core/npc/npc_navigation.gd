@@ -9,6 +9,7 @@ var height: int = 0
 var obstacles: Dictionary = {}
 var allow_diagonal: bool = false
 var max_expansions: int = DEFAULT_MAX_EXPANSIONS
+var origin: Vector2 = Vector2.ZERO
 
 
 func _init(p_width: int = 0, p_height: int = 0, p_obstacles: Array = [], p_options: Dictionary = {}) -> void:
@@ -22,6 +23,12 @@ func configure(p_width: int, p_height: int, p_obstacles: Array = [], p_options: 
 	set_obstacles(p_obstacles)
 	allow_diagonal = bool(p_options.get("allow_diagonal", allow_diagonal))
 	max_expansions = maxi(1, int(p_options.get("max_expansions", max_expansions)))
+	var raw_origin: Variant = p_options.get("origin", null)
+	if raw_origin is Vector2:
+		origin = raw_origin as Vector2
+	elif raw_origin is Vector3:
+		var vector: Vector3 = raw_origin
+		origin = Vector2(vector.x, vector.z)
 
 
 func set_obstacles(cells: Array) -> void:
@@ -150,13 +157,23 @@ func cell_to_world(cell_value, cell_size: float = 1.0, plane_y: float = 0.0) -> 
 	var cell: Variant = _as_cell(cell_value)
 	if cell == null:
 		return Vector3.ZERO
-	return Vector3(float(cell.x) * cell_size, plane_y, float(cell.y) * cell_size)
+	return Vector3(
+		origin.x + float(cell.x) * cell_size,
+		plane_y,
+		origin.y + float(cell.y) * cell_size
+	)
 
 
 func world_to_cell_2d(position: Vector2, cell_size: float = 1.0) -> Vector2i:
 	if cell_size <= 0.0:
 		return Vector2i.ZERO
-	return Vector2i(roundi(position.x / cell_size), roundi(position.y / cell_size))
+	var local: Vector2 = position - origin
+	return Vector2i(roundi(local.x / cell_size), roundi(local.y / cell_size))
+
+
+func is_walkable_world(position: Vector3, cell_size: float = 1.0) -> bool:
+	var cell: Vector2i = world_to_cell_2d(Vector2(position.x, position.z), cell_size)
+	return is_inside(cell) and not is_blocked(cell)
 
 
 func world_to_cell_3d(position: Vector3, cell_size: float = 1.0) -> Vector2i:

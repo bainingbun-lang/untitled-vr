@@ -13,14 +13,25 @@ const GORE_FX_PATH: String = "res://core/game/gore_fx.gd"
 const VR_PERFORMANCE_PATH: String = "res://core/vr/vr_performance.gd"
 const VR_GAME_MODE_PATH: String = "res://core/vr/vr_game_mode.gd"
 const ARMED_NPC_PATH: String = "res://core/game/armed_npc.gd"
+const WORLD_SPAWNER_PATH: String = "res://core/game/world_spawner.gd"
+const NAVIGATION_PATH: String = "res://core/npc/npc_navigation.gd"
+const FACTIONS_PATH: String = "res://core/npc/npc_factions.gd"
+const LOD_PATH: String = "res://core/npc/npc_lod.gd"
 const CharacterModelScript = preload("res://core/game/character_model.gd")
 const VoiceSystemScript = preload("res://core/game/voice_system.gd")
 const GoreFxScript = preload("res://core/game/gore_fx.gd")
 const VrPerformanceScript = preload("res://core/vr/vr_performance.gd")
 const VrGameModeScript = preload("res://core/vr/vr_game_mode.gd")
 const MapWorldBuilderScript = preload("res://core/maps/map_world_builder.gd")
+const WorldSpawnerScript = preload("res://core/game/world_spawner.gd")
+const NPCNavigationScript = preload("res://core/npc/npc_navigation.gd")
+const NPCFactionsScript = preload("res://core/npc/npc_factions.gd")
+const NPCLODScript = preload("res://core/npc/npc_lod.gd")
 
 const DUMMY_COUNT: int = 6
+const STATIC_DUMMY_COUNT: int = 2
+const NAV_CELL_SIZE: float = 1.0
+const PLAYER_CLEARANCE: float = 4.5
 
 var actor: Node3D = null
 var spawn_points: Array = []
@@ -31,7 +42,15 @@ var hotbar: Control = null
 var pause_menu: Node = null
 var dummies: Array = []
 var physics_props: Array = []
+var npcs: Array = []
 
+var navigation = null
+var factions = null
+var npc_lod = null
+var _npcs_root: Node3D = null
+var _npc_voice_mute: int = 0
+var _locomotion: Dictionary = {}
+var _locomotion_timer: float = 0.0
 var _geometry_root: Node3D = null
 var _hud_layer: CanvasLayer = null
 var _dummies_root: Node3D = null
@@ -61,6 +80,10 @@ func setup(meta: Dictionary) -> void:
 	_discard(actor)
 	_discard(_hud_layer)
 	_discard(_dummies_root)
+	for old_npc in npcs:
+		if old_npc != null and is_instance_valid(old_npc):
+			ArmedNpc.unregister(old_npc)
+	_discard(_npcs_root)
 	for key in vr_result.keys():
 		var old_node: Variant = vr_result.get(key)
 		if old_node is Node:
@@ -71,6 +94,7 @@ func setup(meta: Dictionary) -> void:
 	hotbar = null
 	pause_menu = null
 	_dummies_root = null
+	_npcs_root = null
 	vr_state = null
 	vr_active = false
 	vr_result = {}
@@ -78,6 +102,14 @@ func setup(meta: Dictionary) -> void:
 	bounds = AABB()
 	dummies = []
 	physics_props = []
+	npcs = []
+	navigation = null
+	factions = null
+	_models.clear()
+	_skins.clear()
+	_impacts.clear()
+	_wired.clear()
+	_locomotion.clear()
 
 	world_report = MapWorldBuilderScript.build(meta, self)
 	var first_point: Vector3 = Vector3.ZERO
@@ -98,7 +130,10 @@ func setup(meta: Dictionary) -> void:
 	_collect_physics_props()
 	_setup_performance()
 	_setup_voice()
+	_build_navigation(meta)
+	_spawn_living_npcs(first_point, meta)
 	_spawn_dummies(first_point, meta)
+	_connect_player_signals()
 	if not vr_active:
 		_setup_hud()
 		_setup_hotbar()
@@ -112,6 +147,11 @@ func setup(meta: Dictionary) -> void:
 
 
 func _process(delta: float) -> void:
+	ArmedNpc.advance_fx(maxf(delta, 0.0))
+	_locomotion_timer -= maxf(delta, 0.0)
+	if _locomotion_timer <= 0.0:
+		_locomotion_timer = 0.2
+		_sync_locomotion()
 	if vr_state != null and is_instance_valid(vr_state) and vr_state.has_method("tick"):
 		vr_state.call("tick", maxf(delta, 0.0))
 	if performance != null and is_instance_valid(performance) and performance.has_method("observe_frame"):
@@ -142,6 +182,8 @@ func _create_actor(spawn: Vector3) -> Node3D:
 	if result == null:
 		return null
 	result.global_position = spawn
+	if not use_vr and result is CollisionObject3D:
+		result.collision_layer = 0
 	if not use_vr and result is Camera3D:
 		result.look_at(spawn + Vector3(0.0, 1.0, 0.0))
 	return result
@@ -172,10 +214,10 @@ func _spawn_dummies(center: Vector3, meta: Dictionary) -> void:
 	var session := _safe_script(SESSION_SCRIPT)
 	var fallback_seed: int = int(session.get("seed")) if session != null else 0
 	var seed_value: int = int(meta.get("seed", fallback_seed))
-	var count: int = DUMMY_COUNT
+	var count: int = STATIC_DUMMY_COUNT
 	if vr_active and performance != null and performance.has_method("current_profile"):
 		var profile: Dictionary = performance.call("current_profile")
-		count = clampi(int(profile.get("npcs", DUMMY_COUNT)), 1, DUMMY_COUNT)
+		count = clampi(int(profile.get("npcs", STATIC_DUMMY_COUNT)), 1, STATIC_DUMMY_COUNT)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value ^ 0x5EED
 	for i in range(count):
@@ -184,6 +226,13 @@ func _spawn_dummies(center: Vector3, meta: Dictionary) -> void:
 		var point := center + Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
 		point = _clamp_to_bounds(point, center)
 		dummies.append(_create_dummy(point, i))
+	for npc in npcs:
+		if dummies.size() >= DUMMY_COUNT:
+			break
+		if npc != null and is_instance_valid(npc):
+			dummies.append(npc)
+	world_report["static_dummies"] = count
+	world_report["living_npcs_exposed_as_targets"] = dummies.size() - count
 
 
 func _create_dummy(point: Vector3, id: int) -> Node3D:
@@ -254,6 +303,288 @@ func _setup_voice() -> void:
 		_connect_once(node, "subtitle", Callable(self, "_on_voice_subtitle"))
 
 
+func _build_navigation(meta: Dictionary) -> void:
+	var origin: Vector3 = bounds.position
+	var width: int = maxi(1, ceili(bounds.size.x / NAV_CELL_SIZE))
+	var height: int = maxi(1, ceili(bounds.size.z / NAV_CELL_SIZE))
+	var blocked: Dictionary = {}
+	if _geometry_root != null:
+		for body in _geometry_root.find_children("*", "CollisionObject3D", true, false):
+			if str((body as Node).name) == "Ground":
+				continue
+			var box: AABB = _collision_box(body as Node3D)
+			if box.size.x > 0.0 and box.size.z > 0.0:
+				_mark_blocked(blocked, box, origin, width, height, 0.55)
+	for prop in physics_props:
+		if not (prop is Node3D) or not is_instance_valid(prop):
+			continue
+		var box: AABB = _collision_box(prop as Node3D)
+		if box.size.x <= 0.0 or box.size.z <= 0.0:
+			continue
+		_mark_blocked(blocked, box, origin, width, height, 0.45)
+	navigation = NPCNavigationScript.new(width, height, blocked.keys(), {
+		"origin": Vector2(origin.x, origin.z),
+		"max_expansions": 4096,
+	})
+	npc_lod = NPCLODScript.new()
+	var decision: String = "NpcNavigation con rejilla de 1m derivada de colisiones reales del builder; "
+	decision += "celdas marcadas con margen 0.55 (0.45 props) para no atravesar paredes ni obstaculos; "
+	decision += "el origen coincide con bounds.position y se guarda como Vector2(x,z) para pasar coordenadas mundo."
+	world_report["navigation"] = {
+		"decision": decision,
+		"width": width, "height": height, "cell_size": NAV_CELL_SIZE,
+		"origin": Vector2(origin.x, origin.z), "blocked_cells": blocked.size(),
+		"meta_seed": int(meta.get("seed", 0)),
+	}
+
+
+func _collision_box(body: Node3D) -> AABB:
+	if body == null or not is_instance_valid(body):
+		return AABB()
+	for child in body.find_children("*", "CollisionShape3D", true, false):
+		var shape_node := child as CollisionShape3D
+		if shape_node == null or shape_node.shape == null:
+			continue
+		if shape_node.shape is BoxShape3D:
+			var size: Vector3 = (shape_node.shape as BoxShape3D).size
+			var center: Vector3 = body.global_position + shape_node.position
+			return AABB(center - size * 0.5, size)
+	var raw: AABB = body.get_aabb() if body.has_method("get_aabb") else AABB()
+	return raw
+
+
+func _mark_blocked(
+	blocked: Dictionary, box: AABB, origin: Vector3,
+	width: int, height: int, margin: float
+) -> void:
+	var min_x: int = maxi(0, floori((box.position.x - margin - origin.x) / NAV_CELL_SIZE))
+	var max_x: int = mini(width - 1, ceili((box.end.x + margin - origin.x) / NAV_CELL_SIZE))
+	var min_y: int = maxi(0, floori((box.position.z - margin - origin.z) / NAV_CELL_SIZE))
+	var max_y: int = mini(height - 1, ceili((box.end.z + margin - origin.z) / NAV_CELL_SIZE))
+	for y in range(min_y, max_y + 1):
+		for x in range(min_x, max_x + 1):
+			blocked[Vector2i(x, y)] = true
+
+
+func _spawn_living_npcs(center: Vector3, meta: Dictionary) -> void:
+	_npcs_root = Node3D.new()
+	_npcs_root.name = "LivingNPCs"
+	add_child(_npcs_root)
+	if navigation == null:
+		return
+	var platform: String = _session_platform()
+	if platform.is_empty():
+		platform = ArmedNpc.detect_platform()
+	var capacity: int = ArmedNpc.max_active(platform)
+	var wanted: int = mini(capacity, 16)
+	var meta_limit: int = maxi(0, int(meta.get("max_npcs", 0)))
+	if meta_limit > 0:
+		wanted = mini(wanted, meta_limit)
+	if capacity >= 6:
+		wanted = maxi(wanted, 6)
+	wanted = mini(wanted, capacity)
+	if wanted <= 0:
+		return
+	var candidates: Array = _free_navigation_points(center)
+	if candidates.is_empty():
+		return
+	var seed_value: int = int(meta.get("seed", 4242))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value ^ 0xA11CE
+	candidates.shuffle()
+	var selected: Array = []
+	var min_gap: float = 1.7
+	for point in candidates:
+		if selected.size() >= wanted:
+			break
+		var valid: bool = true
+		for other in selected:
+			if point.distance_to(other as Vector3) < min_gap:
+				valid = false
+				break
+		if valid:
+			selected.append(point)
+	if selected.size() < wanted:
+		for point in candidates:
+			if selected.size() >= wanted:
+				break
+			if not selected.has(point):
+				selected.append(point)
+	if selected.is_empty():
+		return
+	factions = NPCFactionsScript.new({})
+	for id in ["civilian", "criminal", "police", "zombie"]:
+		factions.call("register_faction", id, id)
+	factions.call("set_relation", "police", "criminal", -85.0)
+	factions.call("set_relation", "civilian", "criminal", -70.0)
+	factions.call("set_relation", "civilian", "zombie", -90.0)
+	factions.call("set_relation", "police", "zombie", -90.0)
+	factions.call("set_relation", "criminal", "civilian", -45.0)
+	factions.call("set_relation", "zombie", "civilian", -95.0)
+
+	var roles: Array = ["hostile", "civilian", "defender", "zombie", "hostile", "civilian", "zombie", "defender"]
+	var weapons: Dictionary = {
+		"hostile": "assault_rifle", "defender": "pistol",
+		"civilian": "pistol", "zombie": "",
+	}
+	var faction_by_role: Dictionary = {
+		"hostile": "criminal", "defender": "police",
+		"civilian": "civilian", "zombie": "zombie",
+	}
+	var defs: Array = []
+	for i in range(wanted):
+		var role: String = str(roles[i % roles.size()])
+		var personality: Dictionary = {
+			"temperament": rng.randf_range(0.2, 0.9),
+			"confidence": rng.randf_range(0.2, 0.9),
+			"bravery": rng.randf_range(0.2, 0.95),
+			"fear": rng.randf_range(0.1, 0.7),
+			"curiosity": rng.randf_range(0.2, 0.8),
+			"sociability": rng.randf_range(0.1, 0.8),
+			"aggressiveness": rng.randf_range(0.2, 0.95) if role != "civilian" else 0.05,
+		}
+		var needs: Dictionary = {"fatigue": 0.2, "stress": 0.1, "fear": 0.1, "confusion": 0.0, "stun": 0.0, "health": 1.0}
+		defs.append({
+			"id": "npc_%02d" % i,
+			"role": role,
+			"faction": faction_by_role[role],
+			"weapon": weapons[role],
+			"personality": personality,
+			"needs": needs,
+			"routine": [],
+			"state": "idle",
+		})
+	var spawn_meta: Dictionary = {
+		"spawn_points": selected,
+		"platforms": [platform],
+		"performance_profiles": {platform: {"max_npcs": wanted}},
+	}
+	var spawner = WorldSpawnerScript.new()
+	var report: Dictionary = spawner.call("spawn", spawn_meta, defs, seed_value)
+	for entry in report.get("spawned", []):
+		var def: Dictionary = defs[int(entry.get("index", 0))]
+		var role: String = str(def["role"])
+		var npc_id: String = str(entry["id"])
+		var point: Vector3 = entry["position"]
+		factions.call("set_member", npc_id, str(def["faction"]))
+		var options: Dictionary = {
+			"id": npc_id, "npc_id": npc_id,
+			"role": role, "faction_id": str(def["faction"]),
+			"weapon_id": str(def["weapon"]),
+			"difficulty": "normal", "seed": seed_value + int(entry.get("index", 0)) * 17,
+			"platform": platform, "target": actor, "target_id": "player",
+			"navigation": navigation, "observer": self, "fx_parent": self,
+			"bounds": bounds, "nav_cell_size": NAV_CELL_SIZE, "lod": npc_lod,
+			"factions": factions, "patrol_points": selected,
+			"attack_points": selected, "cover_points": selected,
+			"tick_rate": 12.0, "vision_range": 18.0 if role != "zombie" else 14.0,
+			"patrol_speed": 2.0 if role != "zombie" else 3.2,
+			"run_speed": 5.5 if role != "zombie" else 6.4,
+			"drop_weapon_on_death": role != "zombie",
+		}
+		var npc: Node3D = ArmedNpc.spawn(_npcs_root, point, options) as Node3D
+		if npc == null:
+			continue
+		_attach_character_model(npc, _skin_for_role(role), "npc_%s" % npc_id)
+		npcs.append(npc)
+	var role_counts: Dictionary = {}
+	for npc in npcs:
+		var role: String = str(npc.get("role"))
+		role_counts[role] = int(role_counts.get(role, 0)) + 1
+	world_report["ai"] = {
+		"platform": platform, "requested": wanted, "spawned": npcs.size(),
+		"rejected": (report.get("rejected", []) as Array).size(),
+		"rejection_reason": _first_rejection(report),
+		"roles": role_counts, "factions": factions.call("faction_ids"),
+		"tick_hz": 12.0, "lod": true, "subtitles_by_default": false,
+	}
+
+
+func _first_rejection(report: Dictionary) -> String:
+	var rejected: Array = report.get("rejected", [])
+	if rejected.is_empty():
+		return ""
+	var first: Variant = rejected[0]
+	if first is Dictionary:
+		return str((first as Dictionary).get("reason", ""))
+	return str(first)
+
+
+func _free_navigation_points(center: Vector3) -> Array:
+	var result: Array = []
+	if navigation == null:
+		return result
+	var width: int = int(navigation.get("width"))
+	var height: int = int(navigation.get("height"))
+	for y in range(height):
+		for x in range(width):
+			var cell := Vector2i(x, y)
+			if bool(navigation.call("is_blocked", cell)):
+				continue
+			var point: Vector3 = navigation.call("cell_to_world", cell, NAV_CELL_SIZE, 0.0)
+			if point.distance_to(center) < PLAYER_CLEARANCE:
+				continue
+			result.append(point)
+	return result
+
+
+func _skin_for_role(role: String) -> String:
+	var manifest: Dictionary = _role_skin_manifest()
+	var key: String = role.strip_edges().to_lower()
+	if manifest.has(key):
+		var entry: Variant = manifest[key]
+		if entry is String and not str(entry).is_empty():
+			return str(entry)
+		if entry is Dictionary:
+			for field in ["skin", "model", "id", "character"]:
+				if (entry as Dictionary).has(field):
+					var value: String = str((entry as Dictionary)[field])
+					if not value.is_empty():
+						return value
+	match key:
+		"civilian", "civil", "pacifist":
+			return "civil"
+		"defender", "police", "guard":
+			return "soldier"
+		"zombie", "zombi", "infectado":
+			return "enemy"
+		_:
+			return "enemy"
+
+
+func _role_skin_manifest() -> Dictionary:
+	var path: String = "res://assets/models/characters/v2/manifest.json"
+	if not FileAccess.file_exists(path):
+		return {}
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	return (parsed as Dictionary) if parsed is Dictionary else {}
+
+
+func _connect_player_signals() -> void:
+	if actor == null:
+		return
+	_connect_once(actor, "fired", Callable(self, "_on_player_fired"))
+	_connect_once(actor, "weapon_changed", Callable(self, "_on_player_weapon_changed"))
+
+
+func _on_player_fired(result: Dictionary) -> void:
+	if actor == null:
+		return
+	var position: Variant = result.get("position", null)
+	var origin: Vector3 = position if position is Vector3 else actor.global_position
+	for npc in npcs:
+		if npc != null and is_instance_valid(npc) and npc.has_method("hear_gunshot"):
+			npc.call("hear_gunshot", origin, 1.0, str(actor.name))
+
+
+func _on_player_weapon_changed(_item_id) -> void:
+	if actor == null:
+		return
+	for npc in npcs:
+		if npc != null and is_instance_valid(npc) and npc.has_method("notice_weapon"):
+			npc.call("notice_weapon", actor.global_position)
+
+
 func _attach_character_model(target: Node3D, skin: String, voice_id: String) -> Node3D:
 	if target == null or not is_instance_valid(target):
 		return null
@@ -262,8 +593,9 @@ func _attach_character_model(target: Node3D, skin: String, voice_id: String) -> 
 		if model != null:
 			model.queue_free()
 		return null
+	var weapon_mount: Node = target.get_node_or_null("WeaponMount")
 	for mesh in target.find_children("*", "MeshInstance3D", true, false):
-		if not model.is_ancestor_of(mesh):
+		if not model.is_ancestor_of(mesh) and (weapon_mount == null or not weapon_mount.is_ancestor_of(mesh)):
 			(mesh as MeshInstance3D).visible = false
 	model.call("play", "idle")
 	_models[target.get_instance_id()] = model
@@ -284,7 +616,10 @@ func _model_for(target: Node) -> Node3D:
 
 func _wire_targets() -> void:
 	for dummy in dummies:
-		_wire_target(dummy as Node3D, "dummy_%d" % int(dummy.get("dummy_id")))
+		var target := dummy as Node3D
+		if target == null or target.is_in_group("armed_npc"):
+			continue
+		_wire_target(target, "dummy_%d" % int(dummy.get("dummy_id")))
 	_wire_existing_npcs()
 
 
@@ -296,8 +631,16 @@ func _wire_existing_npcs() -> void:
 		var key: String = "npc_%s" % str(npc.get("npc_id"))
 		if _model_for(npc) == null:
 			var role: String = str(npc.get("role"))
-			var skin: String = "enemy" if role == "hostile" else ("civil" if role == "civilian" else "soldier")
-			_attach_character_model(npc, skin, key)
+			_attach_character_model(npc, _skin_for_role(role), key)
+		if npc.has_method("apply_options"):
+			npc.call("apply_options", {
+				"navigation": navigation,
+				"observer": self,
+				"fx_parent": self,
+				"bounds": bounds,
+				"nav_cell_size": NAV_CELL_SIZE,
+				"lod": npc_lod,
+			})
 		_wire_target(npc, key)
 		_connect_once(npc, "action_changed", Callable(self, "_on_npc_action_changed").bind(npc, key))
 		_connect_once(npc, "fired", Callable(self, "_on_npc_fired").bind(npc, key))
@@ -322,10 +665,22 @@ func _connect_once(target: Node, signal_name: String, callable: Callable) -> voi
 
 
 func _on_voice_subtitle(text: String, npc: String) -> void:
+	if _npc_voice_mute > 0:
+		return
 	if vr_state != null and is_instance_valid(vr_state) and vr_state.has_method("show_subtitle"):
 		vr_state.call("show_subtitle", text, npc)
 	elif hud != null and hud.has_method("show_subtitle"):
 		hud.call("show_subtitle", text, npc)
+
+
+func _play_npc_voice(voice_id: String, cue: String, state: Dictionary = {}) -> void:
+	if voice == null or not voice.has_method("play_cue"):
+		return
+	if not state.is_empty() and voice.has_method("set_npc_state"):
+		voice.call("set_npc_state", voice_id, state)
+	_npc_voice_mute += 1
+	voice.call("play_cue", voice_id, cue)
+	_npc_voice_mute -= 1
 
 
 func _on_target_damaged(amount: float, point: Vector3, normal: Vector3, target: Node3D, voice_id: String) -> void:
@@ -338,8 +693,11 @@ func _on_target_damaged(amount: float, point: Vector3, normal: Vector3, target: 
 		model.call("apply_wound", "torso", normal, clampf(0.05 + amount * 0.002, 0.05, 0.3))
 	if voice != null and voice.has_method("play_cue"):
 		var hp: float = float(target.call("health")) if target.has_method("health") else 50.0
-		voice.call("set_npc_state", voice_id, {"health": clampf(hp, 0.0, 100.0), "fear": 0.4})
-		voice.call("play_cue", voice_id, "pain")
+		if target.is_in_group("armed_npc"):
+			_play_npc_voice(voice_id, "pain", {"health": clampf(hp, 0.0, 100.0), "fear": 0.4})
+		else:
+			voice.call("set_npc_state", voice_id, {"health": clampf(hp, 0.0, 100.0), "fear": 0.4})
+			voice.call("play_cue", voice_id, "pain")
 
 
 func _on_dummy_died(target: Node3D, voice_id: String) -> void:
@@ -364,12 +722,19 @@ func _finish_target_death(target: Node3D, voice_id: String) -> void:
 		model.call("play", "die", false)
 		model.call("make_ragdoll", impulse, point)
 		model.call("detach_limb", "arm.r")
-	GoreFxScript.on_death(self, point, 0.8)
+	var is_living_npc: bool = target.is_in_group("armed_npc")
+	if not is_living_npc:
+		GoreFxScript.on_death(self, point, 0.8)
 	if voice != null and voice.has_method("play_cue"):
-		voice.call("set_npc_state", voice_id, {"health": 0.0})
 		var previous_cooldown: float = float(voice.get("cooldown"))
+		voice.call("set_npc_state", voice_id, {"health": 0.0})
 		voice.call("set_cooldown", 0.0)
-		voice.call("play_cue", voice_id, "death")
+		if is_living_npc:
+			_npc_voice_mute += 1
+			voice.call("play_cue", voice_id, "death")
+			_npc_voice_mute -= 1
+		else:
+			voice.call("play_cue", voice_id, "death")
 		voice.call("set_cooldown", previous_cooldown)
 
 
@@ -383,13 +748,11 @@ func _on_target_respawned(target: Node3D, voice_id: String) -> void:
 	_impacts.erase(target.get_instance_id())
 
 
-func _on_npc_action_changed(action: String, target: Node3D, _voice_id: String) -> void:
+func _on_npc_action_changed(action: String, target: Node3D, voice_id: String) -> void:
 	var model := _model_for(target)
-	if model == null:
-		return
 	var anim := "idle"
 	match action:
-		"patrol", "move", "walk":
+		"patrol", "move", "walk", "investigate":
 			anim = "walk"
 		"flee", "run":
 			anim = "run"
@@ -397,13 +760,40 @@ func _on_npc_action_changed(action: String, target: Node3D, _voice_id: String) -
 			anim = "aim"
 		"reload":
 			anim = "hit"
-	model.call("play", anim, anim != "aim")
+	if model != null:
+		model.call("play", anim, anim != "aim")
+	_locomotion[target.get_instance_id()] = anim
+	match action:
+		"investigate":
+			_play_npc_voice(voice_id, "alert")
+		"flee":
+			_play_npc_voice(voice_id, "fear")
+		"attack":
+			_play_npc_voice(voice_id, "effort")
 
 
 func _on_npc_fired(_result: Dictionary, target: Node3D, _voice_id: String) -> void:
 	var model := _model_for(target)
 	if model != null:
 		model.call("play", "shoot", false)
+
+
+func _sync_locomotion() -> void:
+	for npc in npcs:
+		if npc == null or not is_instance_valid(npc) or (npc.has_method("is_dead") and bool(npc.call("is_dead"))):
+			continue
+		var distance: float = global_position.distance_to(npc.global_position)
+		if npc_lod != null and distance > 50.0:
+			continue
+		var model := _model_for(npc)
+		if model == null:
+			continue
+		var speed: float = Vector2(npc.velocity.x, npc.velocity.z).length()
+		var anim: String = "run" if speed > 4.0 else ("walk" if speed > 0.4 else "idle")
+		var key: int = npc.get_instance_id()
+		if str(_locomotion.get(key, "")) != anim:
+			_locomotion[key] = anim
+			model.call("play", anim, true)
 
 
 func _setup_hud() -> void:

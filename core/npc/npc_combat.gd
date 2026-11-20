@@ -19,11 +19,13 @@ const ACTION_FLEE: String = "flee"
 const ACTION_RELOAD: String = "reload"
 const ACTION_HELP: String = "help"
 const ACTION_PATROL: String = "patrol"
+const ACTION_INVESTIGATE: String = "investigate"
 const ACTION_IDLE: String = "idle"
 
 const ROLE_HOSTILE: String = "hostile"
 const ROLE_CIVILIAN: String = "civilian"
 const ROLE_DEFENDER: String = "defender"
+const ROLE_ZOMBIE: String = "zombie"
 
 const DIFFICULTY_EASY: String = "easy"
 const DIFFICULTY_NORMAL: String = "normal"
@@ -71,6 +73,8 @@ var last_result: Dictionary = {}
 var cover_points: Array = []
 var attack_points: Array = []
 var patrol_points: Array = []
+var last_threat_position: Vector3 = Vector3.ZERO
+var melee_range: float = 1.6
 
 var personality = null
 var relations = null
@@ -234,17 +238,21 @@ func advance(delta: float) -> void:
 			reserve -= taken
 
 
-func note_hit(source_id: String = "", danger: float = 0.6) -> void:
+func note_hit(source_id: String = "", danger: float = 0.6, p_position: Vector3 = Vector3.ZERO) -> void:
 	under_attack = 1.5
 	alert_level = clampf(alert_level + clampf(danger, 0.0, 1.0), 0.0, 1.0)
+	if p_position.length_squared() > 0.0001:
+		last_threat_position = p_position
 	if controller != null and controller.memory != null:
 		controller.memory.add_event({"type": "attack", "kind": "hostile", "severity": clampf(danger, 0.0, 1.0), "source_id": source_id})
 	if personality != null:
 		personality.fear = clampf(personality.fear + 0.08 * clampf(danger, 0.0, 1.0), 0.0, 1.0)
 
 
-func note_threat(source_id: String = "", danger: float = 0.5) -> void:
+func note_threat(source_id: String = "", danger: float = 0.5, p_position: Vector3 = Vector3.ZERO) -> void:
 	alert_level = clampf(alert_level + clampf(danger, 0.0, 1.0) * 0.5, 0.0, 1.0)
+	if p_position.length_squared() > 0.0001:
+		last_threat_position = p_position
 	if controller != null and controller.memory != null:
 		controller.memory.add_event({"type": "threat", "kind": "hearing", "severity": clampf(danger, 0.0, 1.0), "source_id": source_id})
 
@@ -379,6 +387,10 @@ func goal_for(p_action: String = "", p_context: Dictionary = {}) -> Vector3:
 			var angle: float = TAU * _hash_float("patrol:%d" % _patrol_index)
 			_patrol_index = (_patrol_index + 1) % 8
 			return origin + Vector3(cos(angle), 0.0, sin(angle)) * 4.0
+		ACTION_INVESTIGATE:
+			if last_threat_position.length_squared() > 0.0001:
+				return last_threat_position
+			return target
 		_:
 			return origin
 
@@ -441,6 +453,7 @@ func snapshot() -> Dictionary:
 		"rng": _rng_state,
 		"patrol_index": _patrol_index,
 		"attitude": _last_attitude,
+		"last_threat_position": last_threat_position,
 	}
 
 
@@ -473,6 +486,11 @@ func _install_actions() -> void:
 	behavior.register_action(ACTION_PATROL, {
 		"score": Callable(self, "_score_patrol"),
 		"available": Callable(self, "_available_patrol"),
+		"state": "walk",
+	})
+	behavior.register_action(ACTION_INVESTIGATE, {
+		"score": Callable(self, "_score_investigate"),
+		"available": Callable(self, "_available_investigate"),
 		"state": "walk",
 	})
 	behavior.register_action(ACTION_IDLE, {
@@ -513,9 +531,14 @@ func _build_context(p_context: Dictionary) -> Dictionary:
 
 
 func _score_attack(ctx: Dictionary) -> float:
-	if not bool(ctx["visible"]) or int(ctx["ammo"]) <= 0 or bool(ctx["reloading"]):
+	var is_zombie: bool = str(ctx["role"]) == ROLE_ZOMBIE
+	if not bool(ctx["visible"]) or bool(ctx["reloading"]):
+		return 0.0
+	if not is_zombie and int(ctx["ammo"]) <= 0:
 		return 0.0
 	var value: float = 0.62 + _ctx_num(ctx, "aggressiveness") * 0.36 + _ctx_num(ctx, "bravery") * 0.18
+	if is_zombie:
+		value += 0.85
 	if str(ctx["role"]) == ROLE_DEFENDER:
 		value += 0.34 if float(ctx["faction_relation"]) < -10.0 else 0.1
 	if bool(ctx["friendly"]):
@@ -585,8 +608,21 @@ func _score_patrol(ctx: Dictionary) -> float:
 	return 0.3 + _ctx_num(ctx, "curiosity") * 0.14 - float(ctx["danger"]) * 0.12
 
 
+func _score_investigate(ctx: Dictionary) -> float:
+	if bool(ctx["visible"]):
+		return 0.0
+	if last_threat_position.length_squared() <= 0.0001:
+		return 0.0
+	var value: float = 0.42 + float(ctx["danger"]) * 0.45 + _ctx_num(ctx, "curiosity") * 0.18
+	if str(ctx["role"]) == ROLE_CIVILIAN:
+		value -= 0.35
+	return maxf(value, 0.0)
+
+
 func _available_attack(ctx: Dictionary) -> bool:
-	return bool(ctx["visible"]) and int(ctx["ammo"]) > 0 and not bool(ctx["reloading"]) \
+	var is_zombie: bool = str(ctx["role"]) == ROLE_ZOMBIE
+	var armed: bool = is_zombie or int(ctx["ammo"]) > 0
+	return bool(ctx["visible"]) and armed and not bool(ctx["reloading"]) \
 		and str(ctx["role"]) != ROLE_CIVILIAN and not bool(ctx["friendly"])
 
 
@@ -614,6 +650,10 @@ func _available_patrol(ctx: Dictionary) -> bool:
 	return not bool(ctx["visible"]) and not bool(ctx["friendly"])
 
 
+func _available_investigate(ctx: Dictionary) -> bool:
+	return not bool(ctx["visible"]) and last_threat_position.length_squared() > 0.0001
+
+
 func _apply_state(action: String) -> void:
 	if controller == null or controller.state_machine == null:
 		return
@@ -634,7 +674,7 @@ func _state_for(action: String) -> String:
 	match action:
 		ACTION_ATTACK:
 			return "alert"
-		ACTION_COVER, ACTION_PATROL:
+		ACTION_COVER, ACTION_PATROL, ACTION_INVESTIGATE:
 			return "walk"
 		ACTION_FLEE:
 			return "flee"
@@ -693,8 +733,10 @@ func _normalize_role(value) -> String:
 	match text:
 		"civilian", "civil", "pacifista", "pacifist":
 			return ROLE_CIVILIAN
-		"defender", "guard", "guardia", "defensor":
+		"defender", "guard", "guardia", "defensor", "police", "policia":
 			return ROLE_DEFENDER
+		"zombie", "zombi", "infectado":
+			return ROLE_ZOMBIE
 		_:
 			return ROLE_HOSTILE
 
