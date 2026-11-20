@@ -8,6 +8,7 @@ updates = {
     "rendering": {
         "renderer/rendering_method": '"mobile"',
         "renderer/rendering_method.mobile": '"mobile"',
+        "textures/vram_compression/import_etc2_astc": "true",
     },
     "xr": {
         "openxr/enabled": "true",
