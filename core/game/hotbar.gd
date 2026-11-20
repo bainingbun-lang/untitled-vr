@@ -4,9 +4,13 @@ extends Control
 signal selected(item_id: String)
 
 const LoadoutScript = preload("res://core/game/loadout.gd")
-const SLOT_WIDTH := 116.0
-const SLOT_HEIGHT := 96.0
+const SLOT_WIDTH := 132.0
+const SLOT_HEIGHT := 112.0
+const REFERENCE_HEIGHT := 1080.0
+const MIN_UI_SCALE := 0.85
 
+var _slot_width := SLOT_WIDTH
+var _slot_height := SLOT_HEIGHT
 var _inventory = null
 var _item_db = null
 var _ids: Array = []
@@ -19,7 +23,14 @@ var _ready_done := false
 
 func _ready() -> void:
 	_ready_done = true
+	if not resized.is_connected(_on_resized):
+		resized.connect(_on_resized)
 	_rebuild()
+
+
+func _on_resized() -> void:
+	if _ready_done:
+		_rebuild()
 
 
 func setup(inventory, item_db) -> void:
@@ -106,7 +117,7 @@ func slot_at_point(point: Vector2) -> int:
 	if not _buttons.is_empty():
 		var first := _buttons[0] as Control
 		if first != null and first.get_global_rect().size.x <= 0.0:
-			var estimated := int(floor(point.x / SLOT_WIDTH))
+			var estimated := int(floor(point.x / _slot_width))
 			if estimated >= 0 and estimated < _buttons.size():
 				return estimated
 	return -1
@@ -135,10 +146,14 @@ func _rebuild() -> void:
 	if _ids.is_empty():
 		return
 
+	var scale := _ui_scale()
+	_slot_width = SLOT_WIDTH * scale
+	_slot_height = SLOT_HEIGHT * scale
+	var font_size: int = maxi(30, roundi(32.0 * scale))
 	_slots_root = HBoxContainer.new()
 	_slots_root.name = "Slots"
-	_slots_root.position = Vector2(12.0, 12.0)
-	_slots_root.add_theme_constant_override("separation", 8)
+	_slots_root.position = Vector2(12.0, 12.0) * scale
+	_slots_root.add_theme_constant_override("separation", roundi(10.0 * scale))
 	add_child(_slots_root)
 
 	for i in range(_ids.size()):
@@ -146,18 +161,51 @@ func _rebuild() -> void:
 		var button := Button.new()
 		button.name = "Slot%d" % i
 		button.text = "%d %s" % [i + 1, _display_name(id)]
-		button.custom_minimum_size = Vector2(SLOT_WIDTH, SLOT_HEIGHT)
+		button.custom_minimum_size = Vector2(_slot_width, _slot_height)
 		button.mouse_filter = Control.MOUSE_FILTER_STOP
+		button.add_theme_font_size_override("font_size", font_size)
+		button.add_theme_color_override("font_color", Color.WHITE)
+		button.add_theme_stylebox_override("normal", _slot_style(Color(0.03, 0.04, 0.07, 0.92)))
+		button.add_theme_stylebox_override("hover", _slot_style(Color(0.10, 0.14, 0.20, 0.95)))
+		button.add_theme_stylebox_override("pressed", _slot_style(Color(0.22, 0.15, 0.04, 0.98)))
 		button.pressed.connect(_on_slot_pressed.bind(i))
 		_slots_root.add_child(button)
 		_buttons.append(button)
 
 	_label = Label.new()
 	_label.name = "CurrentWeapon"
-	_label.position = Vector2(12.0, SLOT_HEIGHT + 24.0)
+	_label.position = Vector2(12.0, _slot_height + 30.0) * scale
 	_label.text = "ARMA: %s" % (current_id() if not current_id().is_empty() else "-")
+	_label.add_theme_font_size_override("font_size", font_size)
+	_label.add_theme_color_override("font_color", Color.WHITE)
+	_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.9))
+	_label.add_theme_constant_override("outline_size", 4)
 	add_child(_label)
 	_update_styles()
+
+
+func _ui_scale() -> float:
+	var height := get_viewport_rect().size.y
+	if height <= 0.0:
+		height = REFERENCE_HEIGHT
+	return clampf(height / REFERENCE_HEIGHT, MIN_UI_SCALE, 1.6)
+
+
+func _slot_style(background: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = Color(0.96, 0.97, 1.0, 0.9)
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 3
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	return style
 
 
 func _clear_children() -> void:

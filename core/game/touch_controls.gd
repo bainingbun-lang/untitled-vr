@@ -68,24 +68,28 @@ func _build_ui() -> void:
 	_look_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_look_pad)
 
-	var jump := _make_button("SALTAR", "JumpButton")
+	_add_pad_label(_move_pad, "<> MOVER", "MovePadLabel")
+	_add_pad_label(_look_pad, "+ MIRAR", "LookPadLabel")
+
+	var jump := _make_button("^ SALTAR", "JumpButton")
 	jump.pressed.connect(func() -> void: jump_pressed.emit())
 
-	var fire := _make_button("DISPARAR", "FireButton")
+	var fire := _make_button(">> DISPARAR", "FireButton")
 	fire.button_down.connect(func() -> void: fire_pressed.emit())
 	fire.button_up.connect(func() -> void: fire_released.emit())
 
-	var reload := _make_button("RECARGAR", "ReloadButton")
+	var reload := _make_button("R RECARGAR", "ReloadButton")
 	reload.pressed.connect(func() -> void: reload_pressed.emit())
 
-	var interact := _make_button("INTERACTUAR", "InteractButton")
+	var interact := _make_button("E INTERACTUAR", "InteractButton")
 	interact.pressed.connect(func() -> void: interact_pressed.emit())
 
-	var menu := _make_button("MENU", "MenuButton")
+	var menu := _make_button("= MENU", "MenuButton")
 	menu.pressed.connect(_on_menu_pressed)
 
 	var hotbar := _make_button("1", "HotbarSlot")
 	hotbar.pressed.connect(func() -> void: hotbar_select.emit(0))
+	_apply_typography()
 
 
 func _make_button(text: String, node_name: String) -> Button:
@@ -94,8 +98,63 @@ func _make_button(text: String, node_name: String) -> Button:
 	button.text = text
 	button.custom_minimum_size = Vector2.ZERO
 	button.mouse_filter = Control.MOUSE_FILTER_STOP
+	button.add_theme_color_override("font_color", Color.WHITE)
+	button.add_theme_color_override("font_hover_color", Color(1.0, 0.92, 0.55))
+	button.add_theme_color_override("font_pressed_color", Color(1.0, 0.78, 0.25))
+	button.add_theme_stylebox_override("normal", _button_style(Color(0.04, 0.05, 0.09, 0.92)))
+	button.add_theme_stylebox_override("hover", _button_style(Color(0.10, 0.13, 0.20, 0.95)))
+	button.add_theme_stylebox_override("pressed", _button_style(Color(0.24, 0.16, 0.05, 0.98)))
+	button.add_theme_stylebox_override("disabled", _button_style(Color(0.04, 0.04, 0.04, 0.7)))
 	add_child(button)
 	return button
+
+
+func _button_style(background: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = Color(0.95, 0.96, 1.0, 0.85)
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_width_top = 2
+	style.border_width_bottom = 3
+	style.corner_radius_top_left = 10
+	style.corner_radius_top_right = 10
+	style.corner_radius_bottom_left = 10
+	style.corner_radius_bottom_right = 10
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	style.content_margin_top = 6
+	style.content_margin_bottom = 6
+	return style
+
+
+func _add_pad_label(pad: ColorRect, text: String, label_name: String) -> void:
+	var label := Label.new()
+	label.name = label_name
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	label.add_theme_color_override("font_color", Color(0.92, 0.95, 1.0, 0.9))
+	pad.add_child(label)
+
+
+func _ui_scale() -> float:
+	return clampf(_area_size().y / 1080.0, 0.85, 1.6)
+
+
+func _apply_typography() -> void:
+	var scale := _ui_scale()
+	var font_size: int = int(round(32.0 * scale))
+	var hotbar_size: int = int(round(42.0 * scale))
+	for node in find_children("*", "Button", true, false):
+		var button := node as Button
+		button.add_theme_font_size_override("font_size", hotbar_size if button.name == "FireButton" or button.name == "HotbarSlot" else font_size)
+	for label_name in ["MovePadLabel", "LookPadLabel"]:
+		var label := get_node_or_null(label_name) as Label
+		if label != null:
+			label.add_theme_font_size_override("font_size", font_size)
 
 
 func _area_size() -> Vector2:
@@ -132,10 +191,15 @@ func _layout() -> void:
 		node.visible = bool(item.get("visible", true))
 		if str(id) == "joystick":
 			joystick_radius = maxf(1.0, minf(rect.size.x, rect.size.y) * 0.5)
-			_knob.size = Vector2(60.0, 60.0)
-			_knob.position = rect.position + (rect.size - _knob.size) * 0.5
+			var knob_size := Vector2(60.0, 60.0) * _ui_scale()
+			_knob.size = knob_size
+			_knob.position = rect.position + (rect.size - knob_size) * 0.5
 			_knob.modulate.a = node.modulate.a
 			_knob.visible = node.visible
+		if str(id) == "fire":
+			var min_fire := Vector2(210.0, 120.0) * _ui_scale()
+			node.size = Vector2(maxf(node.size.x, min_fire.x), maxf(node.size.y, min_fire.y))
+	_apply_typography()
 
 
 func open_layout_editor() -> void:

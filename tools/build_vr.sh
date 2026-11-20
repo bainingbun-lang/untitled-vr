@@ -65,7 +65,17 @@ cp "$VENDOR_CACHE/LICENSE" "$P/addons/godotopenxrvendors/LICENSE-MIT.txt" || fai
 
 unzip -q "$TEMPLATE_ZIP" -d "$P/android/build" || fail "instalacion de plantilla Gradle"
 printf '4.7.stable' > "$P/android/.build_version"
-printf '\nandroid.aapt2FromMavenOverride=%s\n' "$AAPT2_OVERRIDE" >> "$P/android/build/gradle.properties"
+cat >> "$P/android/build/gradle.properties" <<EOF
+
+# Memoria limitada para Termux aarch64 (7 GB, sin daemon).
+org.gradle.daemon=false
+org.gradle.jvmargs=-Xmx1200m -XX:MaxMetaspaceSize=384m
+org.gradle.workers.max=2
+org.gradle.parallel=false
+kotlin.daemon.jvm.options=-Xmx512m
+android.aapt2FromMavenOverride=$AAPT2_OVERRIDE
+doNotStrip=true
+EOF
 
 python3 - "$P/project.godot" <<'PY' || fail "configuracion VR del proyecto copiado"
 import sys

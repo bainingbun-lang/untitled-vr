@@ -54,7 +54,7 @@ func _build() -> void:
 	damage_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(damage_flash)
 
-	health_label = _make_label("HealthLabel", "VIDA 100/100", 30)
+	health_label = _make_label("HealthLabel", "VIDA 100/100", BASE_FONT_SIZE)
 	_anchor(health_label, 0.03, 0.43, 1.0, 1.0, 0.0, -196.0, 0.0, -164.0)
 	health_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	add_child(health_label)
@@ -80,7 +80,7 @@ func _build() -> void:
 	weapon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(weapon_label)
 
-	ammo_label = _make_label("AmmoLabel", "MUNICION: - / -", 40)
+	ammo_label = _make_label("AmmoLabel", "MUNICION: - / -", AMMO_FONT_SIZE)
 	_anchor(ammo_label, 0.55, 0.97, 1.0, 1.0, 0.0, -160.0, 0.0, -110.0)
 	ammo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(ammo_label)
@@ -169,6 +169,9 @@ func _make_label(node_name: String, text: String, font_size: int) -> Label:
 	label.name = node_name
 	label.text = text
 	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", Color.WHITE)
+	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.9))
+	label.add_theme_constant_override("outline_size", 4)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_base_font_sizes[node_name] = font_size
 	return label

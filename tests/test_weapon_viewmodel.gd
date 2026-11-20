@@ -146,6 +146,119 @@ func _initialize() -> void:
 	vm.advance(0.2)
 	_expect(absf(vm.rig_position().y - bob_rest) < 0.01, "posicion estable en la mano VR")
 
+	_case = "particiones moviles por modelo"
+	for id in ["pistol", "submachine_gun", "assault_rifle", "shotgun", "sniper_rifle", "bat"]:
+		_expect(vm.set_weapon(id), "seleccion %s para particion" % id)
+		vm.advance(0.3)
+		var parts = vm.parts()
+		_expect(parts != null, "piezas construidas para %s" % id)
+		if parts == null:
+			continue
+		_expect(parts.roles.size() >= 1, "al menos una pieza en %s" % id)
+		if id == "bat":
+			_expect(parts.has_role("body"), "bate con cuerpo sin piezas moviles")
+		else:
+			_expect(parts.has_role("magazine"), "cargador modelado en %s" % id)
+			_expect(vm.eject_offset().length() > 0.0, "ventana de eyeccion configurada en %s" % id)
+
+	_case = "corredera de pistola"
+	vm.set_weapon("pistol")
+	vm.advance(0.3)
+	_expect(vm.parts().has_role("slide"), "pistola con corredera")
+	vm.on_fired()
+	vm.advance(0.04)
+	_expect(vm.is_fire_stroking(), "ciclo de disparo activo")
+	_expect(vm.part_offset("slide").x < -0.01, "corredera retrocede al disparar")
+	vm.advance(0.25)
+	_expect(not vm.is_fire_stroking(), "ciclo de disparo terminado")
+	_expect(absf(vm.part_offset("slide").x) < 0.005, "corredera vuelve al reposo")
+
+	_case = "cerrojo y palanca AK"
+	vm.set_weapon("assault_rifle")
+	vm.advance(0.3)
+	vm.on_fired()
+	vm.advance(0.04)
+	_expect(vm.part_offset("bolt").x < -0.01, "cerrojo retrocede en cada disparo")
+	_expect(vm.part_offset("charging_handle").x < -0.01, "palanca AK acompana al cerrojo")
+	vm.advance(0.25)
+	_expect(absf(vm.part_offset("bolt").x) < 0.005, "cerrojo vuelve al reposo")
+
+	_case = "corredera trabada con cargador vacio"
+	vm.set_weapon("pistol")
+	vm.advance(0.3)
+	vm.on_empty()
+	vm.advance(0.25)
+	_expect(vm.is_slide_locked(), "corredera queda atras al vaciarse")
+	_expect(vm.part_offset("slide").x < -0.05, "corredera retenida")
+	vm.on_reload_started(0.5)
+	for i in range(30):
+		vm.advance(0.02)
+	_expect(not vm.is_slide_locked(), "corredera se libera al recargar")
+	_expect(absf(vm.part_offset("slide").x) < 0.005, "corredera vuelve tras recarga")
+
+	_case = "cargador cae y se recicla"
+	MuzzleFxScript.clear()
+	vm.set_weapon("assault_rifle")
+	vm.advance(0.3)
+	_expect(MuzzleFxScript.active_dropped_magazine_count() == 0, "sin cargadores caidos al inicio")
+	vm.on_reload_started(0.5)
+	vm.advance(0.02)
+	_expect(vm.reload_phase() == "drop_mag", "fase soltar cargador")
+	_expect(MuzzleFxScript.active_dropped_magazine_count() == 1, "cargador soltado como cuerpo rigido")
+	_expect(MuzzleFxScript.dropped_magazine_at(0) is RigidBody3D, "cargador caido fisico")
+	_expect(not vm.parts().node("magazine").visible, "cargador original oculto al caer")
+	vm.advance(0.15)
+	_expect(vm.reload_phase() == "insert_mag", "fase introducir cargador")
+	_expect(vm.parts().node("magazine").visible, "cargador nuevo visible")
+	_expect(vm.part_offset("magazine").y < -0.02, "cargador nuevo entra desde abajo")
+	vm.advance(0.4)
+	_expect(not vm.is_reloading(), "recarga finalizada")
+	_expect(absf(vm.part_offset("magazine").y) < 0.005, "cargador asentado")
+	MuzzleFxScript.advance(3.0)
+	_expect(MuzzleFxScript.active_dropped_magazine_count() == 0, "cargador caido reciclado")
+
+	_case = "fases de recarga en orden"
+	vm.on_reload_started(0.5)
+	for i in range(30):
+		vm.advance(0.02)
+	_expect(vm.reload_phases() == ["drop_mag", "insert_mag", "seat_mag", "charge"], "fases ordenadas: %s" % str(vm.reload_phases()))
+
+	_case = "bombeo de escopeta y sonido"
+	vm.set_weapon("shotgun")
+	vm.advance(0.4)
+	_expect(vm.parts().has_role("pump"), "escopeta con pieza de bombeo")
+	vm.on_fired()
+	vm.advance(0.12)
+	_expect(vm.part_offset("pump").x < -0.05, "bombeo corre hacia atras")
+	var pump_players: Array = []
+	for node in _root.find_children("*", "AudioStreamPlayer3D", true, false):
+		var player: AudioStreamPlayer3D = node as AudioStreamPlayer3D
+		if player != null and player.stream == RecordedSfx.stream_for("shotgun", "pump"):
+			pump_players.append(player)
+	_expect(pump_players.size() > 0, "sonido pump sincronizado con el bombeo")
+	vm.advance(0.3)
+	_expect(absf(vm.part_offset("pump").x) < 0.005, "bombeo vuelve al frente")
+
+	_case = "recarga cartucho a cartucho"
+	vm.on_reload_started(0.6)
+	vm.advance(0.10)
+	_expect(vm.reload_phase() == "drop_mag", "apertura de escopeta")
+	vm.advance(0.10)
+	_expect(vm.reload_phase() == "insert_mag", "introduccion de cartuchos")
+	_expect(vm.part_offset("pump").x < -0.01, "bombeo cicla por cartucho")
+	vm.advance(0.45)
+	_expect(not vm.is_reloading(), "recarga de escopeta terminada")
+
+	_case = "casquillos por ventana de eyeccion"
+	MuzzleFxScript.clear()
+	var fx_test: MuzzleFx = vm.muzzle_fx()
+	fx_test.fire(1.0, Vector3.FORWARD, Vector3(1.0, 0.0, 0.0))
+	var last_casing := MuzzleFxScript.active_casing_at(MuzzleFxScript.active_casing_count() - 1)
+	_expect(last_casing != null, "casquillo generado")
+	if last_casing != null:
+		_expect(last_casing.global_position.distance_to(fx_test.global_transform * Vector3(1.0, 0.0, 0.0)) < 0.001, "casquillo nace en la ventana")
+	MuzzleFxScript.clear()
+
 	_case = "topes globales de muzzle fx"
 	MuzzleFxScript.clear()
 	var fx = MuzzleFxScript.new()
@@ -165,7 +278,14 @@ func _initialize() -> void:
 	MuzzleFxScript.clear()
 	_expect(MuzzleFxScript.active_casing_count() == 0, "limpieza de casquillos")
 
+	for player_node in _root.find_children("*", "AudioStreamPlayer3D", true, false):
+		var player: AudioStreamPlayer3D = player_node as AudioStreamPlayer3D
+		if player != null and not player.is_queued_for_deletion():
+			player.stop()
+			player.stream = null
+			player.free()
 	MuzzleFxScript.shutdown()
+	RecordedSfx._cache.clear()
 	if _failures.is_empty():
 		print("PASS (%d assertions)" % _checks)
 		quit(0)

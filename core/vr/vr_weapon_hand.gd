@@ -10,6 +10,9 @@ signal two_hand_exited(weapon_id: String)
 signal haptic(hand: String, duration: float, frequency: float, amplitude: float)
 
 const DbScript = preload("res://core/game/weapon_db.gd")
+const ViewmodelScript = preload("res://core/game/weapon_viewmodel.gd")
+const MuzzleFxScript = preload("res://core/game/muzzle_fx.gd")
+const SfxBankScript = preload("res://core/game/sfx_bank.gd")
 
 const HANDGUARD_RADIUS: float = 0.12
 const HANDGUARD_OFFSETS: Dictionary = {
@@ -47,8 +50,11 @@ var recoil_overrides: Dictionary = {}
 var exclude: Array = []
 
 var holder: Node3D = null
+var viewmodel = null
 var last_haptic: Dictionary = {}
 var last_shot: Dictionary = {}
+
+static var _last_fx_frame: int = -1
 
 var _aim_dir: Vector3 = Vector3.FORWARD
 var _two_hand: bool = false
@@ -66,6 +72,11 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if auto_process:
 		step(delta)
+
+
+func reset_buttons() -> void:
+	_was_grip = false
+	_was_trigger = false
 
 
 func other_hand() -> String:
@@ -131,7 +142,7 @@ func step(delta: float) -> void:
 	_was_trigger = trigger
 
 	_recoil = maxf(_recoil - delta * 5.0, 0.0)
-	_update_visual(primary)
+	_update_visual(primary, delta)
 
 
 func try_take(item_id: String = "") -> bool:
@@ -184,13 +195,30 @@ func try_fire(space = null) -> Dictionary:
 	var direction := _aim_dir.normalized()
 	if direction.length_squared() <= 0.000001:
 		direction = aim_direction(primary, Transform3D.IDENTITY, false)
-	var result = weapon_system.call("fire", weapon_id, _muzzle_origin(primary), direction, space, exclude.duplicate())
+	var origin := _muzzle_origin(primary)
+	var result = weapon_system.call("fire", weapon_id, origin, direction, space, exclude.duplicate())
 	last_shot = result if result is Dictionary else {"fired": false, "reason": "respuesta_invalida"}
 	if bool(last_shot.get("fired", false)):
 		_recoil = current_recoil()
+		if viewmodel != null and viewmodel.has_method("on_fired"):
+			viewmodel.call("on_fired")
+		_play_shot_sound(origin)
 		pulse(hand, 0.05, 0.75, 0.55)
 		fired.emit(last_shot)
+	elif str(last_shot.get("error", "")).find("municion") >= 0:
+		if viewmodel != null and viewmodel.has_method("on_empty"):
+			viewmodel.call("on_empty")
 	return last_shot
+
+
+func _play_shot_sound(origin: Vector3) -> void:
+	var host: Node = get_parent() if get_parent() != null else self
+	RecordedSfx.play(weapon_id, "fire", host, origin)
+	if not RecordedSfx.has_sample(weapon_id, "fire"):
+		var audio_host: Node3D = get_parent() as Node3D
+		if audio_host == null:
+			audio_host = self
+		SfxBankScript.play_synth(audio_host, "shot", weapon_id, origin, "sfx")
 
 
 func try_reload() -> bool:
@@ -198,6 +226,9 @@ func try_reload() -> bool:
 		return false
 	var ok := bool(weapon_system.call("reload", weapon_id))
 	if ok:
+		var def: Dictionary = DbScript.get_def(weapon_id)
+		if viewmodel != null and viewmodel.has_method("on_reload_started"):
+			viewmodel.call("on_reload_started", maxf(float(def.get("reload_time", 1.0)), 0.05))
 		reloaded.emit(weapon_id)
 	return ok
 
@@ -280,7 +311,7 @@ func _muzzle_origin(primary: Transform3D) -> Vector3:
 	return primary.origin + basis.x * muzzle_offset.x + basis.y * muzzle_offset.y + basis.z * muzzle_offset.z
 
 
-func _update_visual(primary: Transform3D) -> void:
+func _update_visual(primary: Transform3D, delta: float = 0.0) -> void:
 	if holder == null or weapon_id.is_empty():
 		return
 	var basis := _aim_basis(primary)
@@ -288,6 +319,36 @@ func _update_visual(primary: Transform3D) -> void:
 	var shake: float = current_shake()
 	offset += Vector3(sin(_time * 23.0), cos(_time * 19.0), 0.0) * shake
 	holder.global_transform = Transform3D(basis, primary.origin + offset)
+	if viewmodel != null and is_instance_valid(viewmodel) and viewmodel.has_method("advance"):
+		viewmodel.call("advance", maxf(delta, 0.0))
+	_advance_fx(delta)
+
+
+func _advance_fx(delta: float) -> void:
+	_detach_fx_anchors()
+	var frame := Engine.get_process_frames()
+	if frame == _last_fx_frame:
+		return
+	_last_fx_frame = frame
+	MuzzleFxScript.advance(maxf(delta, 0.0))
+
+
+func _detach_fx_anchors() -> void:
+	if viewmodel == null or not is_instance_valid(viewmodel):
+		return
+	var fx: Node = viewmodel.find_child("MuzzleFx", true, false)
+	if fx == null:
+		return
+	var host: Node = get_tree().root if get_tree() != null else self
+	for child in fx.get_children():
+		if not (child.name == "MuzzleFlash" or child.name == "MuzzleSmoke" or child.name == "DroppedMagazine"):
+			continue
+		if child.get_parent() != host:
+			var world_transform: Transform3D = child.global_transform if child is Node3D else Transform3D.IDENTITY
+			fx.remove_child(child)
+			host.add_child(child)
+			if child is Node3D:
+				child.global_transform = world_transform
 
 
 func _build_visual(id: String) -> void:
@@ -297,6 +358,22 @@ func _build_visual(id: String) -> void:
 	holder = Node3D.new()
 	holder.name = "WeaponVisual"
 	add_child(holder)
+	var cfg: Dictionary = ViewmodelScript.VIEW.get(id, {})
+	if not cfg.is_empty() and cfg.has("muzzle"):
+		muzzle_offset = cfg.get("muzzle", muzzle_offset)
+	var model = ViewmodelScript.new()
+	model.name = "WeaponViewmodel"
+	holder.add_child(model)
+	model.set_process(false)
+	model.call("set_weapon", id)
+	model.call("attach_to", holder)
+	var fx: Node = model.find_child("MuzzleFx", true, false)
+	if fx != null:
+		fx.set("casing_parent", get_tree().root if get_tree() != null else self)
+		fx.call("set_process", false)
+	viewmodel = model
+	if bool(model.call("has_model")):
+		return
 	var def: Dictionary = DbScript.get_def(id)
 	var tags: Array = def.get("tags", [])
 	var long_gun: bool = tags.has("rifle") or tags.has("sniper") or tags.has("smg")
@@ -325,6 +402,7 @@ func _build_visual(id: String) -> void:
 
 
 func _clear_visual() -> void:
+	viewmodel = null
 	if holder != null and is_instance_valid(holder) and not holder.is_queued_for_deletion():
 		holder.queue_free()
 	holder = null

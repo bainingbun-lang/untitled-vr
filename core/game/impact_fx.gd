@@ -11,6 +11,7 @@ static var _active: Array = []
 static var _decals: Array = []
 static var _materials: Dictionary = {}
 static var _meshes: Dictionary = {}
+static var _decal_texture = null
 
 
 static func spawn(parent: Node, surface_type: int, pos: Vector3, normal: Vector3, strength: float = 1.0, direction: Vector3 = Vector3.ZERO) -> void:
@@ -71,6 +72,7 @@ static func shutdown() -> void:
 	_decals.clear()
 	_materials.clear()
 	_meshes.clear()
+	_decal_texture = null
 
 
 static func _emit(parent: Node, pos: Vector3, direction: Vector3, color: Color, count: int, speed: float, spread: float, size: float, gravity: float, emissive: bool, box_mesh: bool) -> void:
@@ -88,8 +90,8 @@ static func _emit(parent: Node, pos: Vector3, direction: Vector3, color: Color, 
 	particles.initial_velocity_min = maxf(speed, 0.0) * 0.35
 	particles.initial_velocity_max = maxf(speed, 0.0)
 	particles.gravity = Vector3(0.0, -absf(gravity), 0.0)
-	particles.scale_amount_min = maxf(size, 0.01) * 0.5
-	particles.scale_amount_max = maxf(size, 0.01)
+	particles.scale_amount_min = clampf(size / 0.07, 0.4, 1.0)
+	particles.scale_amount_max = clampf(size / 0.045, 0.6, 1.4)
 	particles.mesh = _get_mesh(box_mesh)
 	particles.material_override = _get_material(color, emissive, false)
 	anchor.add_child(particles)
@@ -102,11 +104,12 @@ static func _add_hole(parent: Node, pos: Vector3, normal: Vector3, size: float, 
 	var decal := MeshInstance3D.new()
 	decal.name = "ImpactHole"
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(clampf(size, 0.04, 0.6), clampf(size, 0.04, 0.6))
+	var extent := clampf(size, 0.04, 0.35)
+	plane.size = Vector2(extent, extent)
 	decal.mesh = plane
 	decal.material_override = _get_material(color, false, true)
 	var outward := normal.normalized() if normal.length_squared() > 0.0001 else Vector3.FORWARD
-	decal.quaternion = Quaternion(Vector3.FORWARD, outward)
+	decal.quaternion = Quaternion(Vector3.UP, outward)
 	decal.position = pos + outward * 0.012
 	parent.add_child(decal)
 	_decals.append(decal)
@@ -121,6 +124,7 @@ static func _get_material(color: Color, emissive: bool, decal: bool) -> Material
 	var material := StandardMaterial3D.new()
 	if decal:
 		material.albedo_color = Color(color.r, color.g, color.b, 0.78)
+		material.albedo_texture = _get_decal_texture()
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
@@ -142,17 +146,34 @@ static func _get_mesh(box_mesh: bool) -> Mesh:
 	var mesh: Mesh
 	if box_mesh:
 		var box := BoxMesh.new()
-		box.size = Vector3(1.0, 1.0, 1.0)
+		box.size = Vector3(0.07, 0.07, 0.07)
 		mesh = box
 	else:
 		var sphere := SphereMesh.new()
-		sphere.radius = 0.5
-		sphere.height = 1.0
-		sphere.radial_segments = 5
+		sphere.radius = 0.04
+		sphere.height = 0.08
+		sphere.radial_segments = 6
 		sphere.rings = 3
 		mesh = sphere
 	_meshes[key] = mesh
 	return mesh
+
+
+static func _get_decal_texture() -> Texture2D:
+	if _decal_texture == null:
+		var gradient := Gradient.new()
+		gradient.add_point(0.0, Color(1.0, 1.0, 1.0, 1.0))
+		gradient.add_point(0.55, Color(1.0, 1.0, 1.0, 0.85))
+		gradient.add_point(1.0, Color(1.0, 1.0, 1.0, 0.0))
+		var texture := GradientTexture2D.new()
+		texture.gradient = gradient
+		texture.fill = GradientTexture2D.FILL_RADIAL
+		texture.fill_from = Vector2(0.5, 0.5)
+		texture.fill_to = Vector2(1.0, 0.5)
+		texture.width = 32
+		texture.height = 32
+		_decal_texture = texture
+	return _decal_texture
 
 
 static func _retire(node) -> void:

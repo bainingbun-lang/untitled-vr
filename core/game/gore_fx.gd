@@ -5,6 +5,8 @@ const MAX_DECALS := 64
 const MAX_ACTIVE := 32
 const MAX_PUDDLES := 16
 const MAX_PARTS := 12
+const GROUND_MASK := 1
+const GROUND_PROBE := 6.0
 const GAME_SESSION_PATH := "res://core/game/game_session.gd"
 
 static var _decals: Array = []
@@ -16,6 +18,7 @@ static var _blood_material = null
 static var _decal_material = null
 static var _puddle_material = null
 static var _part_material = null
+static var _decal_texture = null
 static var _forced_gore = null
 static var limit_decals: int = MAX_DECALS
 static var limit_active: int = MAX_ACTIVE
@@ -109,17 +112,17 @@ static func puddle(parent: Node, pos: Vector3, normal: Vector3, size: float) -> 
 		return null
 	var puddle_node := MeshInstance3D.new()
 	puddle_node.name = "GorePuddle"
-	var cylinder := CylinderMesh.new()
-	cylinder.top_radius = clampf(size, 0.1, 1.5)
-	cylinder.bottom_radius = cylinder.top_radius
-	cylinder.height = 0.012
-	cylinder.radial_segments = 12
-	cylinder.rings = 1
-	puddle_node.mesh = cylinder
+	puddle_node.mesh = _make_irregular_disc(clampf(size, 0.1, 1.2), 11)
 	puddle_node.material_override = _get_puddle_material()
-	var up := normal.normalized() if normal.length_squared() > 0.0001 else Vector3.UP
-	puddle_node.position = pos + up * 0.006
 	parent.add_child(puddle_node)
+	var surface := _ground_hit(parent, pos + Vector3.UP * 0.25)
+	var impact_pos: Vector3 = surface.get("position", pos)
+	var impact_normal: Vector3 = surface.get("normal", Vector3.UP)
+	if surface.is_empty() or impact_normal.y < 0.5:
+		impact_pos = pos
+		impact_normal = normal.normalized() if normal.length_squared() > 0.0001 else Vector3.UP
+	puddle_node.global_position = impact_pos + impact_normal * 0.004
+	puddle_node.quaternion = Quaternion(Vector3.UP, impact_normal)
 	_puddles.append(puddle_node)
 	while _puddles.size() > limit_puddles:
 		_retire(_puddles.pop_front())
@@ -140,14 +143,19 @@ static func dismember(parent: Node, pos: Vector3, size: float, zone: String = ""
 		body.mass = clampf(scale * 1.5, 0.4, 4.0)
 		body.position = pos + Vector3(randf_range(-0.2, 0.2), randf_range(-0.1, 0.3), randf_range(-0.2, 0.2)) * scale
 		var shape := CollisionShape3D.new()
-		var box := BoxShape3D.new()
-		box.size = Vector3(0.16, 0.24, 0.16) * scale
-		shape.shape = box
+		var sphere_shape := SphereShape3D.new()
+		sphere_shape.radius = 0.1 * scale
+		shape.shape = sphere_shape
 		body.add_child(shape)
 		var visual := MeshInstance3D.new()
-		var mesh := BoxMesh.new()
-		mesh.size = box.size
+		var mesh := SphereMesh.new()
+		mesh.radius = 0.075 * scale
+		mesh.height = 0.19 * scale
+		mesh.radial_segments = 7
+		mesh.rings = 4
 		visual.mesh = mesh
+		visual.scale = Vector3(randf_range(0.85, 1.2), randf_range(0.85, 1.25), randf_range(0.8, 1.1))
+		visual.rotation = Vector3(randf_range(-0.5, 0.5), randf() * TAU, randf_range(-0.5, 0.5))
 		visual.material_override = _get_part_material()
 		body.add_child(visual)
 		parent.add_child(body)
@@ -222,6 +230,7 @@ static func shutdown() -> void:
 	_decal_material = null
 	_puddle_material = null
 	_part_material = null
+	_decal_texture = null
 
 
 static func _add_decal(parent: Node, pos: Vector3, normal: Vector3, size: float) -> void:
@@ -230,16 +239,60 @@ static func _add_decal(parent: Node, pos: Vector3, normal: Vector3, size: float)
 	var decal := MeshInstance3D.new()
 	decal.name = "GoreDecal"
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(size, size)
+	var extent := clampf(size, 0.08, 0.6)
+	plane.size = Vector2(extent, extent)
 	decal.mesh = plane
 	decal.material_override = _get_decal_material()
-	var direction := normal.normalized() if normal.length_squared() > 0.0001 else Vector3.UP
-	decal.quaternion = Quaternion(Vector3.UP, direction)
-	decal.position = pos + direction * 0.01
 	parent.add_child(decal)
+	var surface := _ground_hit(parent, pos + Vector3.UP * 0.25)
+	var impact_pos: Vector3 = surface.get("position", pos)
+	var impact_normal: Vector3 = surface.get("normal", Vector3.UP)
+	if surface.is_empty() or impact_normal.y < 0.5:
+		impact_pos = pos
+		impact_normal = normal.normalized() if normal.length_squared() > 0.0001 else Vector3.UP
+	decal.global_position = impact_pos + impact_normal * 0.006
+	decal.quaternion = Quaternion(Vector3.UP, impact_normal)
 	_decals.append(decal)
 	while _decals.size() > limit_decals:
 		_retire(_decals.pop_front())
+
+
+static func _ground_hit(parent: Node, from: Vector3) -> Dictionary:
+	var world_3d: World3D = parent.get_world_3d() if parent is Node3D else null
+	if world_3d == null:
+		return {}
+	var query := PhysicsRayQueryParameters3D.create(from, from - Vector3.UP * GROUND_PROBE)
+	query.collide_with_bodies = true
+	query.collide_with_areas = false
+	query.collision_mask = GROUND_MASK
+	return world_3d.direct_space_state.intersect_ray(query)
+
+
+static func _make_irregular_disc(radius: float, segments: int) -> Mesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = (int(radius * 1000.0) ^ 0xB100D) & 0x7FFFFFFF
+	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var indices := PackedInt32Array()
+	vertices.append(Vector3.ZERO)
+	normals.append(Vector3.UP)
+	for i in range(segments):
+		var angle := TAU * float(i) / float(segments)
+		var offset := radius * rng.randf_range(0.72, 1.05)
+		vertices.append(Vector3(cos(angle) * offset, 0.0, sin(angle) * offset))
+		normals.append(Vector3.UP)
+	for i in range(segments):
+		indices.append(0)
+		indices.append((i + 1) % segments + 1)
+		indices.append(i + 1)
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
 
 
 static func _retire(node) -> void:
@@ -275,10 +328,29 @@ static func _get_blood_material() -> Material:
 static func _get_decal_material() -> Material:
 	if _decal_material == null:
 		var material := StandardMaterial3D.new()
-		material.albedo_color = Color(0.32, 0.01, 0.01, 1.0)
+		material.albedo_color = Color(0.32, 0.01, 0.01, 0.85)
+		material.albedo_texture = _get_decal_texture()
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		material.roughness = 1.0
 		_decal_material = material
 	return _decal_material
+
+
+static func _get_decal_texture() -> Texture2D:
+	if _decal_texture == null:
+		var gradient := Gradient.new()
+		gradient.add_point(0.0, Color(1.0, 1.0, 1.0, 1.0))
+		gradient.add_point(0.6, Color(1.0, 1.0, 1.0, 0.7))
+		gradient.add_point(1.0, Color(1.0, 1.0, 1.0, 0.0))
+		var texture := GradientTexture2D.new()
+		texture.gradient = gradient
+		texture.fill = GradientTexture2D.FILL_RADIAL
+		texture.fill_from = Vector2(0.5, 0.5)
+		texture.fill_to = Vector2(1.0, 0.5)
+		texture.width = 32
+		texture.height = 32
+		_decal_texture = texture
+	return _decal_texture
 
 
 static func _get_puddle_material() -> Material:

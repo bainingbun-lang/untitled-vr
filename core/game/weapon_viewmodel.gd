@@ -2,6 +2,7 @@ class_name WeaponViewmodel
 extends Node3D
 
 const MuzzleFxScript = preload("res://core/game/muzzle_fx.gd")
+const WeaponPartsScript = preload("res://core/game/weapon_parts.gd")
 
 const MODEL_DIR := "res://assets/models/weapons/"
 
@@ -12,6 +13,7 @@ const VIEW: Dictionary = {
 		"align_y": 90.0,
 		"length": 0.26,
 		"muzzle": Vector3(0.0, 0.035, -0.25),
+		"eject": Vector3(0.035, 0.025, 0.055),
 		"fx": 0.8,
 		"kick": Vector3(0.25, 1.6, 2.2),
 	},
@@ -21,6 +23,7 @@ const VIEW: Dictionary = {
 		"align_y": 90.0,
 		"length": 0.46,
 		"muzzle": Vector3(0.0, 0.04, -0.44),
+		"eject": Vector3(0.04, 0.025, 0.11),
 		"fx": 0.9,
 		"kick": Vector3(0.30, 1.4, 2.0),
 	},
@@ -30,6 +33,7 @@ const VIEW: Dictionary = {
 		"align_y": 90.0,
 		"length": 0.60,
 		"muzzle": Vector3(0.0, 0.045, -0.58),
+		"eject": Vector3(0.05, 0.03, 0.17),
 		"fx": 1.0,
 		"kick": Vector3(0.35, 2.1, 2.8),
 	},
@@ -39,6 +43,7 @@ const VIEW: Dictionary = {
 		"align_y": 90.0,
 		"length": 0.64,
 		"muzzle": Vector3(0.0, 0.04, -0.62),
+		"eject": Vector3(0.045, 0.03, 0.20),
 		"fx": 1.3,
 		"kick": Vector3(0.45, 3.2, 3.8),
 	},
@@ -48,6 +53,7 @@ const VIEW: Dictionary = {
 		"align_y": 90.0,
 		"length": 0.78,
 		"muzzle": Vector3(0.0, 0.05, -0.76),
+		"eject": Vector3(0.045, 0.035, 0.22),
 		"fx": 1.4,
 		"kick": Vector3(0.50, 4.0, 4.6),
 	},
@@ -70,6 +76,10 @@ const RELOAD_SWING := 0.14
 const SWITCH_DURATION := 0.26
 const PUMP_DURATION := 0.32
 const EMPTY_DURATION := 0.18
+const FIRE_STROKE_DURATION := 0.15
+const PART_STROKE := 0.11
+const PUMP_STROKE := 0.16
+const MAG_INSERT_DROP := 0.22
 
 var walk_intensity: float = 0.0
 
@@ -106,6 +116,17 @@ var _empty_active: bool = false
 var _empty_elapsed: float = 0.0
 var _empty_offset: Vector3 = Vector3.ZERO
 var _empty_rotation: Vector3 = Vector3.ZERO
+
+var _parts = null
+var _fire_stroke: float = -1.0
+var _fire_stroke_role: String = ""
+var _slide_locked: bool = false
+var _pump_sfx_fired: bool = false
+var _pump_sfx_index: int = -1
+var _reload_phase: String = ""
+var _reload_t: float = 0.0
+var _reload_phases: Array = []
+var _mag_dropped: bool = false
 
 
 func _ready() -> void:
@@ -167,10 +188,12 @@ func on_fired() -> void:
 	var kick: Vector3 = cfg.get("kick", Vector3(0.3, 1.5, 2.0))
 	_recoil_velocity += kick
 	if _fx != null and float(cfg.get("fx", 1.0)) > 0.0:
-		_fx.fire(float(cfg.get("fx", 1.0)))
+		_fx.fire(float(cfg.get("fx", 1.0)), Vector3.FORWARD, cfg.get("eject", Vector3.ZERO))
+	_start_fire_stroke()
 	if _current_id == "shotgun":
 		_pump_active = true
 		_pump_elapsed = 0.0
+		_pump_sfx_fired = false
 
 
 func on_reload_started(duration: float) -> void:
@@ -178,12 +201,19 @@ func on_reload_started(duration: float) -> void:
 	_reload_duration = maxf(duration, 0.05)
 	_reload_elapsed = 0.0
 	_reload_active = true
+	_reload_phase = ""
+	_reload_t = 0.0
+	_reload_phases.clear()
+	_mag_dropped = false
+	_pump_sfx_index = -1
 
 
 func on_empty() -> void:
 	_ensure_setup()
 	_empty_active = true
 	_empty_elapsed = 0.0
+	if _current_id == "pistol" and _parts != null and _parts.has_role("slide"):
+		_slide_locked = true
 
 
 func set_walk_intensity(value: float) -> void:
@@ -216,6 +246,7 @@ func advance(delta: float) -> void:
 	_step_switch(dt)
 	_step_pump(dt)
 	_step_empty(dt)
+	_step_parts(dt)
 	_apply_transforms()
 
 
@@ -263,6 +294,37 @@ func muzzle_fx() -> MuzzleFx:
 	return _fx
 
 
+func parts():
+	return _parts
+
+
+func part_offset(role: String) -> Vector3:
+	if _parts == null:
+		return Vector3.ZERO
+	return _parts.offset(role)
+
+
+func reload_phase() -> String:
+	return _reload_phase
+
+
+func reload_phases() -> Array:
+	return _reload_phases.duplicate()
+
+
+func is_slide_locked() -> bool:
+	return _slide_locked
+
+
+func is_fire_stroking() -> bool:
+	return _fire_stroke >= 0.0
+
+
+func eject_offset() -> Vector3:
+	var cfg: Dictionary = VIEW.get(_current_id, {})
+	return cfg.get("eject", Vector3.ZERO)
+
+
 func _swap_model(id: String) -> void:
 	for child in _model_holder.get_children():
 		_model_holder.remove_child(child)
@@ -276,6 +338,11 @@ func _swap_model(id: String) -> void:
 	_reload_active = false
 	_reload_offset = Vector3.ZERO
 	_reload_rotation = Vector3.ZERO
+	_parts = null
+	_fire_stroke = -1.0
+	_slide_locked = false
+	_reload_phase = ""
+	_reload_phases.clear()
 	var path: String = str(cfg.get("model", ""))
 	if path.is_empty() or not ResourceLoader.exists(path):
 		push_warning("WeaponViewmodel: modelo no disponible para '%s'" % id)
@@ -309,6 +376,7 @@ func _swap_model(id: String) -> void:
 		node.scale = Vector3.ONE * (length / maxf(_estimate_node_scale(node), 0.0001))
 	if _fx != null:
 		_fx.position = cfg.get("muzzle", Vector3.ZERO)
+	_parts = WeaponPartsScript.build(node, id)
 
 
 func _compute_aabb(root: Node3D) -> AABB:
@@ -345,9 +413,15 @@ func _step_recoil(delta: float) -> void:
 		_recoil_offset = Vector3.ZERO
 		_recoil_velocity = Vector3.ZERO
 		return
-	var accel := -RECOIL_STIFFNESS * _recoil_offset - RECOIL_DAMPING * _recoil_velocity
-	_recoil_velocity += accel * delta
-	_recoil_offset += _recoil_velocity * delta
+	var remaining: float = minf(delta, 0.25)
+	while remaining > 0.0:
+		var step: float = minf(remaining, 1.0 / 90.0)
+		var accel := -RECOIL_STIFFNESS * _recoil_offset - RECOIL_DAMPING * _recoil_velocity
+		_recoil_velocity += accel * step
+		_recoil_offset += _recoil_velocity * step
+		remaining -= step
+	if _recoil_offset.length() > 1.0:
+		_recoil_offset = _recoil_offset.normalized() * 1.0
 
 
 func _step_bob(delta: float) -> void:
@@ -373,10 +447,18 @@ func _step_reload(delta: float) -> void:
 	var curve: float = sin(t * PI)
 	_reload_offset = Vector3(curve * 0.05, -curve * RELOAD_SWING, curve * 0.06)
 	_reload_rotation = Vector3(curve * 32.0, curve * 10.0, curve * 20.0)
+	_reload_t = t
+	var phase: String = _phase_for(t)
+	if phase != _reload_phase:
+		_reload_phase = phase
+		_reload_phases.append(phase)
+		_enter_reload_phase(phase)
 	if t >= 1.0:
 		_reload_active = false
+		_reload_phase = ""
 		_reload_offset = Vector3.ZERO
 		_reload_rotation = Vector3.ZERO
+		_slide_locked = false
 
 
 func _step_switch(delta: float) -> void:
@@ -438,3 +520,145 @@ func _apply_transforms() -> void:
 	_motion.position = _recoil_offset
 	_rig.position = _base_pos + _bob_offset + _reload_offset + _pump_offset + _switch_offset + _empty_offset
 	_rig.rotation_degrees = _reload_rotation + _pump_rotation + _switch_rotation + _empty_rotation
+
+
+func _start_fire_stroke() -> void:
+	if _parts == null:
+		return
+	var role := ""
+	if _parts.has_role("slide"):
+		role = "slide"
+	elif _parts.has_role("bolt"):
+		role = "bolt"
+	elif _parts.has_role("pump"):
+		role = "pump"
+	if role.is_empty():
+		return
+	_fire_stroke_role = role
+	_fire_stroke = 0.0
+
+
+func _phase_for(t: float) -> String:
+	if t < 0.20:
+		return "drop_mag"
+	if t < 0.58:
+		return "insert_mag"
+	if t < 0.74:
+		return "seat_mag"
+	return "charge"
+
+
+func _enter_reload_phase(phase: String) -> void:
+	if phase == "drop_mag":
+		if _current_id == "shotgun" or _mag_dropped or _parts == null:
+			return
+		var magazine: Node3D = _parts.node("magazine")
+		if magazine == null or not is_instance_valid(magazine):
+			return
+		var visual: MeshInstance3D = _first_mesh(magazine)
+		if visual == null or visual.mesh == null:
+			return
+		MuzzleFxScript.drop_magazine(self, magazine.global_transform, visual.mesh, _first_material(visual))
+		_mag_dropped = true
+		magazine.visible = false
+	elif phase == "insert_mag":
+		if _parts != null:
+			var magazine: Node3D = _parts.node("magazine")
+			if magazine != null and is_instance_valid(magazine):
+				magazine.visible = true
+	elif phase == "charge":
+		_slide_locked = false
+
+
+func _step_parts(delta: float) -> void:
+	if _parts == null:
+		return
+	for role in _parts.roles:
+		var pivot: Node3D = _parts.node(str(role))
+		if pivot != null and is_instance_valid(pivot) and _parts.homes.has(role):
+			pivot.position = _parts.homes[role]
+
+	if _slide_locked and _parts.has_role("slide"):
+		_add_part_offset("slide", Vector3(-PART_STROKE, 0.0, 0.0))
+
+	if _fire_stroke >= 0.0:
+		_fire_stroke += delta
+		var t: float = clampf(_fire_stroke / FIRE_STROKE_DURATION, 0.0, 1.0)
+		var curve: float = sin(t * PI)
+		_add_part_offset(_fire_stroke_role, Vector3(-PART_STROKE * curve, 0.0, 0.0))
+		if _fire_stroke_role == "bolt":
+			_add_part_offset("charging_handle", Vector3(-PART_STROKE * curve, 0.0, 0.0))
+		if t >= 1.0:
+			_fire_stroke = -1.0
+
+	if _pump_active and _parts.has_role("pump"):
+		var t: float = clampf(_pump_elapsed / PUMP_DURATION, 0.0, 1.0)
+		_add_part_offset("pump", Vector3(-PUMP_STROKE * sin(t * PI), 0.0, 0.0))
+		if t >= 0.45 and not _pump_sfx_fired:
+			_pump_sfx_fired = true
+			_play_pump_sfx(0)
+
+	if not _reload_active:
+		return
+	match _reload_phase:
+		"insert_mag":
+			var t: float = clampf((_reload_t - 0.20) / 0.38, 0.0, 1.0)
+			var eased: float = 1.0 - (1.0 - t) * (1.0 - t)
+			_add_part_offset("magazine", Vector3(0.0, -MAG_INSERT_DROP * (1.0 - eased), 0.0))
+			if _current_id == "shotgun":
+				var shells: int = mini(int(floor(t * 3.0)), 2)
+				if shells != _pump_sfx_index:
+					_pump_sfx_index = shells
+					_play_pump_sfx(shells)
+				var cycle: float = fmod(t * 3.0, 1.0)
+				_add_part_offset("pump", Vector3(-PUMP_STROKE * sin(cycle * PI), 0.0, 0.0))
+		"seat_mag":
+			var t: float = clampf((_reload_t - 0.58) / 0.16, 0.0, 1.0)
+			_add_part_offset("magazine", Vector3(0.0, 0.025 * sin(t * PI), 0.0))
+		"charge":
+			var t: float = clampf((_reload_t - 0.74) / 0.26, 0.0, 1.0)
+			if _parts.has_role("slide"):
+				_add_part_offset("slide", Vector3(-PART_STROKE * (1.0 - t), 0.0, 0.0))
+			var curve: float = sin(t * PI)
+			_add_part_offset("bolt", Vector3(-PART_STROKE * curve, 0.0, 0.0))
+			_add_part_offset("charging_handle", Vector3(-PART_STROKE * curve, 0.0, 0.0))
+			if _current_id == "shotgun":
+				_add_part_offset("pump", Vector3(-PUMP_STROKE * curve, 0.0, 0.0))
+
+
+func _add_part_offset(role: String, offset: Vector3) -> void:
+	if _parts == null or not _parts.has_role(role):
+		return
+	var pivot: Node3D = _parts.node(role)
+	if pivot == null or not is_instance_valid(pivot):
+		return
+	pivot.position += offset
+
+
+func _first_mesh(node: Node) -> MeshInstance3D:
+	if node is MeshInstance3D:
+		return node as MeshInstance3D
+	for child in node.get_children():
+		var found: MeshInstance3D = _first_mesh(child)
+		if found != null:
+			return found
+	return null
+
+
+func _first_material(mi: MeshInstance3D) -> Material:
+	if mi.material_override != null:
+		return mi.material_override
+	if mi.mesh == null:
+		return null
+	for surface in range(mi.mesh.get_surface_count()):
+		var material: Material = mi.mesh.surface_get_material(surface)
+		if material != null:
+			return material
+	return null
+
+
+func _play_pump_sfx(index: int) -> void:
+	if not RecordedSfx.has_sample("shotgun", "pump"):
+		return
+	var host: Node = get_parent() if get_parent() != null else self
+	RecordedSfx.play("shotgun", "pump", host, global_position)

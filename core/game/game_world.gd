@@ -11,11 +11,13 @@ const CHARACTER_MODEL_PATH: String = "res://core/game/character_model.gd"
 const VOICE_SYSTEM_PATH: String = "res://core/game/voice_system.gd"
 const GORE_FX_PATH: String = "res://core/game/gore_fx.gd"
 const VR_PERFORMANCE_PATH: String = "res://core/vr/vr_performance.gd"
+const VR_GAME_MODE_PATH: String = "res://core/vr/vr_game_mode.gd"
 const ARMED_NPC_PATH: String = "res://core/game/armed_npc.gd"
 const CharacterModelScript = preload("res://core/game/character_model.gd")
 const VoiceSystemScript = preload("res://core/game/voice_system.gd")
 const GoreFxScript = preload("res://core/game/gore_fx.gd")
 const VrPerformanceScript = preload("res://core/vr/vr_performance.gd")
+const VrGameModeScript = preload("res://core/vr/vr_game_mode.gd")
 const MapWorldBuilderScript = preload("res://core/maps/map_world_builder.gd")
 
 const DUMMY_COUNT: int = 6
@@ -36,6 +38,9 @@ var _dummies_root: Node3D = null
 var _syncing_hotbar := false
 var voice: Node = null
 var performance: Node = null
+var vr_state: Node = null
+var vr_active: bool = false
+var vr_result: Dictionary = {}
 var _models: Dictionary = {}
 var _skins: Dictionary = {}
 var _impacts: Dictionary = {}
@@ -56,12 +61,19 @@ func setup(meta: Dictionary) -> void:
 	_discard(actor)
 	_discard(_hud_layer)
 	_discard(_dummies_root)
+	for key in vr_result.keys():
+		var old_node: Variant = vr_result.get(key)
+		if old_node is Node:
+			_discard(old_node as Node)
 	_geometry_root = null
 	actor = null
 	hud = null
 	hotbar = null
 	pause_menu = null
 	_dummies_root = null
+	vr_state = null
+	vr_active = false
+	vr_result = {}
 	spawn_points = []
 	bounds = AABB()
 	dummies = []
@@ -78,23 +90,30 @@ func setup(meta: Dictionary) -> void:
 		if not spawn_points.is_empty():
 			first_point = spawn_points[0]
 		actor = _create_actor(first_point)
+	vr_active = actor != null and actor.has_method("is_active") and bool(actor.call("is_active"))
+	if vr_active:
+		vr_result = VrGameModeScript.setup(self, actor, meta)
+		vr_state = vr_result.get("state", null) as Node
 
 	_collect_physics_props()
 	_setup_performance()
 	_setup_voice()
 	_spawn_dummies(first_point, meta)
-	_setup_hud()
-	_setup_hotbar()
-	_setup_pause_menu()
+	if not vr_active:
+		_setup_hud()
+		_setup_hotbar()
+		_setup_pause_menu()
+		_auto_equip()
+		if actor != null and actor.has_signal("menu_pressed"):
+			var callable := Callable(self, "_on_menu_pressed")
+			if not actor.is_connected("menu_pressed", callable):
+				actor.connect("menu_pressed", callable)
 	_wire_targets()
-	_auto_equip()
-	if actor != null and actor.has_signal("menu_pressed"):
-		var callable := Callable(self, "_on_menu_pressed")
-		if not actor.is_connected("menu_pressed", callable):
-			actor.connect("menu_pressed", callable)
 
 
 func _process(delta: float) -> void:
+	if vr_state != null and is_instance_valid(vr_state) and vr_state.has_method("tick"):
+		vr_state.call("tick", maxf(delta, 0.0))
 	if performance != null and is_instance_valid(performance) and performance.has_method("observe_frame"):
 		var report: Variant = performance.call("observe_frame", maxf(delta, 0.0) * 1000.0, delta)
 		if report is Dictionary and bool((report as Dictionary).get("changed", false)):
@@ -118,24 +137,25 @@ func props() -> Array:
 
 
 func _create_actor(spawn: Vector3) -> Node3D:
-	if ResourceLoader.exists(PLAYER_SCENE):
-		var packed: PackedScene = load(PLAYER_SCENE) as PackedScene
-		if packed != null:
-			var instance: Node = packed.instantiate()
-			if instance is Node3D:
-				var player: Node3D = instance
-				player.name = "Player"
-				add_child(player)
-				player.global_position = spawn
-				return player
-			instance.queue_free()
+	var use_vr: bool = _session_platform() == "vr" and VrGameModeScript.xr_available()
+	var result := VrGameModeScript.build(self, use_vr)
+	if result == null:
+		return null
+	result.global_position = spawn
+	if not use_vr and result is Camera3D:
+		result.look_at(spawn + Vector3(0.0, 1.0, 0.0))
+	return result
 
-	var camera := Camera3D.new()
-	camera.name = "FallbackCamera"
-	camera.position = spawn + Vector3(0.0, 1.6, 4.0)
-	add_child(camera)
-	camera.look_at(spawn + Vector3(0.0, 1.0, 0.0))
-	return camera
+
+func _session_platform() -> String:
+	var session := _safe_script(SESSION_SCRIPT)
+	if session == null:
+		return ""
+	var platform: String = str(session.get("platform"))
+	if platform.is_empty() and session.has_method("detect_platform"):
+		platform = str(session.call("detect_platform"))
+		session.set("platform", platform)
+	return platform
 
 
 func _collect_physics_props() -> void:
@@ -152,10 +172,14 @@ func _spawn_dummies(center: Vector3, meta: Dictionary) -> void:
 	var session := _safe_script(SESSION_SCRIPT)
 	var fallback_seed: int = int(session.get("seed")) if session != null else 0
 	var seed_value: int = int(meta.get("seed", fallback_seed))
+	var count: int = DUMMY_COUNT
+	if vr_active and performance != null and performance.has_method("current_profile"):
+		var profile: Dictionary = performance.call("current_profile")
+		count = clampi(int(profile.get("npcs", DUMMY_COUNT)), 1, DUMMY_COUNT)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value ^ 0x5EED
-	for i in range(DUMMY_COUNT):
-		var angle := TAU * float(i) / float(DUMMY_COUNT) + rng.randf_range(-0.16, 0.16)
+	for i in range(count):
+		var angle := TAU * float(i) / float(maxi(count, 1)) + rng.randf_range(-0.16, 0.16)
 		var radius: float = 5.0 + rng.randf_range(0.0, 1.8)
 		var point := center + Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
 		point = _clamp_to_bounds(point, center)
@@ -298,7 +322,9 @@ func _connect_once(target: Node, signal_name: String, callable: Callable) -> voi
 
 
 func _on_voice_subtitle(text: String, npc: String) -> void:
-	if hud != null and hud.has_method("show_subtitle"):
+	if vr_state != null and is_instance_valid(vr_state) and vr_state.has_method("show_subtitle"):
+		vr_state.call("show_subtitle", text, npc)
+	elif hud != null and hud.has_method("show_subtitle"):
 		hud.call("show_subtitle", text, npc)
 
 
@@ -449,6 +475,9 @@ func _auto_equip() -> void:
 
 
 func _on_menu_pressed() -> void:
+	if vr_state != null and is_instance_valid(vr_state) and vr_state.has_method("toggle_menu"):
+		vr_state.call("toggle_menu")
+		return
 	if pause_menu == null or not is_instance_valid(pause_menu):
 		return
 	if pause_menu.has_method("open"):

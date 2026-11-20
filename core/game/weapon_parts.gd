@@ -113,7 +113,7 @@ static func build(root: Node3D, id: String) -> Result:
 		"largest_island": largest_island,
 	}
 
-	var clean_islands: bool = island_total >= 2 and largest_island <= maxi(3, triangle_total / 2)
+	var clean_islands: bool = island_total >= 2 and largest_island <= maxi(3, triangle_total / 2) and id != "shotgun"
 	if id == "bat" or (clean_islands and island_total <= 16):
 		result.method = "islas conexas"
 	else:
@@ -142,9 +142,9 @@ static func build(root: Node3D, id: String) -> Result:
 				var i0: int = indices[tri * 3] if indices.size() > 0 else tri * 3
 				var i1: int = indices[tri * 3 + 1] if indices.size() > 0 else tri * 3 + 1
 				var i2: int = indices[tri * 3 + 2] if indices.size() > 0 else tri * 3 + 2
-				var p0: Vector3 = rel.xform(verts[i0])
-				var p1: Vector3 = rel.xform(verts[i1])
-				var p2: Vector3 = rel.xform(verts[i2])
+				var p0: Vector3 = rel * verts[i0]
+				var p1: Vector3 = rel * verts[i1]
+				var p2: Vector3 = rel * verts[i2]
 				var centroid: Vector3 = (p0 + p1 + p2) / 3.0
 				var role := _role_for(centroid, bounds, id, clean_islands)
 				var key: String = "%s|%d|%d" % [role, mi.get_instance_id(), surface]
@@ -152,48 +152,61 @@ static func build(root: Node3D, id: String) -> Result:
 					buckets[key] = {
 						"role": role,
 						"material": material,
-						"vertices": PackedVector3Array(),
-						"normals": PackedVector3Array(),
-						"uvs": PackedVector2Array(),
-						"colors": PackedColorArray(),
-						"indices": PackedInt32Array(),
+						"vertices": [],
+						"normals": [],
+						"uvs": [],
+						"colors": [],
+						"indices": [],
 						"remap": {},
 					}
 				var bucket: Dictionary = buckets[key]
+				var vout: Array = bucket["vertices"]
+				var nout: Array = bucket["normals"]
+				var uout: Array = bucket["uvs"]
+				var cout: Array = bucket["colors"]
+				var iout: Array = bucket["indices"]
 				var remap: Dictionary = bucket["remap"]
 				for vi in [i0, i1, i2]:
 					var local_index: int = vi
 					if not remap.has(local_index):
-						var world_vertex: Vector3 = rel.xform(verts[vi])
-						remap[local_index] = (bucket["vertices"] as PackedVector3Array).size()
-						(bucket["vertices"] as PackedVector3Array).append(world_vertex)
+						remap[local_index] = vout.size()
+						vout.append(rel * verts[vi])
 						var transformed_normal := Vector3.UP
 						if normals != null and vi < (normals as PackedVector3Array).size():
-							transformed_normal = (rel.basis.xform((normals as PackedVector3Array)[vi])).normalized()
-						(bucket["normals"] as PackedVector3Array).append(transformed_normal)
+							transformed_normal = (rel.basis * (normals as PackedVector3Array)[vi]).normalized()
+						nout.append(transformed_normal)
 						if uvs != null and vi < (uvs as PackedVector2Array).size():
-							(bucket["uvs"] as PackedVector2Array).append((uvs as PackedVector2Array)[vi])
+							uout.append((uvs as PackedVector2Array)[vi])
 						else:
-							(bucket["uvs"] as PackedVector2Array).append(Vector2.ZERO)
+							uout.append(Vector2.ZERO)
 						if colors != null and vi < (colors as PackedColorArray).size():
-							(bucket["colors"] as PackedColorArray).append((colors as PackedColorArray)[vi])
+							cout.append((colors as PackedColorArray)[vi])
 						else:
-							(bucket["colors"] as PackedColorArray).append(Color.WHITE)
-					(bucket["indices"] as PackedInt32Array).append(int(remap[local_index]))
+							cout.append(Color.WHITE)
+					iout.append(int(remap[local_index]))
+				bucket["vertices"] = vout
+				bucket["normals"] = nout
+				bucket["uvs"] = uout
+				bucket["colors"] = cout
+				bucket["indices"] = iout
+				bucket["remap"] = remap
+				buckets[key] = bucket
 
 	var role_vertices: Dictionary = {}
 	for key in buckets:
 		var bucket: Dictionary = buckets[key]
 		var role: String = str(bucket["role"])
 		if not role_vertices.has(role):
-			role_vertices[role] = PackedVector3Array()
-		for v in (bucket["vertices"] as PackedVector3Array):
-			(role_vertices[role] as PackedVector3Array).append(v)
+			role_vertices[role] = []
+		var collected: Array = role_vertices[role]
+		for v in (bucket["vertices"] as Array):
+			collected.append(v)
+		role_vertices[role] = collected
 
 	for role in role_vertices:
 		var pivot_box := AABB()
 		var first := true
-		for v in (role_vertices[role] as PackedVector3Array):
+		for v in (role_vertices[role] as Array):
 			if first:
 				pivot_box = AABB(v, Vector3.ZERO)
 				first = false
@@ -211,15 +224,15 @@ static func build(root: Node3D, id: String) -> Result:
 			if str(bucket["role"]) != str(role):
 				continue
 			var local_vertices := PackedVector3Array()
-			for v in (bucket["vertices"] as PackedVector3Array):
+			for v in (bucket["vertices"] as Array):
 				local_vertices.append(v - pivot)
 			var arrays := []
 			arrays.resize(Mesh.ARRAY_MAX)
 			arrays[Mesh.ARRAY_VERTEX] = local_vertices
-			arrays[Mesh.ARRAY_NORMAL] = bucket["normals"]
-			arrays[Mesh.ARRAY_TEX_UV] = bucket["uvs"]
-			arrays[Mesh.ARRAY_COLOR] = bucket["colors"]
-			arrays[Mesh.ARRAY_INDEX] = bucket["indices"]
+			arrays[Mesh.ARRAY_NORMAL] = PackedVector3Array(bucket["normals"])
+			arrays[Mesh.ARRAY_TEX_UV] = PackedVector2Array(bucket["uvs"])
+			arrays[Mesh.ARRAY_COLOR] = PackedColorArray(bucket["colors"])
+			arrays[Mesh.ARRAY_INDEX] = PackedInt32Array(bucket["indices"])
 			combined.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 			var material: Material = bucket["material"]
 			if material != null:

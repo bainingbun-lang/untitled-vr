@@ -3,6 +3,10 @@ extends Node3D
 
 signal activated()
 signal vignette_changed(strength: float)
+signal menu_pressed()
+signal reload_requested(hand: String)
+signal health_changed(current: float, maximum: float)
+signal died()
 
 const VrBagScript = preload("res://core/vr/vr_bag.gd")
 const VrWeaponHandScript = preload("res://core/vr/vr_weapon_hand.gd")
@@ -32,6 +36,12 @@ var bag = null
 var weapon_system: Node = null
 var input_provider = null
 
+var health: float = 100.0
+var max_health: float = 100.0
+var inputs_suspended: bool = false
+
+var _was_menu: bool = false
+var _reload_was: Dictionary = {}
 var _active: bool = false
 var _built: bool = false
 var _xr_origin: XROrigin3D = null
@@ -219,12 +229,72 @@ func _process(delta: float) -> void:
 
 
 func step(delta: float) -> void:
+	_poll_buttons()
+	if inputs_suspended:
+		return
+	if bag != null and xr_camera != null:
+		bag.set_head_transform(xr_camera.global_transform)
 	step_locomotion(delta)
 	if left_hand != null:
 		left_hand.step(delta)
 	if right_hand != null:
 		right_hand.step(delta)
 	_update_vignette(delta)
+
+
+func _poll_buttons() -> void:
+	var menu_down: bool = bool(_call_provider("is_menu_pressed", ["left"], false))
+	if menu_down and not _was_menu:
+		menu_pressed.emit()
+	_was_menu = menu_down
+	for hand_name in ["left", "right"]:
+		var down: bool = bool(_call_provider("is_reload_pressed", [hand_name], false))
+		if down and not bool(_reload_was.get(hand_name, false)):
+			reload_requested.emit(hand_name)
+			var hand_node = left_hand if hand_name == "left" else right_hand
+			if hand_node != null and hand_node.has_method("try_reload"):
+				hand_node.call("try_reload")
+		_reload_was[hand_name] = down
+
+
+func set_inputs_suspended(value: bool) -> void:
+	inputs_suspended = value
+	if value:
+		if left_hand != null and left_hand.has_method("reset_buttons"):
+			left_hand.call("reset_buttons")
+		if right_hand != null and right_hand.has_method("reset_buttons"):
+			right_hand.call("reset_buttons")
+
+
+func is_menu_pressed(hand_name: String = "left") -> bool:
+	return _controller_button(hand_name, &"menu")
+
+
+func is_reload_pressed(hand_name: String = "right") -> bool:
+	return _controller_button(hand_name, &"a") or _controller_button(hand_name, &"x")
+
+
+func _controller_button(hand_name: String, action: StringName) -> bool:
+	if not _active:
+		return false
+	var controller = controller_for(hand_name)
+	if controller == null or not controller.has_method("is_button_pressed"):
+		return false
+	return bool(controller.call("is_button_pressed", action))
+
+
+func take_damage(amount: float, _point: Vector3 = Vector3.ZERO, _normal: Vector3 = Vector3.UP) -> void:
+	if amount <= 0.0 or health <= 0.0:
+		return
+	health = maxf(health - amount, 0.0)
+	health_changed.emit(health, max_health)
+	if health <= 0.0:
+		died.emit()
+
+
+func heal_to_full() -> void:
+	health = max_health
+	health_changed.emit(health, max_health)
 
 
 func step_locomotion(delta: float) -> void:

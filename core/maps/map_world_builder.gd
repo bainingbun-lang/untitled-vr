@@ -22,6 +22,7 @@ const GEOMETRY_CONVENTION: String = (
 	+ "obstaculos muestreados por paso deterministico para no exceder MAX_NODES; "
 	+ "GAMEPLAY_NODES reserva hueco para HUD, hotbar y maniquies; "
 	+ "props RigidBody3D del grupo physics_props distribuidos por meta.seed evitando spawns; "
+	+ "props asentados por raycast a la capa 1 (suelo yace en y=0), visual alineado al fondo del collider, sin rotacion inicial y dormidos; "
 	+ "superficies PBR triplanar y props glTF reales con colision convexa simple y set_meta('surface')"
 )
 
@@ -98,18 +99,30 @@ static func create_physics_prop(
 	var base_height := maxf(0.05, float(config.get("height", 0.8)))
 	var ratio := clampf(size / 0.6, 0.4, 3.0)
 	var height := base_height * ratio
+	var shape := _collision_shape(config, height)
+	var shape_height := _shape_height(shape)
+	var ground_y := position.y
+	var surface := _ground_hit(parent, position + Vector3.UP * 2.0)
+	if not surface.is_empty():
+		var hit_pos: Vector3 = surface.get("position", position)
+		var hit_normal: Vector3 = surface.get("normal", Vector3.UP)
+		if hit_normal.y > 0.5:
+			ground_y = hit_pos.y
 
 	var body := RigidBody3D.new()
 	body.name = "Prop_%s" % str(config.get("kind", kind))
 	body.collision_layer = 2
 	body.collision_mask = 1
-	body.position = position
+	body.position = Vector3(position.x, ground_y + shape_height * 0.5, position.z)
 	body.mass = maxf(0.5, float(config.get("mass", 8.0)) * ratio)
+	body.linear_damp = 0.6
+	body.angular_damp = 0.9
+	body.can_sleep = true
 	body.set_meta("surface", str(config.get("surface", "metal")))
 	body.set_meta("prop_kind", str(config.get("kind", kind)))
 
 	var collision := CollisionShape3D.new()
-	collision.shape = _collision_shape(config, height)
+	collision.shape = shape
 	body.add_child(collision)
 
 	var packed := WorldMaterialsScript.prop_scene(str(config.get("kind", kind)))
@@ -117,13 +130,14 @@ static func create_physics_prop(
 		var visual: Node = packed.instantiate()
 		if visual is Node3D:
 			body.add_child(visual)
-			_fit_visual(visual as Node3D, height)
+			_fit_visual(visual as Node3D, shape_height)
 		else:
 			visual.queue_free()
 
 	body.add_to_group("physics_props")
 	if parent != null:
 		parent.add_child(body)
+		body.sleeping = true
 	return body
 
 
@@ -180,15 +194,39 @@ static func _collision_shape(config: Dictionary, height: float) -> Shape3D:
 	return box
 
 
+static func _shape_height(shape: Shape3D) -> float:
+	if shape is CylinderShape3D:
+		return maxf(0.05, (shape as CylinderShape3D).height)
+	if shape is BoxShape3D:
+		return maxf(0.05, (shape as BoxShape3D).size.y)
+	if shape is CapsuleShape3D:
+		return maxf(0.05, (shape as CapsuleShape3D).height)
+	return 0.8
+
+
+static func _ground_hit(parent: Node, from: Vector3) -> Dictionary:
+	var world_3d: World3D = parent.get_world_3d() if parent is Node3D else null
+	if world_3d == null:
+		return {}
+	var query := PhysicsRayQueryParameters3D.create(
+		from, from - Vector3.UP * 4.0
+	)
+	query.collide_with_bodies = true
+	query.collide_with_areas = false
+	query.collision_mask = 1
+	return world_3d.direct_space_state.intersect_ray(query)
+
+
 static func _fit_visual(visual: Node3D, target_height: float) -> void:
 	var bounds := _visual_aabb(visual)
 	if bounds.size.y <= 0.0001:
 		return
 	var scale := clampf(target_height / bounds.size.y, 0.05, 20.0)
 	visual.scale = Vector3(scale, scale, scale)
+	var bottom_offset := -target_height * 0.5 + 0.01
 	visual.position = Vector3(
 		-bounds.get_center().x * scale,
-		-bounds.position.y * scale + 0.01,
+		-bounds.position.y * scale + bottom_offset,
 		-bounds.get_center().z * scale
 	)
 
@@ -338,9 +376,37 @@ static func _build_obstacles(
 
 static func _build_environment(root: Node3D) -> void:
 	var mobile := WorldMaterialsScript.is_mobile()
+	var environment := WorldMaterialsScript.make_environment(mobile)
+	environment.background_mode = Environment.BG_SKY
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	var sky: Sky = environment.sky
+	if sky == null:
+		sky = Sky.new()
+		environment.sky = sky
+	if not (sky.sky_material is PanoramaSkyMaterial):
+		var fallback := ProceduralSkyMaterial.new()
+		fallback.sky_top_color = Color(0.16, 0.32, 0.58)
+		fallback.sky_horizon_color = Color(0.70, 0.78, 0.86)
+		fallback.ground_bottom_color = Color(0.26, 0.25, 0.23)
+		sky.sky_material = fallback
+	else:
+		var panorama := sky.sky_material as PanoramaSkyMaterial
+		var panorama_texture := WorldMaterialsScript.sky_texture()
+		if panorama_texture != null:
+			panorama.panorama = panorama_texture
+		else:
+			var fallback := ProceduralSkyMaterial.new()
+			fallback.sky_top_color = Color(0.16, 0.32, 0.58)
+			fallback.sky_horizon_color = Color(0.70, 0.78, 0.86)
+			fallback.ground_bottom_color = Color(0.26, 0.25, 0.23)
+			sky.sky_material = fallback
+	environment.fog_enabled = true
+	environment.fog_light_color = Color(0.74, 0.78, 0.82)
+	environment.fog_density = 0.0015 if mobile else 0.0025
+	environment.fog_sun_scatter = 0.03
 	var world_environment := WorldEnvironment.new()
 	world_environment.name = "WorldEnvironment"
-	world_environment.environment = WorldMaterialsScript.make_environment(mobile)
+	world_environment.environment = environment
 	root.add_child(world_environment)
 
 	var sun := DirectionalLight3D.new()
