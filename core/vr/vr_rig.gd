@@ -211,16 +211,20 @@ func get_pose(hand_name: String) -> Transform3D:
 
 func is_grip_pressed(hand_name: String) -> bool:
 	var controller = controller_for(hand_name)
-	if controller == null or not controller.has_method("is_button_pressed"):
+	if controller == null:
 		return false
-	return bool(controller.call("is_button_pressed", &"grip"))
+	if controller.has_method("is_button_pressed") and bool(controller.call("is_button_pressed", &"grip")):
+		return true
+	return controller.has_method("get_float") and float(controller.call("get_float", &"grip")) > 0.5
 
 
 func is_trigger_pressed(hand_name: String) -> bool:
 	var controller = controller_for(hand_name)
-	if controller == null or not controller.has_method("is_button_pressed"):
+	if controller == null:
 		return false
-	return bool(controller.call("is_button_pressed", &"trigger"))
+	if controller.has_method("is_button_pressed") and bool(controller.call("is_button_pressed", &"trigger")):
+		return true
+	return controller.has_method("get_float") and float(controller.call("get_float", &"trigger")) > 0.5
 
 
 func get_stick(hand_name: String) -> Vector2:
