@@ -60,8 +60,6 @@ func start(p_viewport: Viewport, p_iface: Object = null, p_tree: SceneTree = nul
 		return _result(false, "no_viewport")
 	if iface is XRInterface:
 		XRServer.primary_interface = iface as XRInterface
-		# Rastreo de suelo (local-floor): la cabeza reporta su altura real sobre el suelo.
-		(iface as XRInterface).play_area_mode = XRInterface.XR_PLAY_AREA_ROOMSCALE
 		# El runtime OpenXR marca el ritmo; vsync propio añade latencia.
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	viewport.use_xr = true

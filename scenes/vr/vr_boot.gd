@@ -34,6 +34,7 @@ func _ready() -> void:
 		get_tree().call_deferred("change_scene_to_file", MAIN_MENU)
 		return
 	(load(SESSION_PATH) as Script).set("platform", "vr")
+	RenderingServer.set_default_clear_color(Color(0.04, 0.08, 0.2))
 	_load_calibration()
 	_build_xr_nodes()
 	xr_camera.current = true
@@ -195,40 +196,3 @@ func _on_menu_button(button_id: String) -> void:
 	if button_id == "recalibrate" and calibration != null:
 		calibration.delete_saved()
 		_start_calibration()
-
-
-func _exit_tree() -> void:
-	# Desconectar del ciclo de vida del bootstrap
-	if BootstrapScript.active != null:
-		var lifecycle_signal: Signal = BootstrapScript.active.lifecycle
-		if lifecycle_signal != null and lifecycle_signal.is_connected(Callable(self, "_on_lifecycle")):
-			lifecycle_signal.disconnect(Callable(self, "_on_lifecycle"))
-	# Limpiar flujo de calibracion
-	if flow != null and is_instance_valid(flow):
-		flow.queue_free()
-		flow = null
-	# Limpiar menu y host
-	if menu != null:
-		menu = null
-	if host != null and is_instance_valid(host):
-		host.queue_free()
-		host = null
-	# Limpiar calibracion
-	calibration = null
-	# Limpiar nodos XR
-	for controller in controllers:
-		if is_instance_valid(controller):
-			controller.queue_free()
-	controllers.clear()
-	_beams.clear()
-	_trigger_down.clear()
-	if xr_camera != null and is_instance_valid(xr_camera):
-		xr_camera.queue_free()
-		xr_camera = null
-	if origin != null and is_instance_valid(origin):
-		origin.queue_free()
-		origin = null
-	# No llamar a BootstrapScript.shutdown() aqui: el bootstrap es global y puede ser reutilizado.
-	# El shutdown se maneja externamente al cerrar la aplicacion.
-	_placed = false
-	_waited = 0.0

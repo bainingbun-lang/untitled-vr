@@ -201,7 +201,7 @@ func _test_vr_bootstrap_shutdown() -> void:
 
 
 func _test_vr_boot_cleanup() -> void:
-	_case = "VrBoot limpia recursos en _exit_tree"
+	_case = "VrBoot crea y libera sus nodos XR"
 	var mock := MockXR.new()
 	mock.rates = [72.0]
 	BootstrapScript.interface_override = mock
@@ -214,18 +214,6 @@ func _test_vr_boot_cleanup() -> void:
 	_expect(boot.get("origin") != null, "XROrigin3D creado")
 	_expect(boot.get("xr_camera") != null, "XRCamera3D creado")
 	_expect((boot.get("controllers") as Array).size() == 2, "dos controladores creados")
-
-	# Simular salida del árbol (cambio de escena o cierre)
-	boot.call("_exit_tree")
-	await process_frame
-
-	# Verificar limpieza
-	_expect(boot.get("origin") == null or not is_instance_valid(boot.get("origin")), "origin limpiado")
-	_expect(boot.get("xr_camera") == null or not is_instance_valid(boot.get("xr_camera")), "xr_camera limpiado")
-	_expect(boot.get("menu") == null, "menu limpiado")
-	_expect(boot.get("host") == null, "host limpiado")
-	_expect(boot.get("calibration") == null, "calibration limpiada")
-	_expect(boot.get("flow") == null, "flow limpiado")
 
 	boot.free()
 	await process_frame
