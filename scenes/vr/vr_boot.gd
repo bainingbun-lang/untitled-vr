@@ -26,6 +26,9 @@ var _beams: Dictionary = {}
 var _trigger_down: Dictionary = {}
 var _placed: bool = false
 var _waited: float = 0.0
+var _diag_label: Label3D = null
+var _diag_lines: Array = []
+var _menu_ok: bool = false
 
 
 func _ready() -> void:
@@ -38,6 +41,7 @@ func _ready() -> void:
 	_load_calibration()
 	_build_xr_nodes()
 	xr_camera.current = true
+	_diag("1/4 XR activo, nodos creados")
 	BootstrapScript.active.lifecycle.connect(_on_lifecycle)
 	# Sin perfil se usan valores por defecto: la calibracion es opcional (RECALIBRAR).
 	_start_menu()
@@ -71,14 +75,45 @@ func _on_calibration_finished(_saved: bool) -> void:
 
 func _start_menu() -> void:
 	var mode := load(GAME_MODE_PATH) as Script
-	menu = mode.call("build_start_menu", mode.call("default_map_meta", 4242), get_tree())
+	if mode == null:
+		_diag("ERROR: vr_game_mode.gd no carga")
+		return
+	_diag("2/4 modo VR cargado")
+	var meta = mode.call("default_map_meta", 4242)
+	if typeof(meta) != TYPE_DICTIONARY or (meta as Dictionary).is_empty():
+		_diag("AVISO: mapa por defecto vacio, uso generador simple")
+		var gen := load("res://core/maps/map_generator.gd") as Script
+		meta = gen.call("generate", 4242, {"width": 24, "height": 18, "obstacle_density": 0.18, "spawn_count": 4}) if gen != null else {}
+	_diag("3/4 mapa listo (%s)" % str((meta as Dictionary).get("choice_label", "base")))
+	menu = mode.call("build_start_menu", meta, get_tree())
 	if menu == null:
-		get_tree().call_deferred("change_scene_to_file", MAIN_MENU)
+		_diag("ERROR: el menu VR no se pudo crear")
 		return
 	host = menu.get_parent()
 	xr_camera.current = true
 	menu.connect("button_pressed", Callable(self, "_on_menu_button"))
 	_placed = false
+	_menu_ok = true
+	_diag("4/4 menu creado: apunta con el laser")
+
+
+func _diag(text: String) -> void:
+	print("[vr_boot] ", text)
+	if xr_camera == null:
+		return
+	if _diag_label == null:
+		_diag_label = Label3D.new()
+		_diag_label.name = "BootDiag"
+		_diag_label.position = Vector3(0.0, -0.25, -1.3)
+		_diag_label.pixel_size = 0.0016
+		_diag_label.font_size = 56
+		_diag_label.modulate = Color(1.0, 0.95, 0.4)
+		_diag_label.no_depth_test = true
+		_diag_label.shaded = false
+		_diag_label.fixed_size = false
+		xr_camera.add_child(_diag_label)
+	_diag_lines.append(text)
+	_diag_label.text = "\n".join(_diag_lines)
 
 
 # true si habia un perfil valido (se carga en silencio); si falta o esta corrupto se recalibra.
@@ -125,6 +160,9 @@ func _process(delta: float) -> void:
 	if xr_camera == null:
 		return
 	_waited += delta
+	if _diag_label != null and _menu_ok and _waited > 12.0:
+		_diag_label.queue_free()
+		_diag_label = null
 	if flow != null:
 		_process_calibration()
 		return
