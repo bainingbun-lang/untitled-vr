@@ -58,7 +58,7 @@ func test_npcs_mobile_debug() -> void:
 		
 		var initial_pos = npc.global_position
 		
-		print("\n  --- NPC %s (role=%s, realistic=%s) ---" % [npc.name, str(npc.get("role")), str(npc.get("realistic"))])
+		print("\n  --- NPC %s (role=%s, realistic=%s) ---" % [npc.name, str(npc.role), str(npc.realistic)])
 		print("  patrol_speed=%.2f, run_speed=%.2f" % [npc.patrol_speed, npc.run_speed])
 		
 		var tick_count = 0
@@ -69,23 +69,21 @@ func test_npcs_mobile_debug() -> void:
 			# Call _physics_process directly to simulate a full physics step (tick + move)
 			if npc.has_method("_physics_process"):
 				npc._physics_process(0.1)
-			var action = str(npc.get("current_action", "?").call()) if npc.has_method("current_action") else "?"
-			# Try to get action from combat
-			if npc.has_method("tick"):
-				var ctx = npc.get("_context", {})
-				# We can't easily get action, so use a placeholder
-				action = "sim"
-			var goal = npc.get("_goal") if npc.has_method("get") else Vector3.ZERO
-			var path = npc.get("_path") if npc.has_method("get") else []
+			var action = "?"
+			if npc.has_method("current_action"):
+				action = str(npc.call("current_action"))
+			var goal = npc._goal
+			var path = npc._path
 			var path_len = path.size()
-			var path_idx = npc.get("_path_index") if npc.has_method("get") else 0
-			var moving = npc.get("_moving") if npc.has_method("get") else false
+			var path_idx = npc._path_index
+			var moving = npc._moving
 			var velocity = npc.velocity
 			print("  Step %d: goal=%s, path_len=%d, path_idx=%d, moving=%s, vel=(%.2f, %.2f, %.2f), pos=%s" % [
 				i, str(goal), path_len, path_idx, str(moving), velocity.x, velocity.y, velocity.z, str(npc.global_position)
 			])
 			tick_count += 1
 			await physics_frame
+			tick_count += 1
 		
 		if not is_instance_valid(npc):
 			error_count_npc += 1

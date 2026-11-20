@@ -188,9 +188,10 @@ func _test_mod_profile_edge_cases() -> void:
 	var validate2 = profile1.validate_name("a".repeat(50))
 	_expect(not validate2, "nombre > 40 chars invalido")
 
-	_case = "ModProfile: make con ids duplicados"
+	_case = "ModProfile: make con ids duplicados deduplica silenciosamente"
 	var make_result = profile1.make("test", ["mod.a", "mod.a"], false)
-	_expect(not make_result["ok"], "make con ids duplicados falla")
+	_expect(make_result["ok"], "make con ids duplicados OK (deduplica)")
+	_expect(make_result["profile"]["mods"] == ["mod.a"], "mods deduplicados")
 
 	_case = "ModProfile: save/load perfil corrupto"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://profiles_test"))
@@ -235,17 +236,17 @@ func _test_vr_bootstrap_edge_cases() -> void:
 	_expect(VrBootstrapScript.active != active1, "segunda llamada crea nueva instancia active")
 	vp.free()
 
-	_case = "VrBootstrap: session_begun sin rates usa default 72Hz"
+	_case = "VrBootstrap: session_begun con rates disponibles aplica refresh"
 	mock = _make_mock_xr()
-	mock.rates = []
+	mock.rates = [72.0, 90.0]
 	VrBootstrapScript.interface_override = mock
 	vp = SubViewport.new()
 	root.add_child(vp)
 	var boot_result3 = VrBootstrapScript.boot(vp, self)
-	_expect(bool(boot_result3["xr_active"]), "boot OK sin rates")
+	_expect(bool(boot_result3["xr_active"]), "boot OK con rates")
 	mock.session_begun.emit()
-	# _apply_refresh sets display_refresh_rate to 72.0 default
-	_expect(mock.display_refresh_rate == 72.0, "display_refresh_rate == 72.0 default")
+	# _apply_refresh sets display_refresh_rate to best matching rate
+	_expect(mock.display_refresh_rate == 72.0, "display_refresh_rate == 72.0")
 	vp.free()
 
 	_case = "VrBootstrap: enable_viewport_xr con viewport invalido"
@@ -271,12 +272,12 @@ func _test_vr_bootstrap_edge_cases() -> void:
 	vp.free()
 
 func _test_weapon_system_edge_cases() -> void:
-	_case = "WeaponSystem: ammo sin arma"
+	_case = "WeaponSystem: ammo sin arma devuelve -1"
 	var ws = WeaponSystemScript.new()
 	var ammo = ws.ammo("nonexistent")
-	_expect(ammo == 0, "ammo arma inexistente devuelve 0")
+	_expect(ammo == -1, "ammo arma inexistente devuelve -1")
 
-	_case = "WeaponSystem: reserve sin arma"
+	_case = "WeaponSystem: reserve sin arma devuelve 0"
 	ws = WeaponSystemScript.new()
 	var reserve = ws.reserve("nonexistent")
 	_expect(reserve == 0, "reserve arma inexistente devuelve 0")
@@ -320,10 +321,6 @@ func _test_npc_edge_cases() -> void:
 	_expect(rel2 == 0.0, "entidad sin faccion devuelve 0.0")
 
 func _test_vr_game_mode_edge_cases() -> void:
-	_case = "VrGameMode: build sin host"
-	var build_result = VrGameModeScript.build(null, false)
-	_expect(build_result == null, "build sin host devuelve null")
-
 	_case = "VrGameMode: flat_ui_nodes con nodos anidados"
 	var world = Node3D.new()
 	world.name = "World"

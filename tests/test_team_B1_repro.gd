@@ -87,7 +87,7 @@ func test_weapons_not_duplicated_or_misplaced() -> void:
 
 func test_weapons_grabbable_after_death() -> void:
 	print("\n=== Test: Armas agarrables tras muerte de NPC ===")
-	# Kill a few NPCs to drop weapons
+	# Kill a few ARMED NPCs to drop weapons
 	var dropped_before = find_dropped_weapons().size()
 	print("Armas caídas antes: %d" % dropped_before)
 	
@@ -96,6 +96,11 @@ func test_weapons_grabbable_after_death() -> void:
 		if killed >= 3:
 			break
 		if is_instance_valid(npc) and npc.has_method("take_damage"):
+			# Only kill armed NPCs (have weapon_system)
+			var weapon_system = npc.get("weapon_system")
+			if weapon_system == null:
+				print("  Saltando NPC %s: sin arma (weapon_system=null)" % npc.name)
+				continue
 			# Kill the NPC
 			npc.take_damage(1000.0, npc.global_position, Vector3.UP, game_world.actor)
 			await process_frame
@@ -174,11 +179,14 @@ func test_npcs_mobile() -> void:
 			if not is_instance_valid(npc):
 				print("  NPC %s: se volvió inválido durante tick" % npc.name)
 				break
-			if npc.has_method("tick"):
-				var result = npc.tick(0.1)
-				var action = str(result.get("id", result.get("action", "?")))
-				print("  NPC %s tick %d: action=%s" % [npc.name, i, action])
-				tick_count += 1
+			# Call _physics_process to simulate a full physics step (tick + movement)
+			if npc.has_method("_physics_process"):
+				npc._physics_process(0.1)
+			var action = "?"
+			if npc.has_method("current_action"):
+				action = str(npc.call("current_action"))
+			print("  NPC %s tick %d: action=%s" % [npc.name, i, action])
+			tick_count += 1
 			await physics_frame
 		
 		if not is_instance_valid(npc):

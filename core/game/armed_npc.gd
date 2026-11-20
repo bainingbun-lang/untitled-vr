@@ -146,6 +146,8 @@ var _cover_has: bool = false
 var _cover_refresh: float = 0.0
 var _home: Vector3 = Vector3.ZERO
 var _last_investigate_goal: Vector3 = Vector3.ZERO
+var _flee_goal_cache: Vector3 = Vector3.ZERO
+var _flee_goal_age: float = 0.0
 
 
 static func detect_platform() -> String:
@@ -877,6 +879,8 @@ func _release_token() -> void:
 
 func _realistic_goal(action: String) -> Vector3:
 	if _reacting:
+		if action == "patrol" or action == "idle":
+			return _calm_goal()
 		_path.clear()
 		return global_position
 	if action == "attack" or action == "cover":
@@ -889,6 +893,8 @@ func _realistic_goal(action: String) -> Vector3:
 		return _calm_goal()
 	if action == "investigate":
 		return _investigate_goal()
+	if action == "flee":
+		return _flee_goal()
 	return _goal
 
 
@@ -972,13 +978,16 @@ func _investigate_goal() -> Vector3:
 		return threat_pos + Vector3(cos(angle), 0.0, sin(angle)) * radius
 	var from_cell: Vector2i = navigation.call("world_to_cell_2d", Vector2(global_position.x, global_position.z), nav_cell_size)
 	var to_cell: Vector2i = navigation.call("world_to_cell_2d", Vector2(threat_pos.x, threat_pos.z), nav_cell_size)
+	var flat: Vector3 = global_position
+	var cache_valid: bool = _last_investigate_goal.length_squared() > 0.0001
+	if cache_valid:
+		var cache_dist: float = flat.distance_to(_last_investigate_goal)
+		if cache_dist > 1.5:
+			return _last_investigate_goal
 	var result: Variant = navigation.call("find_path", from_cell, to_cell, {
 		"position": global_position, "target_position": threat_pos, "cell_size": nav_cell_size,
 	})
 	var threat_reachable: bool = result is Dictionary and bool((result as Dictionary).get("ok", false))
-	var last_goal_dist: float = _last_investigate_goal.distance_squared_to(global_position)
-	if last_goal_dist < 4.0:
-		_last_investigate_goal = Vector3.ZERO
 	for attempt in range(16):
 		var angle: float = _rng.randf() * TAU
 		var radius: float = _rng.randf_range(4.0, 10.0)
@@ -992,18 +1001,12 @@ func _investigate_goal() -> Vector3:
 			"position": global_position, "target_position": search_pos, "cell_size": nav_cell_size,
 		})
 		if reachable is Dictionary and bool((reachable as Dictionary).get("ok", false)):
-			if _last_investigate_goal.length_squared() > 0.0001 and search_pos.distance_squared_to(_last_investigate_goal) < 9.0:
+			if cache_valid and search_pos.distance_squared_to(_last_investigate_goal) < 9.0:
 				continue
-			if search_pos.distance_squared_to(global_position) < 4.0:
+			if search_pos.distance_squared_to(flat) < 4.0:
 				continue
 			_last_investigate_goal = search_pos
 			return search_pos
-	if threat_reachable:
-		if _last_investigate_goal.length_squared() > 0.0001 and threat_pos.distance_squared_to(_last_investigate_goal) < 9.0:
-			pass
-		elif threat_pos.distance_squared_to(global_position) >= 4.0:
-			_last_investigate_goal = threat_pos
-			return threat_pos
 	var best: Vector3 = Vector3.ZERO
 	var best_dist: float = INF
 	for radius in range(1, 12):
@@ -1023,9 +1026,9 @@ func _investigate_goal() -> Vector3:
 						"position": global_position, "target_position": world_point, "cell_size": nav_cell_size,
 					})
 					if reachable is Dictionary and bool((reachable as Dictionary).get("ok", false)):
-						if _last_investigate_goal.length_squared() > 0.0001 and world_point.distance_squared_to(_last_investigate_goal) < 9.0:
+						if cache_valid and world_point.distance_squared_to(_last_investigate_goal) < 9.0:
 							continue
-						if world_point.distance_squared_to(global_position) < 4.0:
+						if world_point.distance_squared_to(flat) < 4.0:
 							continue
 						best_dist = dist
 						best = world_point
@@ -1034,7 +1037,61 @@ func _investigate_goal() -> Vector3:
 	if best_dist < INF:
 		_last_investigate_goal = best
 		return best
-	return threat_pos
+	var angle: float = _rng.randf() * TAU
+	var radius: float = _rng.randf_range(4.0, 8.0)
+	var fallback: Vector3 = threat_pos + Vector3(cos(angle), 0.0, sin(angle)) * radius
+	_last_investigate_goal = fallback
+	return fallback
+
+
+func _flee_goal() -> Vector3:
+	if _threat_position.length_squared() <= 0.0001:
+		return global_position
+	var threat_pos: Vector3 = _threat_position
+	var flat: Vector3 = global_position
+	var to_threat: Vector3 = threat_pos - flat
+	to_threat.y = 0.0
+	var dist_to_threat: float = to_threat.length()
+	if dist_to_threat < 0.001:
+		var angle: float = _rng.randf() * TAU
+		return flat + Vector3(cos(angle), 0.0, sin(angle)) * 15.0
+	var cache_valid: bool = _flee_goal_cache.length_squared() > 0.0001
+	if cache_valid:
+		var cache_dist: float = flat.distance_to(_flee_goal_cache)
+		_flee_goal_age += _dt
+		if cache_dist > 1.5 and _flee_goal_age < 8.0:
+			return _flee_goal_cache
+	var away_dir: Vector3 = (flat - threat_pos).normalized()
+	if _has_navigation_grid():
+		var best: Vector3 = Vector3.ZERO
+		var best_score: float = -INF
+		for attempt in range(24):
+			var angle: float = _rng.randf() * TAU
+			var radius: float = _rng.randf_range(12.0, 20.0)
+			var candidate: Vector3 = flat + Vector3(cos(angle), 0.0, sin(angle)) * radius
+			if not _reachable(candidate):
+				continue
+			var score: float = candidate.distance_squared_to(threat_pos)
+			if has_world_bounds:
+				var margin_x: float = minf(candidate.x - world_bounds.position.x, world_bounds.end.x - candidate.x)
+				var margin_z: float = minf(candidate.z - world_bounds.position.z, world_bounds.end.z - candidate.z)
+				var margin: float = minf(margin_x, margin_z)
+				if margin < 3.0:
+					score -= (3.0 - margin) * 500.0
+			if score > best_score:
+				best_score = score
+				best = candidate
+		if best_score > -INF:
+			_flee_goal_cache = best
+			_flee_goal_age = 0.0
+			return best
+	var fallback: Vector3 = flat + away_dir * 15.0
+	if _has_navigation_grid() and not _reachable(fallback):
+		var angle: float = _rng.randf() * TAU
+		fallback = flat + Vector3(cos(angle), 0.0, sin(angle)) * 15.0
+	_flee_goal_cache = fallback
+	_flee_goal_age = 0.0
+	return fallback
 
 
 func _reachable(point: Vector3) -> bool:
