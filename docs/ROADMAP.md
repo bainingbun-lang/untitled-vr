@@ -19,3 +19,6 @@ PBR, iluminacion dia/noche, linterna, clima, mapas reales descargados (Kenney ya
 Supervivencia por oleadas, objetivos, recogidas, puntuacion en la muñeca, confort VR (giro por pasos, viñeta, sentado), ajustes 3D; distribucion de mods (carpeta user://mods, descarga por URL/GitHub), versiones y compatibilidad.
 ## Fase 6 — Despues
 Decoracion y pulido, cooperativo en linea, logros, modo creativo.
+
+## Ideas aprobadas y cambios (2026-11-20 22:10)
+Lista completa de 40 ideas aprobadas en docs/IDEAS_APROBADAS.md (mapeadas a las fases de arriba). Cambio: la idea 26 (facciones/reputacion) NO va en el sandbox: es un MODO RP aparte (Fase 7). Briefs de la Fase 1 listos y encolados: briefs/C7_D1_datadriven.md, C7_D2_modevents.md, C7_D3_modtools.md.
