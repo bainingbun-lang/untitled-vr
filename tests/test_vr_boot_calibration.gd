@@ -126,15 +126,16 @@ func _boot_without_profile() -> void:
 	DirAccess.remove_absolute(PATH)
 	var boot := _boot(MockXR.new())
 	await process_frame
-	_expect(boot.flow != null and root.get_node_or_null("VrStartMenu") == null, "sin perfil: calibracion antes del menu")
-	_drive(boot.flow)
-	_expect(boot.flow == null and root.get_node_or_null("VrStartMenu") != null, "tras calibrar sigue al menu")
-	_expect(FileAccess.file_exists(PATH), "perfil guardado")
+	_expect(boot.flow == null and root.get_node_or_null("VrStartMenu") != null, "sin perfil: menu directo, calibracion opcional (defaults)")
+	_expect(not FileAccess.file_exists(PATH), "sin perfil no se fuerza calibracion ni se guarda nada")
 	_cleanup(boot)
 	await process_frame
 
 
 func _boot_with_profile() -> void:
+	var saved = CalScript.new()
+	saved.profile_path = PATH
+	saved.save()
 	var boot := _boot(MockXR.new())
 	await process_frame
 	_expect(boot.flow == null and root.get_node_or_null("VrStartMenu") != null, "con perfil: carga silenciosa y menu directo")

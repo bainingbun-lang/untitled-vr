@@ -327,3 +327,42 @@ fuentes permitidas; los sustitutos "realistas" de OpenGameArt/itch.io requieren
 registro o licenses ambiguas. Se priorizó variedad de roles, ropa, edad aparente y
 cumplimiento estricto de licencia y presupuesto.
 
+---
+
+# Créditos de K1 (volante, claxon y motor reales)
+
+Ningún modelo ni sonido de esta sección fue generado por código. Se descargaron a un
+directorio temporal **nuevo y vacío** (`/data/data/com.termux/files/usr/tmp/opencode/k1/stage/wheel/`),
+se inspeccionaron (cabecera GLB, JSON interno, mallas, materiales y triángulos; `file`,
+`ffprobe` para el audio) y solo después se copiaron al proyecto. No se ejecutó ningún
+archivo descargado.
+
+| Asset | Nombre | Autor | URL | Licencia | Archivos en el proyecto |
+|---|---|---|---|---|---|
+| Volante 3D | Steering wheel (Poly by Google) | Poly by Google | https://poly.pizza/m/bIYbhKwE4L0 | CC BY 3.0 (atribución aquí) | `assets/models/vehicles/steering_wheel.glb` |
+| Claxon real | Car Horn (GGBotNet) | GGBotNet | https://opengameart.org/content/car-sound-effects-pack-low-quality | CC0 1.0 | `assets/audio/real/horn_01.ogg` |
+| Motor real | Car Engine Loop (GGBotNet) | GGBotNet | https://opengameart.org/content/car-sound-effects-pack-low-quality | CC0 1.0 | `assets/audio/real/engine_03.ogg` |
+| Motor real (alternativa) | Racing car engine loops | domasx2 | https://opengameart.org/content/racing-car-engine-sound-loops | CC0 1.0 | `assets/audio/real/engine_01.ogg`, `engine_02.ogg` |
+
+CC BY 3.0: https://creativecommons.org/licenses/by/3.0/ — autor y URL del volante
+conservados en esta tabla. El modelo tiene 924 triángulos, 2 materiales y 0 texturas
+(23.140 bytes), muy por debajo del límite de 5k tris por prop y 1024px por textura.
+Los dos archivos de audio ya estaban descargados y convertidos a Ogg Vorbis en A1
+(`assets/audio/real/manifest.json`, `assets/audio/AUDIO_CREDITS.md`) y se reutilizan
+aquí en lugar del claxon sintético y del motor ausente.
+
+---
+
+# Créditos de D1 (mod de ejemplo data-driven)
+
+Modelo descargado a un directorio temporal **nuevo y vacío**
+(`/data/data/com.termux/files/usr/tmp/opencode/d1_stage/model_revolver/`), inspeccionado
+como JSON glTF (1 malla, 1 material, 0 animaciones, 1.446 triángulos, textura PNG embebida
+de 512×512) y copiado después al proyecto. No se ejecutó ningún archivo descargado.
+
+| Asset | Nombre | Autor | URL | Licencia | Archivos en el proyecto |
+|---|---|---|---|---|---|
+| Pistola de ejemplo | Pistol (Zombie Apocalypse Kit - March 2024) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels (pack `Zombie Apocalypse Kit - March 2024`), original: https://quaternius.com/ | CC0 1.0 | `assets/models/weapons/v2/rust_pistol.gltf`, `assets/models/weapons/v2/rust_pistol_Zombie_Atlas.png` (atlas extraído por el importador) |
+
+URL directa de descarga: https://raw.githubusercontent.com/agentkaerf/FreeModels/main/Zombie%20Apocalypse%20Kit%20-%20March%202024/Weapons/glTF/Pistol.gltf
+

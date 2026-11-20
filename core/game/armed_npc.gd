@@ -39,6 +39,10 @@ const PLATFORM_ALIASES: Dictionary = {
 
 static var _active: Array = []
 static var limits_override: Dictionary = {}
+static var _attackers: Array = []
+const MAX_ATTACKERS: int = 2
+const TOKEN_ACTIVE: int = 1
+const TOKEN_QUIET: int = 2
 static var _tracers: Array = []
 static var _tracer_material: StandardMaterial3D = null
 static var _tracer_mesh: BoxMesh = null
@@ -112,6 +116,36 @@ var _fx_script: Script = null
 var _recorded_sfx_script: Script = null
 var _sfx_bank_script: Script = null
 var _rng := RandomNumberGenerator.new()
+var realistic: bool = false
+var avoid_center: Vector3 = Vector3.ZERO
+var avoid_radius: float = 0.0
+var home_radius: float = 12.0
+var _dt: float = 0.0
+var _engaged: bool = false
+var _reacting: bool = false
+var _react_left: float = 0.0
+var _engage_time: float = 0.0
+var _lost_time: float = 0.0
+var _last_seen_pos: Vector3 = Vector3.ZERO
+var _can_shoot: bool = false
+var _token_state: int = 0
+var _token_quiet: float = 0.0
+var _token_cooldown: float = 0.0
+var _bursts_done: int = 0
+var _burst_left: int = 3
+var _burst_pause: float = 0.0
+var _miss_sign: float = 1.0
+var _wp: Vector3 = Vector3.ZERO
+var _wp_has: bool = false
+var _wp_age: float = 0.0
+var _wait_left: float = 0.0
+var _calm_stuck: float = 0.0
+var _path_goal: Vector3 = Vector3.ZERO
+var _cover_pos: Vector3 = Vector3.ZERO
+var _cover_has: bool = false
+var _cover_refresh: float = 0.0
+var _home: Vector3 = Vector3.ZERO
+var _last_investigate_goal: Vector3 = Vector3.ZERO
 
 
 static func detect_platform() -> String:
@@ -175,6 +209,12 @@ static func register(npc) -> bool:
 			return true
 	if not can_spawn(str(npc.get("platform"))):
 		return false
+	# los NPC se cruzan sin bloquearse entre si (la separacion la hace la direccion)
+	if npc.get("realistic"):
+		for entry in _active:
+			if is_instance_valid(entry) and entry.get("realistic"):
+				(npc as PhysicsBody3D).add_collision_exception_with(entry)
+				(entry as PhysicsBody3D).add_collision_exception_with(npc)
 	_active.append(npc)
 	return true
 
@@ -231,11 +271,16 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	_release_token()
 	unregister(self)
 
 
 func apply_options(p_options: Dictionary) -> void:
-	_pending_options = p_options.duplicate(true)
+	_pending_options.merge(p_options.duplicate(true), true)
+	realistic = bool(p_options.get("realistic", realistic))
+	avoid_center = p_options.get("avoid_center", avoid_center)
+	avoid_radius = float(p_options.get("avoid_radius", avoid_radius))
+	home_radius = float(p_options.get("home_radius", home_radius))
 	npc_id = str(p_options.get("id", p_options.get("npc_id", npc_id)))
 	faction_id = str(p_options.get("faction_id", p_options.get("faction", faction_id)))
 	weapon_id = str(p_options.get("weapon_id", weapon_id))
@@ -437,8 +482,13 @@ func _as_position(value: Variant) -> Vector3:
 
 
 func _attach_weapon_model() -> void:
-	if weapon_mount == null or (_weapon_model != null and _weapon_model_id == weapon_id):
+	if weapon_mount == null:
 		return
+	if _weapon_model != null and _weapon_model_id == weapon_id and is_instance_valid(_weapon_model):
+		return
+	for child in weapon_mount.get_children():
+		if child != weapon_visual and is_instance_valid(child):
+			child.queue_free()
 	if _weapon_model != null and is_instance_valid(_weapon_model):
 		_weapon_model.queue_free()
 	_weapon_model = null
@@ -458,11 +508,21 @@ func _attach_weapon_model() -> void:
 	if model == null:
 		return
 	weapon_mount.add_child(model)
-	var box := _combined_aabb(model)
+	var box := _skinned_bounds(model)
+	var target_length: float = 0.72
+	var view_dict: Dictionary = {}
+	if view.has_method("get_constant"):
+		var view_const: Variant = view.call("get_constant", "VIEW")
+		if view_const is Dictionary:
+			view_dict = view_const
+	if view_dict.has(weapon_id):
+		var cfg: Dictionary = view_dict[weapon_id] as Dictionary
+		if cfg.has("length"):
+			target_length = maxf(float(cfg["length"]), 0.05)
 	if not box.size.is_zero_approx():
 		var longest: float = maxf(box.size.x, maxf(box.size.y, box.size.z))
 		if longest > 0.0001:
-			var factor: float = 0.72 / longest
+			var factor: float = target_length / longest
 			model.scale = Vector3(factor, factor, factor)
 		if box.size.x > box.size.z:
 			model.rotation.y = PI * 0.5
@@ -470,6 +530,45 @@ func _attach_weapon_model() -> void:
 	_weapon_model = model
 	if weapon_visual != null:
 		weapon_visual.visible = false
+
+
+# Limites reales (en espacio local del modelo) de las mallas, aplicando el skin: el AABB crudo de una
+# malla skinneada difiere mucho del dibujado (el AKM salia de ~10 m).
+func _skinned_bounds(model: Node3D) -> AABB:
+	var inverse := model.global_transform.affine_inverse()
+	var points: PackedVector3Array = PackedVector3Array()
+	for child in model.find_children("*", "MeshInstance3D", true, false):
+		var mi := child as MeshInstance3D
+		if mi == null or mi.mesh == null:
+			continue
+		var skeleton: Skeleton3D = mi.get_node_or_null(mi.skeleton) as Skeleton3D if mi.skin != null else null
+		if skeleton == null:
+			var box: AABB = mi.mesh.get_aabb()
+			for corner in 8:
+				points.append(inverse * (mi.global_transform * box.get_endpoint(corner)))
+			continue
+		var arrays: Array = mi.mesh.surface_get_arrays(0)
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var bones: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
+		var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
+		var per: int = bones.size() / maxi(verts.size(), 1)
+		var palette: Array = []
+		for bind in mi.skin.get_bind_count():
+			var bone: int = mi.skin.get_bind_bone(bind)
+			if bone < 0:
+				bone = skeleton.find_bone(mi.skin.get_bind_name(bind))
+			palette.append(skeleton.global_transform * skeleton.get_bone_global_pose(maxi(bone, 0)) * mi.skin.get_bind_pose(bind))
+		for index in range(0, verts.size(), 3):
+			var point := Vector3.ZERO
+			for k in per:
+				var weight: float = weights[index * per + k]
+				if weight > 0.0:
+					point += (palette[bones[index * per + k]] * verts[index]) * weight
+			points.append(inverse * point)
+	var result := AABB()
+	for i in points.size():
+		result = AABB(points[i], Vector3.ZERO) if i == 0 else result.expand(points[i])
+	return result
 
 
 func _combined_aabb(node: Node) -> AABB:
@@ -515,6 +614,8 @@ func _apply_pending_options() -> void:
 	combat.call("set_role", role)
 	combat.call("set_difficulty", difficulty)
 	combat.call("set_seed", seed_value)
+	if realistic:
+		combat.set("reaction_delay", 0.0)
 	combat.set("entity_id", npc_id)
 	combat.set("target_id", str(pending_target_id()))
 	combat.set("vision_range", vision_range)
@@ -652,6 +753,9 @@ func is_dead() -> bool:
 func tick(delta: float) -> Dictionary:
 	if combat == null or _dead:
 		return {"action": "dead", "fired": false}
+	_dt = maxf(delta, 0.0)
+	if _home == Vector3.ZERO:
+		_home = global_position
 	combat.set("health_ratio", health_ratio())
 	if weapon_system != null and weapon_system.has_method("advance"):
 		weapon_system.call("advance", maxf(delta, 0.0))
@@ -663,16 +767,309 @@ func tick(delta: float) -> Dictionary:
 		action_changed.emit(action)
 	var goal: Variant = combat.call("goal_for", action, ctx)
 	_goal = goal if goal is Vector3 else Vector3.ZERO
+	if realistic and role != "zombie":
+		_goal = _realistic_goal(action)
 	_sanitize_goal(action)
+	if realistic and _goal.distance_to(_path_goal) > 1.5:
+		_path.clear()
+		_path_goal = _goal
+		_repath_cooldown = 0.0
 	if action == "reload" and not bool(combat.call("is_reloading")):
 		combat.call("start_reload")
 	if action == "attack":
 		if role == "zombie":
 			_melee_attack()
+		elif realistic:
+			if _can_shoot and _burst_pause <= 0.0 and bool(combat.call("can_fire")):
+				var shot: Dictionary = fire()
+				if bool(shot.get("fired", false)):
+					_burst_left -= 1
+					if _burst_left <= 0:
+						_burst_pause = _rng.randf_range(0.9, 1.8)
+						_burst_left = _rng.randi_range(2, 4)
+						_bursts_done += 1
+						_miss_sign = -_miss_sign
 		elif bool(combat.call("can_fire")):
 			fire()
 	_replan_path()
 	return result
+
+
+# Combate con ritmo humano: reaccion, fichas de ataque (max 2), rafagas con pausa, cobertura y paseo.
+func _realistic_gate(ctx: Dictionary, target_position: Vector3) -> void:
+	_can_shoot = false
+	_reacting = false
+	if role == "zombie":
+		return
+	if role == "civilian":
+		if _threat_memory <= 0.0:
+			ctx["visible"] = false
+			ctx["force_action"] = "patrol"
+		return
+	_burst_pause = maxf(0.0, _burst_pause - _dt)
+	_token_cooldown = maxf(0.0, _token_cooldown - _dt)
+	var raw: bool = bool(ctx["visible"])
+	if raw:
+		_lost_time = 0.0
+		_last_seen_pos = target_position
+		if not _engaged:
+			_engaged = true
+			_react_left = _rng.randf_range(0.8, 1.5)
+			_engage_time = 0.0
+			_bursts_done = 0
+			_burst_left = _rng.randi_range(2, 4)
+		if _react_left > 0.0:
+			_react_left -= _dt
+			_reacting = true
+			ctx["visible"] = false
+			ctx["force_action"] = "patrol"
+			return
+		_engage_time += _dt
+		_can_shoot = _token_step(true)
+		if not _can_shoot:
+			ctx["force_action"] = "attack" if _token_state == TOKEN_ACTIVE else "cover"
+		elif _burst_pause > 0.0:
+			ctx["force_action"] = "attack"
+		return
+	ctx["visible"] = false
+	_token_step(false)
+	if _engaged:
+		_lost_time += _dt
+		if _lost_time > 6.0:
+			_engaged = false
+			_react_left = 0.0
+		elif _react_left <= 0.0:
+			_remember_threat(_last_seen_pos, target_id, 2.0)
+			return
+	if _threat_memory <= 0.0:
+		ctx["force_action"] = "patrol"
+
+
+func _token_step(wants: bool) -> bool:
+	if _token_state == TOKEN_QUIET:
+		_token_quiet -= _dt
+		if _token_quiet <= 0.0:
+			_release_token()
+			_token_cooldown = 2.0
+		return false
+	if _token_state == TOKEN_ACTIVE:
+		if not wants or _bursts_done >= 2:
+			_token_state = TOKEN_QUIET
+			_token_quiet = 1.3
+			return false
+		return true
+	if not wants or _token_cooldown > 0.0:
+		return false
+	_attackers = _attackers.filter(func(n): return is_instance_valid(n) and not bool(n.call("is_dead")))
+	if _attackers.size() >= MAX_ATTACKERS:
+		return false
+	_attackers.append(self)
+	_token_state = TOKEN_ACTIVE
+	_bursts_done = 0
+	return true
+
+
+func _release_token() -> void:
+	_attackers.erase(self)
+	_token_state = 0
+	_token_quiet = 0.0
+
+
+func _realistic_goal(action: String) -> Vector3:
+	if _reacting:
+		_path.clear()
+		return global_position
+	if action == "attack" or action == "cover":
+		if _burst_pause > 0.0 or not _can_shoot:
+			var cover: Vector3 = _cover_goal()
+			if _cover_has:
+				return cover
+		return _goal
+	if action == "patrol" or action == "idle":
+		return _calm_goal()
+	if action == "investigate":
+		return _investigate_goal()
+	return _goal
+
+
+func _calm_goal() -> Vector3:
+	if _wait_left > 0.0:
+		_wait_left -= _dt
+		return global_position
+	var flat: Vector3 = global_position
+	if _wp_has:
+		_calm_stuck = _calm_stuck + _dt if Vector2(velocity.x, velocity.z).length() < 0.1 else 0.0
+		if _calm_stuck > 1.5:
+			_calm_stuck = 0.0
+			_wp_has = false
+			_wait_left = 0.3
+			_path.clear()
+			return global_position
+		_wp_age += _dt
+		var gap: Vector3 = _wp - flat
+		gap.y = 0.0
+		if gap.length() < 1.1 or _wp_age > 25.0 or _stuck_time > 2.5:
+			if _stuck_time > 2.5:
+				_stuck_time = 0.0
+			_wp_has = false
+			_wait_left = _rng.randf_range(1.5, 3.5)
+			_path.clear()
+			return global_position
+		return _wp
+	var points: Array = _pending_options.get("patrol_points", [])
+	var chosen: Variant = null
+	for relaxed in [false, true]:
+		var best: Array = []
+		for raw in points:
+			if not raw is Vector3:
+				continue
+			var point: Vector3 = raw
+			var distance: float = point.distance_to(flat)
+			if distance < (2.0 if relaxed else 4.0) or distance > (40.0 if relaxed else 18.0):
+				continue
+			if role == "hostile":
+				if avoid_radius > 0.0 and point.distance_to(avoid_center) < avoid_radius + 2.0:
+					continue
+				if not relaxed and home_radius > 0.0 and point.distance_to(_home) > home_radius:
+					continue
+			best.append(point)
+		for attempt in range(mini(6, best.size())):
+			var candidate: Vector3 = best[_rng.randi() % best.size()]
+			if _reachable(candidate):
+				chosen = candidate
+				break
+		if chosen != null:
+			break
+	if chosen == null:
+		var angle: float = _rng.randf() * TAU
+		var radius: float = _rng.randf_range(3.0, 8.0)
+		var fallback: Vector3 = global_position + Vector3(cos(angle), 0.0, sin(angle)) * radius
+		if _has_navigation_grid():
+			var cell: Vector2i = navigation.call("world_to_cell_2d", Vector2(fallback.x, fallback.z), nav_cell_size)
+			if bool(navigation.call("is_inside", cell)) and not bool(navigation.call("is_blocked", cell)):
+				if _reachable(fallback):
+					_wp = fallback
+					_wp_has = true
+					_wp_age = 0.0
+					_path.clear()
+					return _wp
+		_wait_left = 0.1
+		return global_position
+	_wp = chosen
+	_wp_has = true
+	_wp_age = 0.0
+	_path.clear()
+	return _wp
+
+
+func _investigate_goal() -> Vector3:
+	if _threat_position.length_squared() <= 0.0001:
+		return global_position
+	var threat_pos: Vector3 = _threat_position
+	if not _has_navigation_grid():
+		var angle: float = _rng.randf() * TAU
+		var radius: float = _rng.randf_range(3.0, 6.0)
+		return threat_pos + Vector3(cos(angle), 0.0, sin(angle)) * radius
+	var from_cell: Vector2i = navigation.call("world_to_cell_2d", Vector2(global_position.x, global_position.z), nav_cell_size)
+	var to_cell: Vector2i = navigation.call("world_to_cell_2d", Vector2(threat_pos.x, threat_pos.z), nav_cell_size)
+	var result: Variant = navigation.call("find_path", from_cell, to_cell, {
+		"position": global_position, "target_position": threat_pos, "cell_size": nav_cell_size,
+	})
+	var threat_reachable: bool = result is Dictionary and bool((result as Dictionary).get("ok", false))
+	var last_goal_dist: float = _last_investigate_goal.distance_squared_to(global_position)
+	if last_goal_dist < 4.0:
+		_last_investigate_goal = Vector3.ZERO
+	for attempt in range(16):
+		var angle: float = _rng.randf() * TAU
+		var radius: float = _rng.randf_range(4.0, 10.0)
+		var search_pos: Vector3 = threat_pos + Vector3(cos(angle), 0.0, sin(angle)) * radius
+		var search_cell: Vector2i = navigation.call("world_to_cell_2d", Vector2(search_pos.x, search_pos.z), nav_cell_size)
+		if not bool(navigation.call("is_inside", search_cell)):
+			continue
+		if bool(navigation.call("is_blocked", search_cell)):
+			continue
+		var reachable: Variant = navigation.call("find_path", from_cell, search_cell, {
+			"position": global_position, "target_position": search_pos, "cell_size": nav_cell_size,
+		})
+		if reachable is Dictionary and bool((reachable as Dictionary).get("ok", false)):
+			if _last_investigate_goal.length_squared() > 0.0001 and search_pos.distance_squared_to(_last_investigate_goal) < 9.0:
+				continue
+			if search_pos.distance_squared_to(global_position) < 4.0:
+				continue
+			_last_investigate_goal = search_pos
+			return search_pos
+	if threat_reachable:
+		if _last_investigate_goal.length_squared() > 0.0001 and threat_pos.distance_squared_to(_last_investigate_goal) < 9.0:
+			pass
+		elif threat_pos.distance_squared_to(global_position) >= 4.0:
+			_last_investigate_goal = threat_pos
+			return threat_pos
+	var best: Vector3 = Vector3.ZERO
+	var best_dist: float = INF
+	for radius in range(1, 12):
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				if maxi(absi(dx), absi(dy)) != radius:
+					continue
+				var candidate: Vector2i = to_cell + Vector2i(dx, dy)
+				if not bool(navigation.call("is_inside", candidate)):
+					continue
+				if bool(navigation.call("is_blocked", candidate)):
+					continue
+				var world_point: Vector3 = navigation.call("cell_to_world", candidate, nav_cell_size, threat_pos.y)
+				var dist: float = world_point.distance_squared_to(threat_pos)
+				if dist < best_dist:
+					var reachable: Variant = navigation.call("find_path", from_cell, candidate, {
+						"position": global_position, "target_position": world_point, "cell_size": nav_cell_size,
+					})
+					if reachable is Dictionary and bool((reachable as Dictionary).get("ok", false)):
+						if _last_investigate_goal.length_squared() > 0.0001 and world_point.distance_squared_to(_last_investigate_goal) < 9.0:
+							continue
+						if world_point.distance_squared_to(global_position) < 4.0:
+							continue
+						best_dist = dist
+						best = world_point
+		if best_dist < INF:
+			break
+	if best_dist < INF:
+		_last_investigate_goal = best
+		return best
+	return threat_pos
+
+
+func _reachable(point: Vector3) -> bool:
+	if not _has_navigation_grid():
+		return true
+	var from_cell: Vector2i = navigation.call("world_to_cell_2d", Vector2(global_position.x, global_position.z), nav_cell_size)
+	var to_cell: Vector2i = navigation.call("world_to_cell_2d", Vector2(point.x, point.z), nav_cell_size)
+	var found: Variant = navigation.call("find_path", from_cell, to_cell, {
+		"position": global_position, "target_position": point, "cell_size": nav_cell_size,
+	})
+	return found is Dictionary and bool((found as Dictionary).get("ok", false))
+
+
+func _cover_goal() -> Vector3:
+	_cover_refresh -= _dt
+	if _cover_has and _cover_refresh > 0.0:
+		return _cover_pos
+	_cover_refresh = 1.0
+	_cover_has = false
+	if target == null or not is_instance_valid(target):
+		return global_position
+	var best_distance: float = INF
+	for raw in _pending_options.get("cover_points", []):
+		if not raw is Vector3:
+			continue
+		var point: Vector3 = raw
+		var distance: float = point.distance_to(global_position)
+		if distance > 14.0 or distance >= best_distance or point.distance_to(target.global_position) < 4.0:
+			continue
+		if _has_line_of_sight(point, target.global_position):
+			continue
+		best_distance = distance
+		_cover_pos = point
+		_cover_has = true
+	return _cover_pos if _cover_has else global_position
 
 
 func fire() -> Dictionary:
@@ -692,6 +1089,10 @@ func fire() -> Dictionary:
 		return failed
 	var origin: Vector3 = _muzzle_position()
 	var point: Vector3 = aim_point if has_explicit_aim else target.global_position + Vector3.UP * 1.0
+	if realistic:
+		var side: Vector3 = (point - origin).cross(Vector3.UP).normalized()
+		point += side * _miss_sign * lerpf(2.4, 0.15, clampf(_engage_time / 10.0, 0.0, 1.0))
+		weapon_system.set("damage_scale", lerpf(0.3, 0.7, clampf(_engage_time / 30.0, 0.0, 1.0)))
 	var to_point: Vector3 = point - origin
 	var distance: float = to_point.length()
 	if distance < 0.01:
@@ -794,7 +1195,7 @@ func _move_toward_goal(delta: float) -> void:
 	var speed: float = patrol_speed
 	if action == "flee" or action == "run" or (role == "zombie" and action == "attack"):
 		speed = run_speed
-	elif action == "attack" or action == "investigate":
+	elif action == "attack" or action == "investigate" or action == "cover":
 		speed = maxf(patrol_speed, run_speed * 0.55)
 	if _moving:
 		var direction: Vector3 = offset.normalized()
@@ -873,13 +1274,16 @@ func _context() -> Dictionary:
 		if _threat_position.length_squared() > 0.0001:
 			target_position = _threat_position
 		distance = minf(distance, maxf(global_position.distance_to(target_position), 0.0))
-	return {
+	var context: Dictionary = {
 		"visible": visible,
 		"distance": distance,
 		"target_position": target_position,
 		"position": global_position,
 		"path": _path,
 	}
+	if realistic:
+		_realistic_gate(context, target_position)
+	return context
 
 
 func _has_navigation_grid() -> bool:
@@ -894,10 +1298,25 @@ func _sanitize_goal(action: String) -> void:
 		target.x = clampf(target.x, world_bounds.position.x + 1.0, world_bounds.end.x - 1.0)
 		target.z = clampf(target.z, world_bounds.position.z + 1.0, world_bounds.end.z - 1.0)
 	if action == "flee" and _threat_position.length_squared() > 0.0001:
-		var flee_point: Vector3 = Vector3.ZERO
-		var flee_score: float = -INF
+		var from_cell: Vector2i = navigation.call("world_to_cell_2d", Vector2(global_position.x, global_position.z), nav_cell_size)
+		var target_cell: Vector2i = navigation.call("world_to_cell_2d", Vector2(target.x, target.z), nav_cell_size)
+		if bool(navigation.call("is_inside", target_cell)) and not bool(navigation.call("is_blocked", target_cell)):
+			var reachable: Variant = navigation.call("find_path", from_cell, target_cell, {
+				"position": global_position, "target_position": target, "cell_size": nav_cell_size,
+			})
+			if reachable is Dictionary and bool((reachable as Dictionary).get("ok", false)):
+				_goal = target
+				return
+		var best: Vector3 = Vector3.ZERO
+		var best_score: float = -INF
 		var grid_width: int = int(navigation.get("width"))
 		var grid_height: int = int(navigation.get("height"))
+		var bounds_min_x: float = world_bounds.position.x if has_world_bounds else -INF
+		var bounds_max_x: float = world_bounds.end.x if has_world_bounds else INF
+		var bounds_min_z: float = world_bounds.position.z if has_world_bounds else -INF
+		var bounds_max_z: float = world_bounds.end.z if has_world_bounds else INF
+		var map_center_x: float = (bounds_min_x + bounds_max_x) * 0.5
+		var map_center_z: float = (bounds_min_z + bounds_max_z) * 0.5
 		for y in range(grid_height):
 			for x in range(grid_width):
 				var cell_candidate := Vector2i(x, y)
@@ -908,11 +1327,23 @@ func _sanitize_goal(action: String) -> void:
 				)
 				var score: float = world_point.distance_squared_to(_threat_position)
 				score -= world_point.distance_squared_to(global_position) * 0.05
-				if score > flee_score:
-					flee_score = score
-					flee_point = world_point
-		if flee_score > -INF:
-			_goal = flee_point
+				if has_world_bounds:
+					var margin_x: float = minf(world_point.x - bounds_min_x, bounds_max_x - world_point.x)
+					var margin_z: float = minf(world_point.z - bounds_min_z, bounds_max_z - world_point.z)
+					var margin: float = minf(margin_x, margin_z)
+					if margin < 4.0:
+						score -= (4.0 - margin) * 500.0
+					var dist_to_center: float = (world_point.x - map_center_x) * (world_point.x - map_center_x) + (world_point.z - map_center_z) * (world_point.z - map_center_z)
+					score -= dist_to_center * 0.01
+				if score > best_score:
+					var reachable: Variant = navigation.call("find_path", from_cell, cell_candidate, {
+						"position": global_position, "target_position": world_point, "cell_size": nav_cell_size,
+					})
+					if reachable is Dictionary and bool((reachable as Dictionary).get("ok", false)):
+						best_score = score
+						best = world_point
+		if best_score > -INF:
+			_goal = best
 			return
 	if bool(navigation.call("is_walkable_world", target, nav_cell_size)):
 		_goal = target
@@ -1128,6 +1559,7 @@ func _on_died() -> void:
 	if _dead:
 		return
 	_dead = true
+	_release_token()
 	velocity = Vector3.ZERO
 	set_physics_process(false)
 	collision_layer = 0
@@ -1194,6 +1626,8 @@ func _drop_weapon(parent: Node, position: Vector3, impulse: Vector3) -> Node3D:
 	body.mass = maxf(0.5, weapon_id.length() * 0.2)
 	body.position = position
 	body.add_to_group("weapon_pickup")
+	body.add_to_group("grabbable")
+	body.add_to_group("physics_props")
 	body.set_meta("weapon_id", weapon_id)
 	body.set_meta("pickable", true)
 	var shape := CollisionShape3D.new()

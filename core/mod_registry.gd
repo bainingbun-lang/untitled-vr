@@ -15,6 +15,7 @@ const ModApiScript = preload("res://core/mod_api.gd")
 const RuntimeGDScript = preload("res://core/runtime_gdscript.gd")
 const RuntimeLua = preload("res://core/runtime_lua.gd")
 const RuntimeWasm = preload("res://core/runtime_wasm.gd")
+const ContentRegistryScript = preload("res://core/game/content_registry.gd")
 
 const RESOLVER_PATH := "res://core/mod_resolver.gd"
 const DEFAULT_PRIORITY := 100
@@ -158,6 +159,7 @@ func load_all(candidates: Array) -> Dictionary:
 		}
 		_order.append(id)
 		loaded_now.append(id)
+		ContentRegistryScript.instance().load_mod(id, dir, int(manifest.get("priority", DEFAULT_PRIORITY)))
 
 	for candidate in candidates:
 		var manifest := _manifest_of(candidate)
@@ -167,6 +169,7 @@ func load_all(candidates: Array) -> Dictionary:
 		failed[module_id] = "no resuelto (dependencias incompletas)"
 		errors.append("%s no se cargo: dependencias incompletas" % module_id)
 
+	ContentRegistryScript.instance().sync_loaded(loaded_ids())
 	return {
 		"ok": failed.is_empty() and errors.is_empty(),
 		"loaded": loaded_now,
@@ -199,6 +202,8 @@ func unload(module_id: String) -> Dictionary:
 
 	_loaded.erase(module_id)
 	_order.erase(module_id)
+	ContentRegistryScript.instance().unload_mod(module_id)
+	ContentRegistryScript.instance().sync_loaded(loaded_ids())
 	return {"ok": true, "errors": errors}
 
 

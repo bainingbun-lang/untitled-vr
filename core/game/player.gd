@@ -9,6 +9,7 @@ const INVENTORY_PATH := "res://core/game/inventory.gd"
 const LOADOUT_PATH := "res://core/game/loadout.gd"
 const VIEWMODEL_PATH := "res://core/game/weapon_viewmodel.gd"
 const ReloadSystemScript = preload("res://core/game/reload_system.gd")
+const ModHooksScript = preload("res://core/game/mod_hooks.gd")
 const SFX_BANK_PATH := "res://core/game/sfx_bank.gd"
 const AUDIO_SYNTH_PATH := "res://core/game/audio_synth.gd"
 const TOUCH_SIGNALS := [
@@ -449,7 +450,17 @@ func _die() -> void:
 		return
 	_dead = true
 	_respawn_timer = respawn_delay
+	ModHooksScript.emit("player_died", {
+		"player_id": str(get_instance_id()), "killer": "", "position": global_position,
+	})
 	died.emit()
+
+
+func notify_item_picked(item_id: String, amount: int = 1, position: Vector3 = Vector3.ZERO) -> void:
+	ModHooksScript.emit("item_picked", {
+		"item_id": item_id, "amount": amount,
+		"inventory_owner": str(get_instance_id()), "position": position,
+	})
 
 
 func respawn(at: Variant = null) -> void:
@@ -677,6 +688,10 @@ func enter_vehicle(v: Node3D) -> void:
 	_move_input = Vector2.ZERO
 	_drive_input = Vector3.ZERO
 	_jump_queued = false
+	ModHooksScript.emit("vehicle_entered", {
+		"vehicle_id": str(v.get_instance_id()), "player_id": str(get_instance_id()),
+		"seats": int(v.get("seats")) if v.get("seats") is int else 0,
+	})
 
 
 func exit_vehicle() -> void:

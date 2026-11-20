@@ -1,58 +1,15 @@
 class_name SurfaceMaterialDef
 extends Resource
 
+const ContentRegistryScript = preload("res://core/game/content_registry.gd")
+
 enum Type { FLESH, METAL, WOOD, CONCRETE, DIRT, GLASS, WATER }
 
-const IDS := ["flesh", "metal", "wood", "concrete", "dirt", "glass", "water"]
+const _TYPE_IDS: Array[String] = ["flesh", "metal", "wood", "concrete", "dirt", "glass", "water"]
 
-const DEFS := {
-	Type.FLESH: {
-		"id": "flesh", "name": "Carne", "penetration": 0.70, "bounce": 0.02,
-		"absorption": 0.25, "thickness": 0.40, "transfer": 0.35,
-		"effect": "blood", "color": Color(0.55, 0.02, 0.02),
-	},
-	Type.METAL: {
-		"id": "metal", "name": "Metal", "penetration": 0.15, "bounce": 0.90,
-		"absorption": 0.50, "thickness": 0.02, "transfer": 0.08,
-		"effect": "sparks", "color": Color(0.85, 0.55, 0.15),
-	},
-	Type.WOOD: {
-		"id": "wood", "name": "Madera", "penetration": 0.55, "bounce": 0.15,
-		"absorption": 0.35, "thickness": 0.10, "transfer": 0.55,
-		"effect": "splinters", "color": Color(0.45, 0.28, 0.12),
-	},
-	Type.CONCRETE: {
-		"id": "concrete", "name": "Hormigon", "penetration": 0.02, "bounce": 0.20,
-		"absorption": 0.90, "thickness": 0.30, "transfer": 0.0,
-		"effect": "dust", "color": Color(0.55, 0.54, 0.50),
-	},
-	Type.DIRT: {
-		"id": "dirt", "name": "Tierra", "penetration": 0.25, "bounce": 0.05,
-		"absorption": 0.65, "thickness": 0.50, "transfer": 0.12,
-		"effect": "dust", "color": Color(0.38, 0.28, 0.16),
-	},
-	Type.GLASS: {
-		"id": "glass", "name": "Vidrio", "penetration": 0.80, "bounce": 0.10,
-		"absorption": 0.15, "thickness": 0.01, "transfer": 0.80,
-		"effect": "shards", "color": Color(0.55, 0.80, 0.90),
-	},
-	Type.WATER: {
-		"id": "water", "name": "Agua", "penetration": 0.35, "bounce": 0.05,
-		"absorption": 0.90, "thickness": 4.00, "transfer": 0.0,
-		"effect": "splash", "color": Color(0.35, 0.65, 0.85),
-	},
-}
-
-const ALIASES := {
-	"flesh": Type.FLESH, "carne": Type.FLESH, "body": Type.FLESH, "organic": Type.FLESH,
-	"metal": Type.METAL, "steel": Type.METAL, "acero": Type.METAL, "hierro": Type.METAL,
-	"wood": Type.WOOD, "madera": Type.WOOD, "lumber": Type.WOOD,
-	"concrete": Type.CONCRETE, "hormigon": Type.CONCRETE, "cement": Type.CONCRETE,
-	"stone": Type.CONCRETE, "piedra": Type.CONCRETE, "brick": Type.CONCRETE,
-	"dirt": Type.DIRT, "tierra": Type.DIRT, "soil": Type.DIRT, "sand": Type.DIRT, "arena": Type.DIRT,
-	"glass": Type.GLASS, "vidrio": Type.GLASS, "cristal": Type.GLASS,
-	"water": Type.WATER, "agua": Type.WATER, "liquid": Type.WATER,
-}
+static var IDS: Array = _build_ids()
+static var DEFS: Dictionary = _build_defs()
+static var ALIASES: Dictionary = _build_aliases()
 
 @export var type: int = Type.CONCRETE
 @export var penetration: float = 0.0
@@ -74,6 +31,12 @@ func configure(p_type: int) -> void:
 	absorption = float(def.get("absorption", 0.0))
 	thickness = float(def.get("thickness", 0.0))
 	transfer = float(def.get("transfer", 0.0))
+
+
+static func refresh() -> void:
+	DEFS = _build_defs()
+	IDS = _build_ids()
+	ALIASES = _build_aliases()
 
 
 static func all_types() -> Array:
@@ -170,3 +133,39 @@ static func penetration_cost(p_type: int) -> float:
 
 static func can_penetrate(p_type: int, power: float) -> bool:
 	return clampf(power, 0.0, 1.0) > penetration_cost(p_type)
+
+
+static func _build_defs() -> Dictionary:
+	var registry := ContentRegistryScript.instance()
+	var result: Dictionary = {}
+	for type_id in range(_TYPE_IDS.size()):
+		var id := str(_TYPE_IDS[type_id])
+		var entry: Dictionary = registry.definition("surface", id)
+		var def: Dictionary = entry.duplicate(true)
+		def.erase("aliases")
+		def["id"] = id
+		var raw_color: Array = def.get("color", [0.5, 0.5, 0.5])
+		while raw_color.size() < 3:
+			raw_color.append(0.5)
+		def["color"] = Color(float(raw_color[0]), float(raw_color[1]), float(raw_color[2]))
+		result[type_id] = def
+	return result
+
+
+static func _build_ids() -> Array:
+	var result: Array = []
+	for id in _TYPE_IDS:
+		result.append(str(id))
+	return result
+
+
+static func _build_aliases() -> Dictionary:
+	var result: Dictionary = {}
+	var registry := ContentRegistryScript.instance()
+	for type_id in range(_TYPE_IDS.size()):
+		var id := str(_TYPE_IDS[type_id])
+		var def: Dictionary = registry.definition("surface", id)
+		result[id] = type_id
+		for alias in def.get("aliases", []):
+			result[str(alias)] = type_id
+	return result

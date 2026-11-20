@@ -17,21 +17,32 @@ const WORLD_SPAWNER_PATH: String = "res://core/game/world_spawner.gd"
 const NAVIGATION_PATH: String = "res://core/npc/npc_navigation.gd"
 const FACTIONS_PATH: String = "res://core/npc/npc_factions.gd"
 const LOD_PATH: String = "res://core/npc/npc_lod.gd"
+const GAME_MODE_PATH: String = "res://core/game/game_mode.gd"
+const MODE_SURVIVAL_PATH: String = "res://core/game/mode_survival.gd"
+const SPAWN_MENU_SCENE: String = "res://scenes/ui/spawn_menu.tscn"
 const CharacterModelScript = preload("res://core/game/character_model.gd")
 const VoiceSystemScript = preload("res://core/game/voice_system.gd")
 const GoreFxScript = preload("res://core/game/gore_fx.gd")
 const VrPerformanceScript = preload("res://core/vr/vr_performance.gd")
 const VrGameModeScript = preload("res://core/vr/vr_game_mode.gd")
+const VrDebugPanelScript = preload("res://core/vr/vr_debug_panel.gd")
 const MapWorldBuilderScript = preload("res://core/maps/map_world_builder.gd")
 const WorldSpawnerScript = preload("res://core/game/world_spawner.gd")
 const NPCNavigationScript = preload("res://core/npc/npc_navigation.gd")
 const NPCFactionsScript = preload("res://core/npc/npc_factions.gd")
 const NPCLODScript = preload("res://core/npc/npc_lod.gd")
+const GameModeScript = preload("res://core/game/game_mode.gd")
+const VehicleSpawnerScript = preload("res://core/game/vehicle_spawner.gd")
+const VrVehicleInputScript = preload("res://core/vr/vr_vehicle_input.gd")
 
 const DUMMY_COUNT: int = 6
 const STATIC_DUMMY_COUNT: int = 2
 const NAV_CELL_SIZE: float = 1.0
 const PLAYER_CLEARANCE: float = 4.5
+const SAFE_RADIUS: float = 8.0
+const PARKED_VEHICLE_COUNT: int = 4
+const PARKED_VEHICLE_IDS: Array = ["sedan", "pickup", "van", "suv"]
+const PARKED_VEHICLE_HEIGHT: float = 1.0
 
 var actor: Node3D = null
 var spawn_points: Array = []
@@ -43,6 +54,9 @@ var pause_menu: Node = null
 var dummies: Array = []
 var physics_props: Array = []
 var npcs: Array = []
+var _nav_blocked: Dictionary = {}
+var parked_vehicles: Array = []
+var spawn_menu: Control = null
 
 var navigation = null
 var factions = null
@@ -60,11 +74,15 @@ var performance: Node = null
 var vr_state: Node = null
 var vr_active: bool = false
 var vr_result: Dictionary = {}
+var debug_panel: VrDebugPanel = null
 var _models: Dictionary = {}
 var _skins: Dictionary = {}
 var _impacts: Dictionary = {}
 var _wired: Dictionary = {}
 var _npc_scan_timer := 0.0
+
+var active_game_mode = null
+var _game_mode_type: int = 0
 
 
 func _ready() -> void:
@@ -80,6 +98,8 @@ func setup(meta: Dictionary) -> void:
 	_discard(actor)
 	_discard(_hud_layer)
 	_discard(_dummies_root)
+	_discard(spawn_menu)
+	_clear_world_vehicles()
 	for old_npc in npcs:
 		if old_npc != null and is_instance_valid(old_npc):
 			ArmedNpc.unregister(old_npc)
@@ -95,9 +115,12 @@ func setup(meta: Dictionary) -> void:
 	pause_menu = null
 	_dummies_root = null
 	_npcs_root = null
+	spawn_menu = null
+	parked_vehicles = []
 	vr_state = null
 	vr_active = false
 	vr_result = {}
+	debug_panel = null
 	spawn_points = []
 	bounds = AABB()
 	dummies = []
@@ -127,16 +150,25 @@ func setup(meta: Dictionary) -> void:
 		vr_result = VrGameModeScript.setup(self, actor, meta)
 		vr_state = vr_result.get("state", null) as Node
 
+	_setup_debug_panel()
+
 	_collect_physics_props()
 	_setup_performance()
 	_setup_voice()
 	_build_navigation(meta)
 	_spawn_living_npcs(first_point, meta)
 	_spawn_dummies(first_point, meta)
+	_park_vehicles(first_point, meta)
+	_block_parked_vehicles()
 	_connect_player_signals()
+	
+	var mode_type: int = int(meta.get("game_mode", 0))
+	_setup_game_mode(mode_type, first_point, meta)
+	
 	if not vr_active:
 		_setup_hud()
 		_setup_hotbar()
+		_setup_spawn_menu()
 		_setup_pause_menu()
 		_auto_equip()
 		if actor != null and actor.has_signal("menu_pressed"):
@@ -154,10 +186,13 @@ func _process(delta: float) -> void:
 		_sync_locomotion()
 	if vr_state != null and is_instance_valid(vr_state) and vr_state.has_method("tick"):
 		vr_state.call("tick", maxf(delta, 0.0))
+	if active_game_mode != null and is_instance_valid(active_game_mode) and active_game_mode.has_method("tick"):
+		active_game_mode.call("tick", maxf(delta, 0.0))
 	if performance != null and is_instance_valid(performance) and performance.has_method("observe_frame"):
 		var report: Variant = performance.call("observe_frame", maxf(delta, 0.0) * 1000.0, delta)
 		if report is Dictionary and bool((report as Dictionary).get("changed", false)):
 			GoreFxScript.apply_profile((report as Dictionary).get("profile", {}))
+	_process_debug_panel_vr(delta)
 	_npc_scan_timer -= maxf(delta, 0.0)
 	if _npc_scan_timer <= 0.0:
 		_npc_scan_timer = 0.5
@@ -174,6 +209,30 @@ func target_dummies() -> Array:
 
 func props() -> Array:
 	return physics_props.duplicate()
+
+
+func get_active_game_mode() -> Object:
+	return active_game_mode
+
+
+func get_game_mode_type() -> int:
+	return _game_mode_type
+
+
+func start_game_mode(mode_type: int, meta: Dictionary = {}) -> void:
+	var current_meta: Dictionary = meta.duplicate()
+	if current_meta.is_empty():
+		current_meta = _session_meta()
+	if current_meta.is_empty():
+		current_meta = {"seed": 4242}
+	
+	var start_point: Vector3 = Vector3.ZERO
+	if actor != null and is_instance_valid(actor):
+		start_point = actor.global_position
+	elif not spawn_points.is_empty():
+		start_point = spawn_points[0]
+	
+	_setup_game_mode(mode_type, start_point, current_meta)
 
 
 func _create_actor(spawn: Vector3) -> Node3D:
@@ -205,6 +264,335 @@ func _collect_physics_props() -> void:
 	for node in get_tree().get_nodes_in_group("physics_props"):
 		if node.is_ancestor_of(self) or self.is_ancestor_of(node):
 			physics_props.append(node)
+
+
+func _clear_world_vehicles() -> void:
+	for vehicle in VehicleSpawnerScript.alive():
+		if vehicle != null and is_instance_valid(vehicle) and vehicle.get_parent() == self:
+			vehicle.get_parent().remove_child(vehicle)
+			vehicle.queue_free()
+
+
+func vehicles() -> Array:
+	var result: Array = []
+	for vehicle in VehicleSpawnerScript.alive():
+		if vehicle != null and is_instance_valid(vehicle) and vehicle.get_parent() == self:
+			result.append(vehicle)
+	return result
+
+
+func parked_vehicle_list() -> Array:
+	return parked_vehicles.duplicate()
+
+
+func _block_parked_vehicles() -> void:
+	if navigation == null:
+		return
+	var width: int = int(navigation.get("width"))
+	var height: int = int(navigation.get("height"))
+	var npc_cells: Array = []
+	for npc in npcs:
+		if npc != null and is_instance_valid(npc):
+			npc_cells.append(navigation.call("world_to_cell_2d", Vector2(npc.global_position.x, npc.global_position.z), NAV_CELL_SIZE))
+	var accepted: Dictionary = {}
+	for vehicle in parked_vehicles:
+		if not (vehicle is Node3D) or not is_instance_valid(vehicle):
+			continue
+		var box: AABB = _collision_box(vehicle as Node3D)
+		if box.size.x <= 0.0 or box.size.z <= 0.0:
+			continue
+		var cells: Dictionary = {}
+		_mark_blocked(cells, box, bounds.position, width, height, 0.4)
+		# la celda de un NPC ya nacido y su entorno no se bloquean: quedaria atrapado
+		for cell in npc_cells:
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					cells.erase(cell + Vector2i(dx, dy))
+		var trial: Dictionary = _nav_blocked.duplicate()
+		trial.merge(accepted)
+		trial.merge(cells)
+		var open_ok: bool = true
+		for cell in npc_cells:
+			if _free_area(cell, trial, width, height, 60) < 60:
+				open_ok = false
+				break
+		if open_ok:
+			accepted.merge(cells)
+	_nav_blocked.merge(accepted)
+	navigation.call("set_obstacles", accepted.keys())
+
+
+func _setup_game_mode(mode_type: int, first_point: Vector3, meta: Dictionary) -> void:
+	if active_game_mode != null and is_instance_valid(active_game_mode):
+		active_game_mode.call("stop")
+		_discard(active_game_mode)
+		active_game_mode = null
+	
+	if mode_type == 0:
+		_game_mode_type = 0
+		return
+	
+	var seed: int = int(meta.get("seed", 4242))
+	
+	match mode_type:
+		1: # SURVIVAL
+			return # M2 en cuarentena: ver ~/untitled-control/m2_partial
+		_:
+			return
+	
+	if active_game_mode != null:
+		active_game_mode.call("start")
+
+
+# Celdas libres alcanzables desde start (con tope): detecta bolsas sin salida.
+func _free_area(start: Vector2i, blocked: Dictionary, width: int, height: int, cap: int) -> int:
+	var seen: Dictionary = {start: true}
+	var queue: Array = [start]
+	while not queue.is_empty() and seen.size() < cap:
+		var cell: Vector2i = queue.pop_back()
+		for step in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var next: Vector2i = cell + step
+			if next.x < 0 or next.y < 0 or next.x >= width or next.y >= height:
+				continue
+			if seen.has(next) or blocked.has(next):
+				continue
+			seen[next] = true
+			queue.append(next)
+	return seen.size()
+
+
+func _park_vehicles(center: Vector3, meta: Dictionary) -> void:
+	parked_vehicles = []
+	if not bool(world_report.get("ok", false)):
+		return
+	var candidates: Array = _all_free_points()
+	if candidates.is_empty():
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(meta.get("seed", 4242)) ^ 0xC0FFEE
+	candidates.shuffle()
+	var placed: Array = []
+	var wanted: int = mini(PARKED_VEHICLE_COUNT, PARKED_VEHICLE_IDS.size())
+	for i in range(wanted):
+		var id: String = str(PARKED_VEHICLE_IDS[i])
+		var point: Vector3 = Vector3.ZERO
+		var found: bool = false
+		for candidate in candidates:
+			point = candidate
+			if point.distance_to(center) < 6.0:
+				continue
+			if _too_close_planar(point, spawn_points, 3.2):
+				continue
+			if _too_close_planar(point, physics_props, 2.4):
+				continue
+			if _too_close_planar(point, dummies, 2.6):
+				continue
+			if _too_close_planar(point, npcs, 2.6):
+				continue
+			if _point_blocked(point, 1.8):
+				continue
+			if _too_close_planar(point, placed, 4.0):
+				continue
+			found = true
+			break
+		if not found:
+			break
+		placed.append(point)
+		var yaw: float = rng.randf_range(-PI, PI)
+		var xform := Transform3D(Basis(Vector3.UP, yaw), point + Vector3.UP * PARKED_VEHICLE_HEIGHT)
+		var vehicle = VehicleSpawnerScript.spawn(id, xform, self)
+		if vehicle == null:
+			continue
+		vehicle.name = "ParkedCar_%d_%s" % [i, id]
+		vehicle.set_meta("parked", true)
+		parked_vehicles.append(vehicle)
+	world_report["parked_vehicles"] = parked_vehicles.size()
+	world_report["parked_positions"] = placed.duplicate()
+
+
+func _all_free_points() -> Array:
+	var result: Array = []
+	if navigation == null:
+		return result
+	var width: int = int(navigation.get("width"))
+	var height: int = int(navigation.get("height"))
+	for y in range(height):
+		for x in range(width):
+			var cell := Vector2i(x, y)
+			if bool(navigation.call("is_blocked", cell)):
+				continue
+			var point: Vector3 = navigation.call("cell_to_world", cell, NAV_CELL_SIZE, 0.0)
+			point.y = 0.0
+			result.append(point)
+	return result
+
+
+func _nearest_free_point(target: Vector3, ignore_vehicles: bool = false) -> Vector3:
+	var best: Vector3 = target
+	var best_distance: float = INF
+	for point in _all_free_points():
+		if _point_blocked(point, 1.4):
+			continue
+		if not ignore_vehicles and _too_close_planar(point, vehicles(), 2.2):
+			continue
+		var distance: float = point.distance_to(target)
+		if distance < best_distance:
+			best_distance = distance
+			best = point
+	best.y = target.y
+	return best
+
+
+func _point_blocked(point: Vector3, radius: float) -> bool:
+	if _geometry_root != null:
+		for body in _geometry_root.find_children("*", "CollisionObject3D", true, false):
+			if str((body as Node).name) == "Ground":
+				continue
+			var box: AABB = _collision_box(body as Node3D)
+			if box.size.x <= 0.0 or box.size.z <= 0.0:
+				continue
+			var pad := Vector3(radius, radius, radius)
+			var expanded := AABB(box.position - pad, box.size + pad * 2.0)
+			if expanded.has_point(Vector3(point.x, box.get_center().y, point.z)):
+				return true
+	for prop in physics_props:
+		if not (prop is Node3D) or not is_instance_valid(prop):
+			continue
+		var box: AABB = _collision_box(prop as Node3D)
+		if box.size.x <= 0.0 or box.size.z <= 0.0:
+			continue
+		var pad := Vector3(radius * 0.5, radius, radius * 0.5)
+		var expanded := AABB(box.position - pad, box.size + pad * 2.0)
+		if expanded.has_point(Vector3(point.x, box.get_center().y, point.z)):
+			return true
+	return false
+
+
+func _planar_distance(a: Vector3, b: Vector3) -> float:
+	return Vector2(a.x - b.x, a.z - b.z).length()
+
+
+func _too_close_planar(point: Vector3, others: Array, radius: float) -> bool:
+	for other in others:
+		var other_point: Vector3 = Vector3.ZERO
+		if other is Vector3:
+			other_point = other
+		elif other is Node3D and is_instance_valid(other):
+			other_point = (other as Node3D).global_position
+		else:
+			continue
+		if _planar_distance(point, other_point) < radius:
+			return true
+	return false
+
+
+func spawn_vehicle_in_front(vehicle_id: String, distance: float = 4.0) -> Node3D:
+	var origin: Vector3 = Vector3.ZERO
+	var forward: Vector3 = Vector3.FORWARD
+	if actor != null and is_instance_valid(actor):
+		origin = actor.global_position
+		var camera: Node3D = null
+		var xr_camera: Variant = actor.get("xr_camera")
+		if xr_camera is Node3D:
+			camera = xr_camera as Node3D
+		elif actor is Camera3D:
+			camera = actor as Node3D
+		if camera != null:
+			forward = -camera.global_transform.basis.z
+		else:
+			forward = -actor.global_transform.basis.z
+	forward.y = 0.0
+	if forward.length_squared() < 0.0001:
+		forward = Vector3.FORWARD
+	forward = forward.normalized()
+	var target: Vector3 = origin + forward * maxf(distance, 1.0)
+	target.y = 0.0
+	var point: Vector3 = _nearest_free_point(target)
+	var yaw: float = atan2(forward.x, forward.z)
+	var xform := Transform3D(Basis(Vector3.UP, yaw), point + Vector3.UP * PARKED_VEHICLE_HEIGHT)
+	var vehicle = VehicleSpawnerScript.spawn(vehicle_id, xform, self)
+	if vehicle != null:
+		vehicle.set_meta("spawned_by_menu", true)
+		world_report["menu_spawns"] = int(world_report.get("menu_spawns", 0)) + 1
+	return vehicle
+
+
+func _setup_spawn_menu() -> void:
+	if not ResourceLoader.exists(SPAWN_MENU_SCENE) or _hud_layer == null:
+		return
+	var packed := load(SPAWN_MENU_SCENE) as PackedScene
+	if packed == null:
+		return
+	var instance := packed.instantiate()
+	if not (instance is Control):
+		if instance != null:
+			instance.free()
+		return
+	spawn_menu = instance as Control
+	spawn_menu.name = "SpawnMenu"
+	_hud_layer.add_child(spawn_menu)
+	spawn_menu.visible = false
+	if spawn_menu.has_signal("spawn_requested"):
+		_connect_once(spawn_menu, "spawn_requested", Callable(self, "_on_spawn_requested"))
+	if spawn_menu.has_signal("closed"):
+		_connect_once(spawn_menu, "closed", Callable(self, "close_spawn_menu"))
+
+
+func open_spawn_menu() -> void:
+	if spawn_menu != null and is_instance_valid(spawn_menu):
+		spawn_menu.visible = true
+
+
+func close_spawn_menu() -> void:
+	if spawn_menu != null and is_instance_valid(spawn_menu):
+		spawn_menu.visible = false
+
+
+func _on_spawn_requested(vehicle_id: String) -> void:
+	var vehicle := spawn_vehicle_in_front(vehicle_id)
+	if vehicle != null:
+		close_spawn_menu()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if debug_panel != null and is_instance_valid(debug_panel):
+		if debug_panel.handle_pc_input(event):
+			return
+	if vr_active or spawn_menu == null or not is_instance_valid(spawn_menu):
+		return
+	if not (event is InputEventKey):
+		return
+	var key := event as InputEventKey
+	if key.pressed and not key.echo and key.keycode == KEY_V:
+		if spawn_menu.visible:
+			close_spawn_menu()
+		else:
+			open_spawn_menu()
+
+
+func _nearest_vehicle(point: Vector3, radius: float) -> Node3D:
+	var best: Node3D = null
+	var best_distance: float = radius
+	for vehicle in vehicles():
+		if not (vehicle is Node3D):
+			continue
+		var distance: float = (vehicle as Node3D).door_position().distance_to(point)
+		if distance < best_distance:
+			best_distance = distance
+			best = vehicle as Node3D
+	return best
+
+
+func _on_player_interact() -> void:
+	if actor == null or not is_instance_valid(actor):
+		return
+	var current: Variant = actor.get("vehicle")
+	if current != null and is_instance_valid(current) and actor.has_method("exit_vehicle"):
+		actor.call("exit_vehicle")
+		return
+	var nearest: Node3D = _nearest_vehicle(actor.global_position, 2.6)
+	if nearest != null and actor.has_method("enter_vehicle"):
+		actor.call("enter_vehicle", nearest)
 
 
 func _spawn_dummies(center: Vector3, meta: Dictionary) -> void:
@@ -299,6 +687,8 @@ func _setup_voice() -> void:
 	voice = node
 	node.name = "VoiceSystem"
 	add_child(node)
+	if node.has_method("set_subtitles_enabled"):
+		node.call("set_subtitles_enabled", true)
 	if node.has_signal("subtitle"):
 		_connect_once(node, "subtitle", Callable(self, "_on_voice_subtitle"))
 
@@ -314,7 +704,7 @@ func _build_navigation(meta: Dictionary) -> void:
 				continue
 			var box: AABB = _collision_box(body as Node3D)
 			if box.size.x > 0.0 and box.size.z > 0.0:
-				_mark_blocked(blocked, box, origin, width, height, 0.55)
+				_mark_blocked(blocked, box, origin, width, height, 0.5)
 	for prop in physics_props:
 		if not (prop is Node3D) or not is_instance_valid(prop):
 			continue
@@ -322,6 +712,7 @@ func _build_navigation(meta: Dictionary) -> void:
 		if box.size.x <= 0.0 or box.size.z <= 0.0:
 			continue
 		_mark_blocked(blocked, box, origin, width, height, 0.45)
+	_nav_blocked = blocked
 	navigation = NPCNavigationScript.new(width, height, blocked.keys(), {
 		"origin": Vector2(origin.x, origin.z),
 		"max_expansions": 4096,
@@ -349,6 +740,21 @@ func _collision_box(body: Node3D) -> AABB:
 			var size: Vector3 = (shape_node.shape as BoxShape3D).size
 			var center: Vector3 = body.global_position + shape_node.position
 			return AABB(center - size * 0.5, size)
+	# formas no-caja (muros de edificios en trimesh/convexas): union de sus cajas envolventes
+	var merged := AABB()
+	var first: bool = true
+	for child in body.find_children("*", "CollisionShape3D", true, false):
+		var node := child as CollisionShape3D
+		if node == null or node.shape == null or not node.is_inside_tree():
+			continue
+		var mesh: ArrayMesh = node.shape.get_debug_mesh()
+		if mesh == null:
+			continue
+		var box: AABB = node.global_transform * mesh.get_aabb()
+		merged = box if first else merged.merge(box)
+		first = false
+	if not first:
+		return merged
 	var raw: AABB = body.get_aabb() if body.has_method("get_aabb") else AABB()
 	return raw
 
@@ -357,10 +763,11 @@ func _mark_blocked(
 	blocked: Dictionary, box: AABB, origin: Vector3,
 	width: int, height: int, margin: float
 ) -> void:
-	var min_x: int = maxi(0, floori((box.position.x - margin - origin.x) / NAV_CELL_SIZE))
-	var max_x: int = mini(width - 1, ceili((box.end.x + margin - origin.x) / NAV_CELL_SIZE))
-	var min_y: int = maxi(0, floori((box.position.z - margin - origin.z) / NAV_CELL_SIZE))
-	var max_y: int = mini(height - 1, ceili((box.end.z + margin - origin.z) / NAV_CELL_SIZE))
+	# la celda es un punto en su coordenada entera: se bloquea solo si queda a menos de `margin` de la caja
+	var min_x: int = maxi(0, ceili((box.position.x - margin - origin.x) / NAV_CELL_SIZE))
+	var max_x: int = mini(width - 1, floori((box.end.x + margin - origin.x) / NAV_CELL_SIZE))
+	var min_y: int = maxi(0, ceili((box.position.z - margin - origin.z) / NAV_CELL_SIZE))
+	var max_y: int = mini(height - 1, floori((box.end.z + margin - origin.z) / NAV_CELL_SIZE))
 	for y in range(min_y, max_y + 1):
 		for x in range(min_x, max_x + 1):
 			blocked[Vector2i(x, y)] = true
@@ -386,6 +793,12 @@ func _spawn_living_npcs(center: Vector3, meta: Dictionary) -> void:
 	if wanted <= 0:
 		return
 	var candidates: Array = _free_navigation_points(center)
+	var main_area: Dictionary = _largest_nav_component()
+	if not main_area.is_empty():
+		candidates = candidates.filter(func(p): return main_area.has(navigation.call("world_to_cell_2d", Vector2((p as Vector3).x, (p as Vector3).z), NAV_CELL_SIZE)))
+	var outside: Array = candidates.filter(func(p): return (p as Vector3).distance_to(center) >= SAFE_RADIUS)
+	if outside.size() >= wanted:
+		candidates = outside
 	if candidates.is_empty():
 		return
 	var seed_value: int = int(meta.get("seed", 4242))
@@ -412,6 +825,22 @@ func _spawn_living_npcs(center: Vector3, meta: Dictionary) -> void:
 				selected.append(point)
 	if selected.is_empty():
 		return
+	# los hostiles nacen lejos: garantiza puntos a >= 14 m del jugador entre los elegidos
+	var hostile_wanted: int = clampi(wanted / 3, 1, 3)
+	var far: Array = candidates.filter(func(p): return (p as Vector3).distance_to(center) >= 14.0)
+	far.shuffle()
+	var far_have: int = selected.filter(func(p): return (p as Vector3).distance_to(center) >= 14.0).size()
+	for point in far:
+		if far_have >= hostile_wanted:
+			break
+		if selected.has(point):
+			continue
+		var nearest: int = 0
+		for i in range(selected.size()):
+			if (selected[i] as Vector3).distance_to(center) < (selected[nearest] as Vector3).distance_to(center):
+				nearest = i
+		selected[nearest] = point
+		far_have += 1
 	factions = NPCFactionsScript.new({})
 	for id in ["civilian", "criminal", "police", "zombie"]:
 		factions.call("register_faction", id, id)
@@ -422,15 +851,11 @@ func _spawn_living_npcs(center: Vector3, meta: Dictionary) -> void:
 	factions.call("set_relation", "criminal", "civilian", -45.0)
 	factions.call("set_relation", "zombie", "civilian", -95.0)
 
-	var roles: Array = ["hostile", "civilian", "defender", "zombie", "hostile", "civilian", "zombie", "defender"]
-	var weapons: Dictionary = {
-		"hostile": "assault_rifle", "defender": "pistol",
-		"civilian": "pistol", "zombie": "",
-	}
-	var faction_by_role: Dictionary = {
-		"hostile": "criminal", "defender": "police",
-		"civilian": "civilian", "zombie": "zombie",
-	}
+	var weapons: Dictionary = {"hostile": "assault_rifle", "civilian": ""}
+	var faction_by_role: Dictionary = {"hostile": "criminal", "civilian": "civilian"}
+	var roles: Array = []
+	for i in range(wanted):
+		roles.append("hostile" if i < clampi(wanted / 3, 1, 3) else "civilian")
 	var defs: Array = []
 	for i in range(wanted):
 		var role: String = str(roles[i % roles.size()])
@@ -461,9 +886,18 @@ func _spawn_living_npcs(center: Vector3, meta: Dictionary) -> void:
 	}
 	var spawner = WorldSpawnerScript.new()
 	var report: Dictionary = spawner.call("spawn", spawn_meta, defs, seed_value)
+	var ranked: Array = (report.get("spawned", []) as Array).duplicate()
+	ranked.sort_custom(func(a, b): return (a["position"] as Vector3).distance_to(center) > (b["position"] as Vector3).distance_to(center))
+	var hostile_ids: Dictionary = {}
+	for i in range(mini(clampi(wanted / 3, 1, 3), ranked.size())):
+		hostile_ids[str((ranked[i] as Dictionary)["id"])] = true
+	var pool: Array = candidates.slice(0, 60)
 	for entry in report.get("spawned", []):
 		var def: Dictionary = defs[int(entry.get("index", 0))]
-		var role: String = str(def["role"])
+		var role: String = "hostile" if hostile_ids.has(str(entry["id"])) else "civilian"
+		def["role"] = role
+		def["faction"] = faction_by_role[role]
+		def["weapon"] = weapons[role]
 		var npc_id: String = str(entry["id"])
 		var point: Vector3 = entry["position"]
 		factions.call("set_member", npc_id, str(def["faction"]))
@@ -475,12 +909,13 @@ func _spawn_living_npcs(center: Vector3, meta: Dictionary) -> void:
 			"platform": platform, "target": actor, "target_id": "player",
 			"navigation": navigation, "observer": self, "fx_parent": self,
 			"bounds": bounds, "nav_cell_size": NAV_CELL_SIZE, "lod": npc_lod,
-			"factions": factions, "patrol_points": selected,
-			"attack_points": selected, "cover_points": selected,
-			"tick_rate": 12.0, "vision_range": 18.0 if role != "zombie" else 14.0,
-			"patrol_speed": 2.0 if role != "zombie" else 3.2,
-			"run_speed": 5.5 if role != "zombie" else 6.4,
-			"drop_weapon_on_death": role != "zombie",
+			"factions": factions, "patrol_points": pool,
+			"attack_points": pool, "cover_points": pool,
+			"tick_rate": 12.0, "vision_range": 18.0,
+			"patrol_speed": 1.1 if role == "hostile" else 1.4,
+			"run_speed": 3.6 if role == "hostile" else 5.5,
+			"realistic": true, "avoid_center": center, "avoid_radius": SAFE_RADIUS,
+			"drop_weapon_on_death": role == "hostile",
 		}
 		var npc: Node3D = ArmedNpc.spawn(_npcs_root, point, options) as Node3D
 		if npc == null:
@@ -508,6 +943,36 @@ func _first_rejection(report: Dictionary) -> String:
 	if first is Dictionary:
 		return str((first as Dictionary).get("reason", ""))
 	return str(first)
+
+
+# Celdas libres de la mayor zona conectada: los NPC solo nacen donde pueden andar.
+func _largest_nav_component() -> Dictionary:
+	var best: Dictionary = {}
+	var seen: Dictionary = {}
+	var width: int = int(navigation.get("width"))
+	var height: int = int(navigation.get("height"))
+	for y in range(height):
+		for x in range(width):
+			var start := Vector2i(x, y)
+			if seen.has(start) or bool(navigation.call("is_blocked", start)):
+				continue
+			var area: Dictionary = {start: true}
+			var queue: Array = [start]
+			seen[start] = true
+			while not queue.is_empty():
+				var cell: Vector2i = queue.pop_back()
+				for step in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					var next: Vector2i = cell + step
+					if next.x < 0 or next.y < 0 or next.x >= width or next.y >= height:
+						continue
+					if seen.has(next) or bool(navigation.call("is_blocked", next)):
+						continue
+					seen[next] = true
+					area[next] = true
+					queue.append(next)
+			if area.size() > best.size():
+				best = area
+	return best
 
 
 func _free_navigation_points(center: Vector3) -> Array:
@@ -565,6 +1030,7 @@ func _connect_player_signals() -> void:
 		return
 	_connect_once(actor, "fired", Callable(self, "_on_player_fired"))
 	_connect_once(actor, "weapon_changed", Callable(self, "_on_player_weapon_changed"))
+	_connect_once(actor, "interact_pressed", Callable(self, "_on_player_interact"))
 
 
 func _on_player_fired(result: Dictionary) -> void:
@@ -632,7 +1098,8 @@ func _wire_existing_npcs() -> void:
 		if _model_for(npc) == null:
 			var role: String = str(npc.get("role"))
 			_attach_character_model(npc, _skin_for_role(role), key)
-		if npc.has_method("apply_options"):
+		if npc.has_method("apply_options") and not npc.has_meta("gw_wired"):
+			npc.set_meta("gw_wired", true)
 			npc.call("apply_options", {
 				"navigation": navigation,
 				"observer": self,
@@ -791,7 +1258,7 @@ func _sync_locomotion() -> void:
 		var speed: float = Vector2(npc.velocity.x, npc.velocity.z).length()
 		var anim: String = "run" if speed > 4.0 else ("walk" if speed > 0.4 else "idle")
 		var key: int = npc.get_instance_id()
-		if str(_locomotion.get(key, "")) != anim:
+		if str(_locomotion.get(key, "")) != anim or str(model.call("current_animation")).is_empty():
 			_locomotion[key] = anim
 			model.call("play", anim, true)
 
@@ -839,6 +1306,33 @@ func _setup_hotbar() -> void:
 		if not ids.is_empty():
 			hotbar.call("select", 0)
 
+
+func _setup_debug_panel() -> void:
+	if debug_panel != null and is_instance_valid(debug_panel):
+		return
+	debug_panel = VrDebugPanelScript.new()
+	debug_panel.name = "DebugPanel"
+	add_child(debug_panel)
+	if debug_panel.has_method("ready"):
+		debug_panel.call("ready")
+
+func _process_debug_panel_vr(delta: float) -> void:
+	if not vr_active or debug_panel == null or not is_instance_valid(debug_panel):
+		return
+	if not debug_panel.is_open:
+		return
+	if actor == null or not actor.has_method("get_pose"):
+		return
+	var left_pose: Variant = actor.call("get_pose", "left")
+	var right_pose: Variant = actor.call("get_pose", "right")
+	if not (left_pose is Transform3D) or not (right_pose is Transform3D):
+		return
+	var trigger_pressed: bool = false
+	if actor.has_method("is_trigger_pressed"):
+		trigger_pressed = bool(actor.call("is_trigger_pressed", "right"))
+	elif actor.has_method("_trigger_axis"):
+		trigger_pressed = float(actor.call("_trigger_axis", "right")) > 0.5
+	debug_panel.try_press(right_pose.origin, -right_pose.basis.z, trigger_pressed)
 
 func _setup_pause_menu() -> void:
 	if not ResourceLoader.exists(PAUSE_MENU_SCRIPT):

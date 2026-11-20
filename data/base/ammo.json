@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "mod": "untitled.base",
+  "content": [
+    {"type": "ammo", "id": "untitled.base:pistol_ammo", "name": "Munición 9x19mm", "weapon": "untitled.base:pistol", "caliber": "9x19mm", "magazine": 12, "damage": 24.0, "uses_ammo": true, "tags": ["pistol", "sidearm"]},
+    {"type": "ammo", "id": "untitled.base:smg_ammo", "name": "Munición 9x19mm SMG", "weapon": "untitled.base:submachine_gun", "caliber": "9x19mm", "magazine": 30, "damage": 16.0, "uses_ammo": true, "tags": ["smg"]},
+    {"type": "ammo", "id": "untitled.base:rifle_ammo", "name": "Munición 5.56x45mm", "weapon": "untitled.base:assault_rifle", "caliber": "5.56x45mm", "magazine": 30, "damage": 28.0, "uses_ammo": true, "tags": ["rifle"]},
+    {"type": "ammo", "id": "untitled.base:shotgun_ammo", "name": "Munición 12/70", "weapon": "untitled.base:shotgun", "caliber": "12/70", "magazine": 6, "damage": 12.0, "uses_ammo": true, "tags": ["shotgun", "pellets"]},
+    {"type": "ammo", "id": "untitled.base:sniper_ammo", "name": "Munición 7.62x51mm", "weapon": "untitled.base:sniper_rifle", "caliber": "7.62x51mm", "magazine": 5, "damage": 95.0, "uses_ammo": true, "tags": ["sniper"]},
+    {"type": "ammo", "id": "untitled.base:bat_ammo", "name": "Sin munición (cuerpo a cuerpo)", "weapon": "untitled.base:bat", "caliber": "none", "magazine": 0, "damage": 35.0, "uses_ammo": false, "tags": ["melee"]}
+  ]
+}

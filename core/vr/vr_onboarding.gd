@@ -20,6 +20,7 @@ const TUTORIAL_LINES: Array = [
 	"4. MOVERTE: stick izquierdo camina, stick derecho gira",
 	"5. MUÑECA IZQUIERDA: mírala para ver el inventario o recalibrar",
 ]
+const TUTORIAL_AUTO_CLOSE := 8.0
 const WRIST_MAX_DISTANCE := 0.65
 const WRIST_MAX_ANGLE := 0.75
 const TRIGGER_ON := 0.6
@@ -45,6 +46,7 @@ var tutorial_open: bool = false
 var weapon_rows: Array = []
 var _trigger_was: Dictionary = {"left": false, "right": false}
 var _tutorial_placed: bool = false
+var _tutorial_age: float = 0.0
 
 
 func configure(p_holsters, p_weapon_system: Node, weapon_ids: Array, p_dominant: String = "right") -> void:
@@ -235,6 +237,7 @@ func _build_tutorial() -> void:
 
 func show_tutorial() -> void:
 	tutorial_open = true
+	_tutorial_age = 0.0
 	_tutorial_placed = false
 	tutorial_panel.visible = true
 
@@ -277,6 +280,9 @@ func tick(_delta: float, head: Transform3D, poses: Dictionary, triggers: Diction
 		var pressed: bool = float(triggers.get("right", 0.0)) > TRIGGER_ON and not bool(_trigger_was["right"])
 		wrist_menu.try_press(right_pose.origin, -right_pose.basis.z, pressed)
 	if tutorial_open:
+		_tutorial_age += maxf(_delta, 0.0)
+		if _tutorial_age >= TUTORIAL_AUTO_CLOSE:
+			close_tutorial()
 		if not _tutorial_placed:
 			var forward := -head.basis.z
 			forward.y = 0.0

@@ -1,0 +1,15 @@
+{
+  "content": [
+    {
+      "type": "ammo",
+      "id": "untitled.example-weapon:rust_pistol_ammo",
+      "name": "Munición 9x19mm (oxidada)",
+      "weapon": "untitled.example-weapon:rust_pistol",
+      "caliber": "9x19mm",
+      "magazine": 10,
+      "damage": 22.0,
+      "uses_ammo": true,
+      "tags": ["pistol", "example"]
+    }
+  ]
+}

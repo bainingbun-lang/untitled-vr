@@ -35,7 +35,26 @@ const ANIM_CANDIDATES: Dictionary = {
 	"shoot": ["Gun_Shoot", "Idle_Gun_Shoot", "Shoot", "shoot", "Fire", "Punch_Right", "Punch", "punch"],
 	"hit": ["HitRecieve", "HitReact", "Hit", "hit", "HitRecieve_2", "Punch_Left", "Punch", "punch"],
 	"die": ["Death", "death", "Die", "die", "Death_1"],
+	"crouch": ["Idle", "idle", "Idle_Neutral", "Idle_Gun", "Walk", "walk"],
+	"cover": ["Idle_Gun_Pointing", "Idle_Gun", "Idle", "idle", "Idle_Gun_Shoot"],
+	"reload": ["Idle_Gun", "Interact", "Idle", "idle", "Idle_Gun_Shoot"],
+	"melee": ["Punch_Right", "Punch", "punch", "Kick_Right", "Gun_Shoot"],
+	"hit_head": ["HitRecieve_2", "HitReact", "HitRecieve", "Hit", "hit", "Punch_Left", "Punch", "punch"],
+	"hit_limb": ["HitRecieve_2", "HitReact", "HitRecieve", "Hit", "hit", "Punch_Left", "Punch", "punch"],
+	"zombie_idle": ["Idle", "Idle_Attack", "idle", "Walk", "walk"],
+	"zombie_walk": ["Walk", "Run_Arms", "walk", "Run", "run"],
+	"zombie_run": ["Run_Arms", "Run", "Run_Attack", "run", "Walk"],
+	"zombie_attack": ["Punch", "Idle_Attack", "Run_Attack", "punch", "Gun_Shoot"],
 }
+
+const ANIM_BLEND: float = 0.16
+const HIT_BLEND: float = 0.07
+const SHOOT_BLEND: float = 0.05
+const LOOK_YAW_LIMIT_DEG: float = 70.0
+const LOOK_PITCH_LIMIT_DEG: float = 35.0
+const TORSO_YAW_LIMIT_DEG: float = 28.0
+const FOOTSTEP_STRIDE: float = 0.85
+const RECORDED_SFX_PATH: String = "res://core/game/recorded_sfx.gd"
 
 const BONE_ALIASES: Dictionary = {
 	"head": ["Head"],
@@ -85,6 +104,11 @@ static var _logged_skins: Dictionary = {}
 static var _v2_manifest: Dictionary = {}
 static var _v2_manifest_loaded: bool = false
 
+signal footstep(side: String)
+signal animation_changed(logical: String, real: String)
+signal hit_reacted(zone: String, point: Vector3)
+signal died(logical: String)
+
 var skin_id: String = ""
 var model_root: Node3D = null
 var skeleton: Skeleton3D = null
@@ -101,6 +125,35 @@ var _limbs: Array = []
 var _ragdolled: bool = false
 var _variation_scale: float = 1.0
 var _variation_tint: Color = Color.WHITE
+
+var auto_drive: bool = true
+var look_enabled: bool = false
+var look_target: Vector3 = Vector3.ZERO
+var aim_enabled: bool = false
+var aim_target: Vector3 = Vector3.ZERO
+
+var _state: String = "idle"
+var _speed_scale: float = 1.0
+var _step_phase: float = 0.0
+var _step_side: int = 0
+var _recoil: float = 0.0
+var _stagger: float = 0.0
+var _crouch: float = 0.0
+var _zombie: bool = false
+var _hit_lock: float = 0.0
+var _shoot_lock: float = 0.0
+var _death_pending: float = -1.0
+var _look_yaw: float = 0.0
+var _look_pitch: float = 0.0
+var _aim_yaw: float = 0.0
+var _head_bone: int = -1
+var _torso_bone: int = -1
+var _hips_bone: int = -1
+var _head_offset: Quaternion = Quaternion.IDENTITY
+var _torso_offset: Quaternion = Quaternion.IDENTITY
+var _hip_offset: Vector3 = Vector3.ZERO
+var _has_prev_pose: bool = false
+var _host_connected: int = 0
 
 
 static func skin_ids() -> Array:
@@ -225,6 +278,75 @@ func _ready() -> void:
 		return
 	if model_root == null:
 		load_model(skin_id)
+	_zombie = str(skin_id).to_lower().contains("zombie") or str(skin_id) == "enemy"
+	_connect_host_signals()
+
+
+func _connect_host_signals() -> void:
+	if _host_connected != 0:
+		return
+	var host := get_parent()
+	if host == null or host == get_tree().root:
+		return
+	_host_connected = 1
+	if host.has_signal("fired") and not host.is_connected("fired", Callable(self, "_on_host_fired")):
+		host.connect("fired", Callable(self, "_on_host_fired"))
+	if host.has_signal("damaged") and not host.is_connected("damaged", Callable(self, "_on_host_damaged")):
+		host.connect("damaged", Callable(self, "_on_host_damaged"))
+	var damageable: Variant = host.get("damageable")
+	if damageable is Node and (damageable as Node).has_signal("damaged"):
+		var node := damageable as Node
+		if not node.is_connected("damaged", Callable(self, "_on_host_damaged")):
+			node.connect("damaged", Callable(self, "_on_host_damaged"))
+
+
+func _on_host_fired(_result: Dictionary) -> void:
+	react_shoot()
+
+
+func _on_host_damaged(amount: float, point: Vector3, normal: Vector3) -> void:
+	var zone := "torso"
+	if point.length_squared() > 0.0001:
+		var relative := point - global_position
+		if relative.y > _height * 0.72:
+			zone = "head"
+		elif absf(relative.x) > _height * 0.16:
+			zone = "limb"
+	react_hit(zone, point, normal, amount)
+
+
+func _process(delta: float) -> void:
+	if _death_pending > 0.0:
+		_death_pending -= delta
+	if not auto_drive or _ragdolled or not is_loaded():
+		return
+	var host := get_parent()
+	if host == null or host == get_tree().root:
+		return
+	var speed := 0.0
+	var velocity_value: Variant = host.get("velocity")
+	if velocity_value is Vector3:
+		speed = (velocity_value as Vector3).length()
+	elif host.get("_moving") == true:
+		speed = maxf(speed, 2.4)
+	var action := ""
+	if host.has_method("current_action"):
+		action = str(host.call("current_action"))
+	var aiming: bool = action == "attack" or action == "aim" or host.get("has_explicit_aim") == true
+	var crouching: bool = action == "cover" or host.get("crouching") == true
+	if action == "reload" and _state != "reload" and _hit_lock <= 0.0:
+		_switch("reload", ANIM_BLEND)
+	if action == "melee" and _state != "melee" and _hit_lock <= 0.0:
+		_switch("melee", SHOOT_BLEND)
+	update_animation(delta, speed, aiming, crouching, action == "cover")
+	var aim_value: Variant = host.get("aim_point")
+	var target_value: Variant = host.get("target")
+	if aim_value is Vector3 and (host.get("has_explicit_aim") == true or action == "attack"):
+		set_look_target(aim_value as Vector3)
+	elif target_value is Node3D and is_instance_valid(target_value as Node3D):
+		set_look_target((target_value as Node3D).global_position)
+	else:
+		clear_look_target()
 
 
 func load_model(id: String, seed: int = -1) -> bool:
@@ -332,16 +454,11 @@ func current_animation() -> String:
 	return _current_anim
 
 
-func play(anim_name: String, loop: bool = true) -> bool:
+func play(anim_name: String, _loop: bool = true) -> bool:
 	if animation_player == null or _ragdolled:
 		return false
-	var target := str(_anim_map.get(anim_name, anim_name))
-	if target.is_empty() or not animation_player.has_animation(StringName(target)):
+	if not _switch(anim_name, ANIM_BLEND):
 		return false
-	if animation_player.has_method("set_animation_loop"):
-		animation_player.call("set_animation_loop", StringName(target), loop)
-	animation_player.play(StringName(target))
-	_current_anim = anim_name
 	return true
 
 
@@ -349,6 +466,266 @@ func stop() -> void:
 	if animation_player != null:
 		animation_player.stop()
 	_current_anim = ""
+	_state = ""
+
+
+func animation_for(logical: String) -> String:
+	return str(_anim_map.get(logical, logical))
+
+
+func state() -> String:
+	return _state
+
+
+func blend_value() -> float:
+	return clampf(_speed_scale, 0.0, 2.0)
+
+
+func set_zombie(enabled: bool) -> void:
+	_zombie = enabled
+
+
+func is_zombie() -> bool:
+	return _zombie
+
+
+func set_look_target(point: Vector3) -> void:
+	look_enabled = true
+	look_target = point
+
+
+func clear_look_target() -> void:
+	look_enabled = false
+
+
+func set_aim_target(point: Vector3) -> void:
+	aim_enabled = true
+	aim_target = point
+
+
+func clear_aim_target() -> void:
+	aim_enabled = false
+
+
+func look_yaw() -> float:
+	return rad_to_deg(_look_yaw)
+
+
+func look_pitch() -> float:
+	return rad_to_deg(_look_pitch)
+
+
+func aim_yaw() -> float:
+	return rad_to_deg(_aim_yaw)
+
+
+func update_animation(delta: float, speed: float, p_aiming: bool = false, p_crouching: bool = false, p_covering: bool = false) -> void:
+	if not is_loaded() or _ragdolled:
+		return
+	var speed01 := clampf(absf(speed) / 4.2, 0.0, 1.0)
+	var moving: bool = absf(speed) > 0.18
+	var desired := "idle"
+	if moving:
+		desired = "run" if speed01 > 0.62 else "walk"
+	if _zombie:
+		if moving:
+			desired = "zombie_run" if speed01 > 0.55 else "zombie_walk"
+		else:
+			desired = "zombie_idle"
+	if p_aiming and not _zombie:
+		desired = "aim"
+	if p_crouching and not moving:
+		desired = "crouch"
+	if p_covering:
+		desired = "cover"
+	if _hit_lock > 0.0:
+		_hit_lock = maxf(0.0, _hit_lock - delta)
+		desired = _state if not _state.is_empty() else "hit"
+	elif _shoot_lock > 0.0:
+		_shoot_lock = maxf(0.0, _shoot_lock - delta)
+		desired = _state if not _state.is_empty() else "shoot"
+	var target_scale := 1.0
+	if moving and not _hit_lock > 0.0 and not _shoot_lock > 0.0:
+		target_scale = 0.78 + speed01 * 0.52
+	_speed_scale = lerpf(_speed_scale, target_scale, clampf(delta * 10.0, 0.0, 1.0))
+	if animation_player != null:
+		animation_player.speed_scale = _speed_scale
+	if desired != _state:
+		_switch(desired, ANIM_BLEND)
+	_crouch = lerpf(_crouch, 1.0 if (p_crouching or p_covering) else 0.0, clampf(delta * 9.0, 0.0, 1.0))
+	if moving:
+		var cadence := 1.0 if desired == "walk" else 1.65
+		if _zombie:
+			cadence = 0.8
+		_step_phase += delta * cadence * maxf(speed01, 0.25) / maxf(FOOTSTEP_STRIDE, 0.1)
+		if _step_phase >= 1.0:
+			_step_phase = fmod(_step_phase, 1.0)
+			_step_side = 1 - _step_side
+			_emit_footstep("left" if _step_side == 0 else "right")
+	_apply_pose_overlays(delta)
+
+
+func react_shoot() -> void:
+	if _ragdolled:
+		return
+	if _hit_lock > 0.0:
+		return
+	_switch("shoot", SHOOT_BLEND)
+	_shoot_lock = minf(_anim_length("shoot") * 0.8, 0.3)
+	_recoil = 1.0
+
+
+func react_hit(zone: String, point: Vector3 = Vector3.ZERO, normal: Vector3 = Vector3.FORWARD, amount: float = 25.0) -> void:
+	if _ragdolled:
+		return
+	var z := zone.to_lower()
+	var anim := "hit"
+	if z.contains("head") or z.contains("cabeza"):
+		anim = "hit_head"
+		_stagger = 0.95
+	elif z.contains("arm") or z.contains("hand") or z.contains("limb") or z.contains("brazo"):
+		anim = "hit_limb"
+		_stagger = 0.45
+	else:
+		_stagger = 0.6
+	if not _switch(anim, HIT_BLEND):
+		_switch("hit", HIT_BLEND)
+	_hit_lock = minf(_anim_length(anim) * 0.85, 0.45)
+	apply_wound(z if not z.is_empty() else "torso", normal, clampf(0.06 + amount * 0.0025, 0.06, 0.28))
+	var world_point := point if point.length_squared() > 0.0001 else global_position + Vector3.UP * (_height * 0.6)
+	hit_reacted.emit(z, world_point)
+
+
+func play_die(zone: String = "", point: Vector3 = Vector3.ZERO) -> bool:
+	if _ragdolled:
+		return false
+	var ok := _switch("die", 0.09)
+	_death_pending = _anim_length("die")
+	_stagger = 0.0
+	_recoil = 0.0
+	died.emit(zone)
+	return ok
+
+
+# AnimationPlayer no tiene set_animation_loop: sin esto idle/walk suenan una vez y quedan congelados.
+func _set_loop(real: String, loop: bool) -> void:
+	if animation_player == null or real.is_empty() or not animation_player.has_animation(StringName(real)):
+		return
+	animation_player.get_animation(StringName(real)).loop_mode = Animation.LOOP_LINEAR if loop else Animation.LOOP_NONE
+
+
+func _switch(logical: String, blend: float) -> bool:
+	if animation_player == null or _ragdolled:
+		return false
+	var real := animation_for(logical)
+	if real.is_empty() or not animation_player.has_animation(StringName(real)):
+		return false
+	if real == animation_for(_current_anim) and _state == logical:
+		return true
+	_set_loop(real, logical != "shoot" and logical != "hit" and logical != "die" and logical != "melee")
+	animation_player.play(StringName(real), clampf(blend, 0.0, 0.5), 1.0, false)
+	_state = logical
+	_current_anim = logical
+	animation_changed.emit(logical, real)
+	return true
+
+
+func _anim_length(logical: String) -> float:
+	if animation_player == null:
+		return 0.25
+	var real := animation_for(logical)
+	if real.is_empty() or not animation_player.has_animation(StringName(real)):
+		return 0.25
+	var anim := animation_player.get_animation(StringName(real))
+	if anim == null:
+		return 0.25
+	return maxf(anim.length, 0.05)
+
+
+func _emit_footstep(side: String) -> void:
+	footstep.emit(side)
+	if not ResourceLoader.exists(RECORDED_SFX_PATH):
+		return
+	var script := load(RECORDED_SFX_PATH) as Script
+	if script == null or not script.has_method("play_bank"):
+		return
+	var bank := "step_concrete"
+	var material_value: Variant = get_parent().get("floor_material") if get_parent() != null else null
+	if typeof(material_value) == TYPE_STRING:
+		var name := String(material_value).to_lower()
+		if name.contains("metal"):
+			bank = "step_metal"
+		elif name.contains("wood"):
+			bank = "step_wood"
+		elif name.contains("dirt") or name.contains("sand"):
+			bank = "step_dirt"
+		elif name.contains("grass"):
+			bank = "step_grass"
+		elif name.contains("water"):
+			bank = "step_water"
+	script.call("play_bank", bank, self, global_position, null, "", {"volume_db": -12.0, "max_distance": 14.0})
+
+
+func _apply_pose_overlays(delta: float) -> void:
+	if skeleton == null:
+		return
+	if _head_bone < 0:
+		_head_bone = _find_bone("head")
+	if _torso_bone < 0:
+		_torso_bone = _find_bone("chest")
+		if _torso_bone < 0:
+			_torso_bone = _find_bone("torso")
+	if _hips_bone < 0:
+		_hips_bone = _find_bone("hips")
+
+	_recoil = maxf(0.0, _recoil - delta * 5.5)
+	_stagger = maxf(0.0, _stagger - delta * 3.0)
+
+	var wanted_yaw := 0.0
+	var wanted_pitch := 0.0
+	if look_enabled and _head_bone >= 0:
+		var origin := skeleton.to_global(skeleton.get_bone_global_pose(_head_bone).origin)
+		var to_target := look_target - origin
+		if to_target.length_squared() > 0.0001:
+			var forward := -global_transform.basis.z.normalized()
+			var flat_to := Vector3(to_target.x, 0.0, to_target.z)
+			var flat_forward := Vector3(forward.x, 0.0, forward.z)
+			if flat_to.length_squared() > 0.0001 and flat_forward.length_squared() > 0.0001:
+				wanted_yaw = atan2(flat_forward.cross(flat_to).y, flat_forward.dot(flat_to))
+			wanted_pitch = asin(clampf(to_target.normalized().y, -1.0, 1.0))
+	var yaw_limit := deg_to_rad(LOOK_YAW_LIMIT_DEG)
+	var pitch_limit := deg_to_rad(LOOK_PITCH_LIMIT_DEG)
+	wanted_yaw = clampf(wanted_yaw, -yaw_limit, yaw_limit)
+	wanted_pitch = clampf(wanted_pitch, -pitch_limit, pitch_limit)
+	_look_yaw = lerpf(_look_yaw, wanted_yaw, clampf(delta * 9.0, 0.0, 1.0))
+	_look_pitch = lerpf(_look_pitch, wanted_pitch, clampf(delta * 9.0, 0.0, 1.0))
+	var wanted_aim_yaw := clampf(_look_yaw * 0.42, -deg_to_rad(TORSO_YAW_LIMIT_DEG), deg_to_rad(TORSO_YAW_LIMIT_DEG))
+	_aim_yaw = lerpf(_aim_yaw, wanted_aim_yaw, clampf(delta * 7.0, 0.0, 1.0))
+
+	var recoil_pitch := -_recoil * 0.09
+	var stagger_pitch := _stagger * 0.10
+	var wanted_head_offset: Quaternion = Quaternion(Vector3.UP, _look_yaw) * Quaternion(Vector3.RIGHT, _look_pitch + recoil_pitch * 0.5 + stagger_pitch * 0.6)
+	var wanted_torso_offset: Quaternion = Quaternion(Vector3.UP, _aim_yaw) * Quaternion(Vector3.RIGHT, recoil_pitch + stagger_pitch)
+	var wanted_hip_offset := Vector3(0.0, -0.30 * _crouch, 0.0)
+
+	var base_head: Quaternion = skeleton.get_bone_pose_rotation(_head_bone) if _head_bone >= 0 else Quaternion.IDENTITY
+	var base_torso: Quaternion = skeleton.get_bone_pose_rotation(_torso_bone) if _torso_bone >= 0 else Quaternion.IDENTITY
+	var base_hip: Vector3 = skeleton.get_bone_pose_position(_hips_bone) if _hips_bone >= 0 else Vector3.ZERO
+	if _has_prev_pose:
+		base_head = base_head * _head_offset.inverse()
+		base_torso = base_torso * _torso_offset.inverse()
+		base_hip -= _hip_offset
+
+	_head_offset = wanted_head_offset
+	_torso_offset = wanted_torso_offset
+	_hip_offset = wanted_hip_offset
+	if _head_bone >= 0:
+		skeleton.set_bone_pose_rotation(_head_bone, (base_head * _head_offset).normalized())
+	if _torso_bone >= 0:
+		skeleton.set_bone_pose_rotation(_torso_bone, (base_torso * _torso_offset).normalized())
+	if _hips_bone >= 0:
+		skeleton.set_bone_pose_position(_hips_bone, base_hip + _hip_offset)
+	_has_prev_pose = true
 
 
 func make_ragdoll(impulse: Vector3, hit_point: Vector3) -> Node3D:
@@ -544,8 +921,8 @@ func _xform_aabb(xform: Transform3D, box: AABB) -> AABB:
 
 func _map_animations() -> void:
 	_anim_map.clear()
-	for logical in LOGICAL_ANIMS:
-		_anim_map[logical] = _resolve_animation(String(logical))
+	for logical in ANIM_CANDIDATES.keys():
+		_anim_map[String(logical)] = _resolve_animation(String(logical))
 
 
 func _map_animations_v2(entry: Dictionary) -> void:
@@ -558,11 +935,11 @@ func _map_animations_v2(entry: Dictionary) -> void:
 	var mapping = entry.get("anim_map", {})
 	if typeof(mapping) != TYPE_DICTIONARY:
 		mapping = {}
-	for logical in LOGICAL_ANIMS:
+	for logical in ANIM_CANDIDATES.keys():
 		var real := str((mapping as Dictionary).get(logical, ""))
 		if real.is_empty() or not available.has(real):
 			real = _resolve_animation(String(logical))
-		_anim_map[logical] = real
+		_anim_map[String(logical)] = real
 
 
 func _apply_variation(scale: float, tint: Color) -> void:

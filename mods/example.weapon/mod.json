@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "id": "untitled.example-weapon",
+  "version": "1.0.0",
+  "engine": "4.7",
+  "platforms": ["pc", "android", "vr"],
+  "permissions": [],
+  "priority": 100,
+  "description": "Mod de ejemplo data-driven: anade una pistola con modelo real CC0."
+}

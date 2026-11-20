@@ -30,6 +30,9 @@ func _initialize() -> void:
 	AudioSynthScript.set_seed(12345)
 	await process_frame
 	await process_frame
+	_case = "audio real por defecto"
+	_expect(not _voice.subtitles_enabled, "subtitulos desactivados por defecto")
+	_expect(not _voice.tts_enabled, "TTS desactivado por defecto")
 
 	_case = "streams PCM generados por codigo"
 	for weapon in WEAPONS:
@@ -74,20 +77,21 @@ func _initialize() -> void:
 	AudioSynthScript.clear_cache()
 	AudioSynthScript.set_seed(12345)
 
-	_case = "voces sintetizadas y variacion por NPC"
+	_case = "voces grabadas y variacion por NPC"
 	_voice.register_npc("alpha", {"pitch": 0.82, "gender": 0.1, "age": 0.8, "mood": 0.25, "timbre": 0.9})
 	_voice.register_npc("beta", {"pitch": 1.32, "gender": 0.9, "age": 0.15, "mood": 0.85, "timbre": 1.3})
 	_voice.register_npc("gamma", {"pitch": 1.05, "gender": 0.5, "age": 0.5, "mood": 0.5})
-	var alpha_fear: AudioStreamWAV = _voice.voice_stream("alpha", "fear")
-	var beta_fear: AudioStreamWAV = _voice.voice_stream("beta", "fear")
-	var gamma_fear: AudioStreamWAV = _voice.voice_stream("gamma", "fear")
-	_check_stream(alpha_fear, "grito de miedo alpha")
-	_check_stream(beta_fear, "grito de miedo beta")
-	_expect(not _bytes_equal(alpha_fear.data, beta_fear.data), "voces distintas entre NPC")
-	_expect(not _bytes_equal(beta_fear.data, gamma_fear.data), "voces distintas entre beta y gamma")
-	_expect(_bytes_equal(alpha_fear.data, _voice.voice_stream("alpha", "fear").data), "voz determinista por NPC y cue")
+	var alpha_fear: AudioStream = _voice.voice_stream("alpha", "fear")
+	var beta_fear: AudioStream = _voice.voice_stream("beta", "fear")
+	var gamma_fear: AudioStream = _voice.voice_stream("gamma", "fear")
+	_check_real_stream(alpha_fear, "grito de miedo alpha")
+	_check_real_stream(beta_fear, "grito de miedo beta")
+	_expect(alpha_fear is AudioStreamOggVorbis, "voz grabada en OGG")
+	_expect(alpha_fear != beta_fear or beta_fear != gamma_fear, "bancos distintos por genero")
+	_expect(_voice.voice_variant_count("fear", _voice.profile_for("beta")) >= 3, "varias muestras de miedo")
+	_expect(_voice.voice_stream("alpha", "fear") == alpha_fear, "voz cacheada por NPC y cue")
 	for cue in NONVERBAL_CUES:
-		_check_stream(_voice.voice_stream("alpha", cue), "voz %s" % cue)
+		_check_real_stream(_voice.voice_stream("alpha", cue), "voz %s" % cue)
 	_expect(_voice.cached_voice_count() > 0, "voces cacheadas")
 	_expect(_voice.voice_cache_bytes() <= VoiceSystemScript.VOICE_CACHE_LIMIT_BYTES, "tope de memoria de voces")
 
@@ -111,6 +115,7 @@ func _initialize() -> void:
 	_voice.register_npc("beta", {"pitch": 1.32, "gender": 0.9})
 
 	_case = "cooldown y subtitulos"
+	_voice.set_subtitles_enabled(true)
 	_voice.set_cooldown(0.6)
 	_subtitles.clear()
 	_expect(_voice.play_cue("alpha", "pain"), "primera voz permitida")
@@ -145,14 +150,28 @@ func _initialize() -> void:
 	_expect(not VoiceSystemScript.tts_available(), "sin voces TTS el sistema lo detecta")
 	_expect(_voice.speak_phrase("alpha", "help"), "frase hablada sin TTS no rompe")
 	_expect_eq(_voice.last_subtitle(), "¡Ayuda!", "subtitulo de ayuda siempre presente")
-	_expect(_subtitles.size() == 1 and str((_subtitles[0] as Dictionary).get("npc", "")) == "alpha", "subtitulo identifica al NPC")
+	_expect(_subtitles.size() == 1 and str((_subtitles[0] as Dictionary).get("npc", "")) == "NPC", "subtitulo usa nombre visible generico")
+	_voice.register_npc("dummy_5", {"relation": -0.5})
+	_voice.set_cooldown(0.0)
+	_expect(_voice.play_cue("dummy_5", "pain"), "NPC con nombre interno puede hablar")
+	var last_entry: Dictionary = _subtitles[_subtitles.size() - 1]
+	_expect(not str(last_entry.get("npc", "")).contains("dummy") and not str(last_entry.get("npc", "")).contains("5"), "nombre interno nunca se muestra")
+	_voice.set_cooldown(0.6)
 	_expect_eq(VoiceSystemScript.tts_calls.size(), 0, "sin voces no se llama a TTS")
+	_voice.set_subtitles_enabled(false)
+	_voice.set_tts_enabled(false)
 	VoiceSystemScript.tts_voices_override = ["voz_prueba"]
 	VoiceSystemScript.tts_speak_hook = Callable(self, "_record_tts")
 	_tts_record.clear()
 	_voice.advance(1.0)
 	_expect(VoiceSystemScript.tts_available(), "override de TTS disponible para la prueba")
-	_expect(_voice.speak_phrase("beta", "cover"), "frase con TTS disponible")
+	_expect(_voice.speak_phrase("beta", "cover"), "frase con TTS disponible usa muestra real")
+	_expect_eq(VoiceSystemScript.tts_calls.size(), 0, "TTS desactivado aunque existan voces")
+	_voice.set_subtitles_enabled(true)
+	_voice.set_tts_enabled(true)
+	VoiceSystemScript.tts_prefer = true
+	_voice.advance(1.0)
+	_expect(_voice.speak_phrase("beta", "cover"), "frase con TTS activado")
 	_expect_eq(VoiceSystemScript.tts_calls.size(), 1, "una llamada TTS")
 	_expect(_tts_record.size() >= 1 and str(_tts_record[0]) == "¡Cúbrete!", "TTS recibe el texto de la frase")
 	_expect_eq(_voice.last_subtitle(), "¡Cúbrete!", "subtitulo tambien con TTS")
@@ -194,6 +213,7 @@ func _initialize() -> void:
 	_voice.reset()
 	VoiceSystemScript.reset_tts_test_hooks()
 	AudioSynthScript.clear_cache()
+	RecordedSfx.clear_cache()
 	_planar_free(planar)
 	_planar_free(positional)
 	SfxBankScript.reset()
@@ -227,6 +247,13 @@ func _check_stream(audio, label: String) -> void:
 	_expect(wave.get_length() > 0.0 and wave.get_length() <= AudioSynthScript.MAX_SECONDS, "%s duracion acotada" % label)
 	_expect(absf(float(wave.data.size() / 2) - wave.get_length() * float(AudioSynthScript.RATE)) <= 1.0, "%s muestras coherentes" % label)
 	_expect(_peak(_samples(wave)) > 0.05, "%s no es silencio" % label)
+
+
+func _check_real_stream(audio: AudioStream, label: String) -> void:
+	_expect(audio != null, "%s disponible" % label)
+	if audio == null:
+		return
+	_expect(audio.get_length() > 0.05 and audio.get_length() <= 8.0, "%s duracion razonable" % label)
 
 
 func _samples(wave: AudioStreamWAV) -> PackedFloat32Array:

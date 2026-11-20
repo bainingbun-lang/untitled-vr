@@ -3,6 +3,7 @@ extends Node3D
 
 const MuzzleFxScript = preload("res://core/game/muzzle_fx.gd")
 const WeaponPartsScript = preload("res://core/game/weapon_parts.gd")
+const HandsViewmodelScript = preload("res://core/game/hands_viewmodel.gd")
 
 const MODEL_DIR := "res://assets/models/weapons/"
 
@@ -88,6 +89,7 @@ var _motion: Node3D = null
 var _rig: Node3D = null
 var _model_holder: Node3D = null
 var _fx: MuzzleFx = null
+var _hands: Node3D = null
 var _current_id: String = ""
 var _base_pos: Vector3 = Vector3.ZERO
 var _in_vr_hand: bool = false
@@ -153,6 +155,9 @@ func _ensure_setup() -> void:
 	_fx = MuzzleFxScript.new()
 	_fx.name = "MuzzleFx"
 	_rig.add_child(_fx)
+	_hands = HandsViewmodelScript.new()
+	_hands.name = "HandsViewmodel"
+	add_child(_hands)
 
 
 static func model_path_for(id: String) -> String:
@@ -234,6 +239,10 @@ func attach_to(node: Node) -> void:
 			node.add_child(self)
 	transform = Transform3D.IDENTITY
 	_in_vr_hand = true
+	# En VR las manos son las del mando: los brazos FPS flotando serian un segundo par de manos.
+	if is_instance_valid(_hands):
+		_hands.queue_free()
+		_hands = null
 	walk_intensity = 0.0
 	_bob_offset = Vector3.ZERO
 
@@ -289,6 +298,14 @@ func recoil_offset() -> Vector3:
 
 func rig_position() -> Vector3:
 	return _rig.position if is_instance_valid(_rig) else Vector3.ZERO
+
+
+func rig_rotation() -> Vector3:
+	return _rig.rotation_degrees if is_instance_valid(_rig) else Vector3.ZERO
+
+
+func hands_viewmodel() -> Node:
+	return _hands
 
 
 func muzzle_fx() -> MuzzleFx:

@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "mod": "untitled.base",
+  "content": [
+    {"type": "sound_bank", "id": "untitled.base:weapon_fire", "name": "Disparos reales", "category": "weapon", "files": ["res://assets/audio/real/shot_pistol_01.ogg", "res://assets/audio/real/shot_rifle_01.ogg", "res://assets/audio/real/shot_sniper_01.ogg"], "layers": ["body", "tail", "room"], "loop": false},
+    {"type": "sound_bank", "id": "untitled.base:ambience", "name": "Ambiente exterior", "category": "ambience", "files": ["res://assets/audio/real/amb_birds_01.ogg", "res://assets/audio/real/amb_city_01.ogg", "res://assets/audio/real/amb_wind_01.ogg"], "layers": ["far", "near"], "loop": true},
+    {"type": "sound_bank", "id": "untitled.base:body_impacts", "name": "Impactos de cuerpo", "category": "body", "files": ["res://assets/audio/real/body_pistol_01.ogg", "res://assets/audio/real/body_assault_rifle_01.ogg", "res://assets/audio/real/body_shotgun_01.ogg"], "layers": ["lowpass"], "loop": false}
+  ]
+}

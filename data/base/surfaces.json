@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "mod": "untitled.base",
+  "content": [
+    {"type": "surface", "id": "untitled.base:flesh", "name": "Carne", "penetration": 0.70, "bounce": 0.02, "absorption": 0.25, "thickness": 0.40, "transfer": 0.35, "effect": "blood", "color": [0.55, 0.02, 0.02], "aliases": ["flesh", "carne", "body", "organic"]},
+    {"type": "surface", "id": "untitled.base:metal", "name": "Metal", "penetration": 0.15, "bounce": 0.90, "absorption": 0.50, "thickness": 0.02, "transfer": 0.08, "effect": "sparks", "color": [0.85, 0.55, 0.15], "aliases": ["metal", "steel", "acero", "hierro"]},
+    {"type": "surface", "id": "untitled.base:wood", "name": "Madera", "penetration": 0.55, "bounce": 0.15, "absorption": 0.35, "thickness": 0.10, "transfer": 0.55, "effect": "splinters", "color": [0.45, 0.28, 0.12], "aliases": ["wood", "madera", "lumber"]},
+    {"type": "surface", "id": "untitled.base:concrete", "name": "Hormigon", "penetration": 0.02, "bounce": 0.20, "absorption": 0.90, "thickness": 0.30, "transfer": 0.0, "effect": "dust", "color": [0.55, 0.54, 0.50], "aliases": ["concrete", "hormigon", "cement", "stone", "piedra", "brick"]},
+    {"type": "surface", "id": "untitled.base:dirt", "name": "Tierra", "penetration": 0.25, "bounce": 0.05, "absorption": 0.65, "thickness": 0.50, "transfer": 0.12, "effect": "dust", "color": [0.38, 0.28, 0.16], "aliases": ["dirt", "tierra", "soil", "sand", "arena"]},
+    {"type": "surface", "id": "untitled.base:glass", "name": "Vidrio", "penetration": 0.80, "bounce": 0.10, "absorption": 0.15, "thickness": 0.01, "transfer": 0.80, "effect": "shards", "color": [0.55, 0.80, 0.90], "aliases": ["glass", "vidrio", "cristal"]},
+    {"type": "surface", "id": "untitled.base:water", "name": "Agua", "penetration": 0.35, "bounce": 0.05, "absorption": 0.90, "thickness": 4.00, "transfer": 0.0, "effect": "splash", "color": [0.35, 0.65, 0.85], "aliases": ["water", "agua", "liquid"]}
+  ]
+}

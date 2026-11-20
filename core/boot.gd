@@ -5,12 +5,14 @@ const EventBusScript = preload("res://core/event_bus.gd")
 const ModLoaderScript = preload("res://core/mod_loader.gd")
 const MapRegistryScript = preload("res://core/maps/map_registry.gd")
 const MapLoaderScript = preload("res://core/maps/map_loader.gd")
+const ContentRegistryScript = preload("res://core/game/content_registry.gd")
 
 var bus
 var mod_registry
 var mod_loader
 var map_registry
 var map_loader
+var content_registry
 
 
 func _init() -> void:
@@ -34,6 +36,7 @@ func _reset() -> void:
 	mod_registry = mod_loader.get_registry()
 	map_registry = MapRegistryScript.new()
 	map_loader = MapLoaderScript.new()
+	content_registry = ContentRegistryScript.instance()
 
 
 func _run_mods(mods_dir: String) -> Dictionary:
@@ -82,3 +85,16 @@ func _maps_ok(report: Dictionary) -> bool:
 	if rejected is Array:
 		return (rejected as Array).is_empty()
 	return false
+
+
+func shutdown() -> void:
+	# Limpiar registro de contenido si existe
+	if content_registry != null and content_registry.has_method("clear"):
+		content_registry.clear()
+	# Limpiar referencias
+	bus = null
+	mod_registry = null
+	mod_loader = null
+	map_registry = null
+	map_loader = null
+	content_registry = null

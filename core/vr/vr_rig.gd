@@ -24,6 +24,7 @@ const DbScript = preload("res://core/game/weapon_db.gd")
 @export var teleport_enabled: bool = false
 @export var teleport_max_distance: float = 5.0
 @export var auto_process: bool = true
+const BODY_RADIUS: float = 0.25
 
 var xr_availability_override: Callable = Callable()
 var xr_interface = null
@@ -53,6 +54,7 @@ var _active: bool = false
 var _built: bool = false
 var _xr_origin: XROrigin3D = null
 var _snap_timer: float = 0.0
+var _body_shape: CapsuleShape3D = null
 var _vignette: float = 0.0
 var _vignette_ring: MeshInstance3D = null
 
@@ -71,10 +73,13 @@ func build() -> bool:
 	_xr_origin.name = "XROrigin3D"
 	add_child(_xr_origin)
 	xr_origin = _xr_origin
+	xr_origin.world_scale = 1.0
+	xr_origin.current = true
 
 	xr_camera = XRCamera3D.new()
 	xr_camera.name = "XRCamera3D"
 	xr_origin.add_child(xr_camera)
+	xr_camera.current = true
 
 	left_controller = XRController3D.new()
 	left_controller.name = "LeftController"
@@ -256,8 +261,12 @@ func _ensure_floor_height(delta: float) -> void:
 	if _floor_timer < floor_fix_delay:
 		return
 	_floor_checked = true
+	# Con espacio local-floor/stage el runtime ya da la altura real: no se toca.
+	if xr_interface != null and xr_interface.has_method("get_play_area_mode") \
+			and int(xr_interface.call("get_play_area_mode")) >= 3:
+		return
 	var eye: float = xr_camera.position.y
-	if eye < 0.5:
+	if eye < 0.5 and eye > -0.5:
 		floor_offset = default_eye_height - eye
 		xr_origin.position.y += floor_offset
 
@@ -338,7 +347,7 @@ func _controller_button(hand_name: String, action: StringName) -> bool:
 	return bool(controller.call("is_button_pressed", action))
 
 
-func take_damage(amount: float, _point: Vector3 = Vector3.ZERO, _normal: Vector3 = Vector3.UP) -> void:
+func take_damage(amount: float, _point: Vector3 = Vector3.ZERO, _normal: Vector3 = Vector3.UP, _attacker = null) -> void:
 	if amount <= 0.0 or health <= 0.0:
 		return
 	health = maxf(health - amount, 0.0)
@@ -359,7 +368,7 @@ func step_locomotion(delta: float) -> void:
 	var turn_stick: Vector2 = _call_provider("get_stick", ["right"], Vector2.ZERO)
 	var velocity := locomotion_velocity(move_stick, _head_forward(), move_speed, stick_deadzone)
 	if velocity.length_squared() > 0.000001:
-		xr_origin.global_position += velocity * delta
+		xr_origin.global_position += _slide_motion(velocity * delta)
 	var can_step: bool = _snap_timer <= 0.0
 	var yaw := turn_delta(
 		turn_stick.x, turn_mode, smooth_turn_speed, snap_turn_degrees,
@@ -372,6 +381,68 @@ func step_locomotion(delta: float) -> void:
 	_snap_timer = maxf(_snap_timer - delta, 0.0)
 	if absf(turn_stick.x) < snap_threshold:
 		_snap_timer = 0.0
+
+
+# Cuerpo del jugador contra la geometria del mundo (capa 1): sin esto se atraviesan paredes.
+func _body_blocked(motion: Vector3) -> Vector3:
+	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state if is_inside_tree() else null
+	if space == null or motion.length_squared() <= 0.0000001:
+		return motion
+	if _body_shape == null:
+		_body_shape = CapsuleShape3D.new()
+		_body_shape.radius = BODY_RADIUS
+		_body_shape.height = 1.2
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = _body_shape
+	query.collision_mask = 1
+	query.transform = Transform3D(Basis.IDENTITY, xr_origin.global_position + Vector3(0.0, 0.9, 0.0))
+	# Metido a fondo en la geometria (aparecio dentro): se deja salir; rozar la pared no cuenta.
+	var core := CapsuleShape3D.new()
+	core.radius = BODY_RADIUS * 0.4
+	core.height = 1.0
+	query.shape = core
+	if _hits_static(space.intersect_shape(query, 4)):
+		return motion
+	query.shape = _body_shape
+	# NPC, dianas y coches comparten capa con el mundo: los que ya rozan al jugador no lo frenan.
+	var passable: Array[RID] = []
+	for entry in space.intersect_shape(query, 8):
+		if not (entry["collider"] is StaticBody3D):
+			passable.append(entry["rid"])
+	query.exclude = passable
+	# Ya en contacto con la pared: cast_motion devuelve 1.0, asi que se quita a mano la parte que empuja hacia ella.
+	var rest: Dictionary = space.get_rest_info(query)
+	if not rest.is_empty():
+		var away: Vector3 = query.transform.origin - (rest["point"] as Vector3)
+		away.y = 0.0
+		if away.length_squared() > 0.00000001:
+			away = away.normalized()
+			motion -= away * minf(motion.dot(away), 0.0)
+			if motion.length_squared() <= 0.0000001:
+				return Vector3.ZERO
+	query.motion = motion
+	var fractions: PackedFloat32Array = space.cast_motion(query)
+	return motion * fractions[0] if not fractions.is_empty() else motion
+
+
+static func _hits_static(results: Array) -> bool:
+	for entry in results:
+		if entry["collider"] is StaticBody3D:
+			return true
+	return false
+
+
+func _slide_motion(motion: Vector3) -> Vector3:
+	var full := _body_blocked(motion)
+	if full.is_equal_approx(motion):
+		return motion
+	var along_x := _body_blocked(Vector3(motion.x, 0.0, 0.0))
+	var along_z := _body_blocked(Vector3(0.0, 0.0, motion.z))
+	var best := full
+	for candidate in [along_x, along_z]:
+		if candidate.length_squared() > best.length_squared():
+			best = candidate
+	return best
 
 
 func _head_forward() -> Vector3:

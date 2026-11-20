@@ -1,6 +1,8 @@
 class_name ItemDb
 extends RefCounted
 
+const ContentRegistryScript = preload("res://core/game/content_registry.gd")
+
 const DEFAULT_MAX_STACK := 1
 const DEFAULT_STACKABLE_MAX_STACK := 64
 
@@ -63,6 +65,22 @@ func load_json(text: String) -> Dictionary:
 			if not _log.is_empty():
 				last = str(_log[_log.size() - 1])
 			errors.append(last)
+	return {
+		"ok": errors.is_empty(),
+		"registered": registered,
+		"errors": errors,
+	}
+
+
+func load_content(registry = null) -> Dictionary:
+	var source = registry if registry != null else ContentRegistryScript.instance()
+	var registered := 0
+	var errors: Array = []
+	for id in source.ids("item"):
+		if register(source.definition("item", id)):
+			registered += 1
+		else:
+			errors.append("item '%s' rechazado" % id)
 	return {
 		"ok": errors.is_empty(),
 		"registered": registered,
@@ -192,11 +210,33 @@ static func parse(data: Variant) -> Dictionary:
 static func _valid_id(id: String) -> bool:
 	if id.is_empty() or id != id.to_lower():
 		return false
-	for c in id:
-		var digit := c >= "0" and c <= "9"
-		var letter := c >= "a" and c <= "z"
+	var parts := id.split(":")
+	if parts.size() > 2:
+		return false
+	if parts.size() == 2 and not _valid_word(parts[0]):
+		return false
+	var local := parts[parts.size() - 1]
+	if local.is_empty():
+		return false
+	for c in local:
+		var digit := "0123456789".contains(c)
+		var letter := "abcdefghijklmnopqrstuvwxyz".contains(c)
 		if not digit and not letter and c != "_" and c != "-":
 			return false
+	return true
+
+
+static func _valid_word(value: String) -> bool:
+	if value.is_empty() or value != value.to_lower():
+		return false
+	for c in value.split("."):
+		if c.is_empty():
+			return false
+		for letter in c:
+			var digit := "0123456789".contains(letter)
+			var alpha := "abcdefghijklmnopqrstuvwxyz".contains(letter)
+			if not digit and not alpha and letter != "-" and letter != "_":
+				return false
 	return true
 
 

@@ -20,6 +20,9 @@ const ReloadScript = preload("res://core/vr/vr_reload_gestures.gd")
 const ReloadSystemScript = preload("res://core/game/reload_system.gd")
 const RecoilScript = preload("res://core/vr/vr_recoil.gd")
 
+const HOLSTER_GRAB_SCALE: float = 1.6
+const SLOT_PRIORITY: Array = ["pistol", "assault_rifle", "shotgun", "sniper_rifle", "submachine_gun", "bat"]
+const PROP_GRAB_RADIUS: float = 0.25
 const HANDGUARD_RADIUS: float = 0.12
 const HANDGUARD_OFFSETS: Dictionary = {
 	"pistol": 0.08,
@@ -80,6 +83,8 @@ static var _last_fx_frame: int = -1
 var _aim_dir: Vector3 = Vector3.FORWARD
 var _two_hand: bool = false
 var _was_grip: bool = false
+var _hand_velocity: Vector3 = Vector3.ZERO
+var _last_hand_origin: Vector3 = Vector3.ZERO
 var _was_trigger: bool = false
 var _recoil: float = 0.0
 var _time: float = 0.0
@@ -343,15 +348,21 @@ func step(delta: float) -> void:
 	var other_grip := _button("grip", other_hand())
 
 	if grip and not _was_grip:
-		if weapon_id.is_empty() and _in_bag_zone(primary):
-			try_take()
-	elif not grip and _was_grip and not weapon_id.is_empty() and _in_bag_zone(primary):
-		stow()
+		if weapon_id.is_empty():
+			if _in_bag_zone(primary):
+				try_take()
+			elif not try_take_from_holster(primary):
+				_grab_nearby_prop(primary)
+	elif not grip and _was_grip:
+		if not weapon_id.is_empty() and _in_bag_zone(primary):
+			stow()
+		_release_prop(primary)
 	_was_grip = grip
+	_carry_prop(primary, delta)
 	if auto_equip and not _auto_done and weapon_id.is_empty() and bag != null and not (bag.items() as Array).is_empty():
 		_auto_done = true
 		var ids: Array = bag.items()
-		try_take("pistol" if ids.has("pistol") else str(ids[0]))
+		try_take("pistol" if ids.has("pistol") else str(ids[0]), true)
 
 	var secondary_free: bool = bag == null or bag.held_in(other_hand()).is_empty()
 	var in_zone: bool = false
@@ -387,12 +398,13 @@ func step(delta: float) -> void:
 	_update_visual(primary, delta)
 
 
-func try_take(item_id: String = "") -> bool:
+# force: arma de inicio, se saca del bolso aunque la mano no este en su zona.
+func try_take(item_id: String = "", force: bool = false) -> bool:
 	if not weapon_id.is_empty() or bag == null:
 		return false
 	var pose := _pose(hand)
 	if not bag.is_open():
-		bag.open(pose.origin)
+		bag.open(bag.bag_center() if force else pose.origin)
 	var ids: Array = bag.items()
 	if ids.is_empty():
 		return false
@@ -415,6 +427,92 @@ func try_take(item_id: String = "") -> bool:
 		grab_weapon_from_pose(Transform3D(_aim_basis(pose), pose.origin), 1.0, "grip")
 	weapon_taken.emit(weapon_id, hand)
 	return true
+
+
+# Agarre generoso (radio x1.6) de la funda mas cercana: cadera=pistola, espalda=arma larga, pecho/bolso=la primera.
+func try_take_from_holster(pose: Transform3D) -> bool:
+	if holsters == null or bag == null or not weapon_id.is_empty():
+		return false
+	var ids: Array = bag.items()
+	if ids.is_empty():
+		return false
+	var flat: Vector3 = bag.head_forward
+	flat.y = 0.0
+	flat = flat.normalized() if flat.length_squared() > 0.000001 else Vector3.FORWARD
+	holsters.set_head_pose(Transform3D(Basis.looking_at(flat, Vector3.UP), bag.head_position))
+	var nearest: Dictionary = holsters.nearest_slot(pose, HOLSTER_GRAB_SCALE)
+	if not bool(nearest["ok"]):
+		return false
+	var choice: String = str(ids[0])
+	for id in SLOT_PRIORITY:
+		var tags: Array = DbScript.get_def(str(id)).get("tags", [])
+		if ids.has(id) and holsters.preferred_slot(str(id), tags) == str(nearest["slot"]):
+			choice = str(id)
+			break
+	return try_take(choice, true)
+
+
+func _grab_nearby_prop(pose: Transform3D) -> bool:
+	if not is_inside_tree():
+		return false
+	var best_prop: Node3D = null
+	var best_prop_distance: float = PROP_GRAB_RADIUS
+	for node in get_tree().get_nodes_in_group("physics_props"):
+		if node is Node3D and is_instance_valid(node):
+			var distance: float = (node as Node3D).global_position.distance_to(pose.origin)
+			if distance < best_prop_distance:
+				best_prop_distance = distance
+				best_prop = node as Node3D
+	var best_weapon: Node3D = null
+	var best_weapon_distance: float = PROP_GRAB_RADIUS
+	for node in get_tree().get_nodes_in_group("weapon_pickup"):
+		if node is Node3D and is_instance_valid(node):
+			var distance: float = (node as Node3D).global_position.distance_to(pose.origin)
+			if distance < best_weapon_distance:
+				best_weapon_distance = distance
+				best_weapon = node as Node3D
+	if best_weapon != null and best_weapon_distance <= best_prop_distance:
+		return _equip_weapon_from_pickup(best_weapon)
+	if best_prop == null:
+		return false
+	_last_hand_origin = pose.origin
+	_hand_velocity = Vector3.ZERO
+	return grab_world_prop(best_prop, PROP_GRAB_RADIUS)
+
+
+func _equip_weapon_from_pickup(pickup: Node3D) -> bool:
+	if not pickup.has_meta("weapon_id"):
+		return false
+	var id: String = str(pickup.get_meta("weapon_id"))
+	if id.is_empty():
+		return false
+	if not weapon_id.is_empty():
+		return false
+	weapon_id = id
+	_build_visual(weapon_id)
+	if use_physical_grab and grab_system != null:
+		grab_weapon_from_pose(Transform3D(_aim_basis(_pose(hand)), _pose(hand).origin), 1.0, "grip")
+	pickup.free()
+	weapon_taken.emit(weapon_id, hand)
+	return true
+
+
+func _carry_prop(primary: Transform3D, delta: float) -> void:
+	if grab_system == null:
+		return
+	var prop: Node3D = grab_system.held_prop()
+	if prop == null or not is_instance_valid(prop):
+		return
+	var target: Vector3 = primary.origin
+	_hand_velocity = (target - _last_hand_origin) / maxf(delta, 0.0001) if delta > 0.0 else _hand_velocity
+	prop.global_position = target
+	_last_hand_origin = target
+
+
+func _release_prop(primary: Transform3D) -> void:
+	if grab_system == null or grab_system.held_prop() == null:
+		return
+	grab_system.release_prop(GrabScript.safe_vector(_hand_velocity).limit_length(GrabScript.MAX_THROW_SPEED))
 
 
 func stow() -> void:

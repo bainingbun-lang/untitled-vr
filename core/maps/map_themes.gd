@@ -23,6 +23,8 @@ const THEME_SIZES: Dictionary = {
 }
 const MAX_BUILDINGS: int = 6
 const MAX_THEME_NODES: int = 72
+# Alto de muros de la oficina: con el vano del modelo de puerta (~0.76 del alto) da una puerta de ~2.05 m.
+const OFFICE_WALL_HEIGHT: float = 2.7
 const MODEL_ROAD_CROSS: String = "res://assets/models/maps/city-roads/road-crossroad.glb"
 const MODEL_ROAD_CROSSING: String = "res://assets/models/maps/city-roads/road-crossing.glb"
 const MODEL_ROAD_STRAIGHT: String = "res://assets/models/maps/city-roads/road-straight.glb"
@@ -645,30 +647,30 @@ static func _build_office(
 		for x in range(width):
 			var point := Vector3(x0 + float(x) + 0.5, 0.02, z0 + float(z) + 0.5)
 			floors.append([MODEL_OFFICE_FLOOR, point, 0.0])
-			roofs.append([MODEL_OFFICE_ROOF, Vector3(point.x, 2.48, point.z), 0.0])
+			roofs.append([MODEL_OFFICE_ROOF, Vector3(point.x, OFFICE_WALL_HEIGHT + 0.08, point.z), 0.0])
 
 	for x in range(width):
-		var south := Vector3(x0 + float(x) + 0.5, 1.2, z0 + 0.06)
-		var north := Vector3(x0 + float(x) + 0.5, 1.2, z0 + float(depth) - 0.06)
+		var south := Vector3(x0 + float(x) + 0.5, OFFICE_WALL_HEIGHT * 0.5, z0 + 0.06)
+		var north := Vector3(x0 + float(x) + 0.5, OFFICE_WALL_HEIGHT * 0.5, z0 + float(depth) - 0.06)
 		var south_door: bool = side == "south" and _near_xz(south, entrance, 0.6)
 		var north_door: bool = side == "north" and _near_xz(north, entrance, 0.6)
 		_office_wall_segment(walls, boxes,
 			MODEL_OFFICE_DOOR if south_door else MODEL_OFFICE_WALL,
-			south, 0.0, Vector3(1.0, 2.4, 0.12), south_door)
+			south, 0.0, Vector3(1.0, OFFICE_WALL_HEIGHT, 0.12), south_door)
 		_office_wall_segment(walls, boxes,
 			MODEL_OFFICE_DOOR if north_door else MODEL_OFFICE_WINDOW,
-			north, 0.0, Vector3(1.0, 2.4, 0.12), north_door)
+			north, 0.0, Vector3(1.0, OFFICE_WALL_HEIGHT, 0.12), north_door)
 	for z in range(depth):
-		var west := Vector3(x0 + 0.06, 1.2, z0 + float(z) + 0.5)
-		var east := Vector3(x0 + float(width) - 0.06, 1.2, z0 + float(z) + 0.5)
+		var west := Vector3(x0 + 0.06, OFFICE_WALL_HEIGHT * 0.5, z0 + float(z) + 0.5)
+		var east := Vector3(x0 + float(width) - 0.06, OFFICE_WALL_HEIGHT * 0.5, z0 + float(z) + 0.5)
 		var west_door: bool = side == "west" and _near_xz(west, entrance, 0.6)
 		var east_door: bool = side == "east" and _near_xz(east, entrance, 0.6)
 		_office_wall_segment(walls, boxes,
 			MODEL_OFFICE_DOOR if west_door else MODEL_OFFICE_WINDOW,
-			west, PI * 0.5, Vector3(1.0, 2.4, 0.12), west_door)
+			west, PI * 0.5, Vector3(1.0, OFFICE_WALL_HEIGHT, 0.12), west_door)
 		_office_wall_segment(walls, boxes,
 			MODEL_OFFICE_DOOR if east_door else MODEL_OFFICE_WALL,
-			east, PI * 0.5, Vector3(1.0, 2.4, 0.12), east_door)
+			east, PI * 0.5, Vector3(1.0, OFFICE_WALL_HEIGHT, 0.12), east_door)
 
 	for x in range(1, width - 1):
 		var x_center: float = x0 + float(x) + 0.5
@@ -677,16 +679,16 @@ static func _build_office(
 		)
 		_office_wall_segment(walls, boxes,
 			MODEL_OFFICE_DOOR if partition_door else MODEL_OFFICE_WALL,
-			Vector3(x_center, 1.2, z0 + 2.0), 0.0,
-			Vector3(1.0, 2.4, 0.12), partition_door)
+			Vector3(x_center, OFFICE_WALL_HEIGHT * 0.5, z0 + 2.0), 0.0,
+			Vector3(1.0, OFFICE_WALL_HEIGHT, 0.12), partition_door)
 	var split_x: float = x0 + float(width - 2)
 	for z in range(2, depth - 1):
 		var z_center: float = z0 + float(z) + 0.5
 		var meeting_door: bool = absf(z_center - (z0 + 3.5)) < 0.55
 		_office_wall_segment(walls, boxes,
 			MODEL_OFFICE_DOOR if meeting_door else MODEL_OFFICE_WALL,
-			Vector3(split_x, 1.2, z_center), PI * 0.5,
-			Vector3(1.0, 2.4, 0.12), meeting_door)
+			Vector3(split_x, OFFICE_WALL_HEIGHT * 0.5, z_center), PI * 0.5,
+			Vector3(1.0, OFFICE_WALL_HEIGHT, 0.12), meeting_door)
 
 	_office_furniture(furniture, boxes, x0, z0, width, depth)
 	_add_model_group(group, "OfficeFloor", floors, Vector3(1.0, 0.04, 1.0), 70.0, true)
@@ -731,9 +733,9 @@ static func _build_office(
 	elif time_of_day == "noche":
 		energy = 1.2
 	for light_point in [
-		Vector3(x0 + 1.5, 2.15, z0 + 1.3),
-		Vector3(x0 + float(width) * 0.5, 2.15, z0 + 3.0),
-		Vector3(x0 + float(width) - 1.3, 2.15, z0 + float(depth) - 1.3),
+		Vector3(x0 + 1.5, OFFICE_WALL_HEIGHT - 0.25, z0 + 1.3),
+		Vector3(x0 + float(width) * 0.5, OFFICE_WALL_HEIGHT - 0.25, z0 + 3.0),
+		Vector3(x0 + float(width) - 1.3, OFFICE_WALL_HEIGHT - 0.25, z0 + float(depth) - 1.3),
 	]:
 		var lamp := OmniLight3D.new()
 		lamp.name = "OfficeLight"
@@ -806,9 +808,9 @@ static func _office_furniture(
 	placements.append([MODEL_PLANT, Vector3(x0 + 0.6, 0.5, z0 + 0.6), 0.0, Vector3(0.7, 1.0, 0.7)])
 	placements.append([MODEL_PLANT, Vector3(x0 + float(width) - 0.7, 0.5, z0 + 0.6), 0.0, Vector3(0.7, 1.0, 0.7)])
 	placements.append([MODEL_PLANT, Vector3(x0 + 1.0, 0.5, z0 + float(depth) - 0.7), 0.0, Vector3(0.7, 1.0, 0.7)])
-	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + 1.5, 2.35, z0 + 1.3), 0.0, Vector3(0.5, 0.12, 0.5)])
-	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + float(width) * 0.5, 2.35, z0 + minf(3.0, float(depth) - 0.7)), 0.0, Vector3(0.5, 0.12, 0.5)])
-	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + float(width) - 1.3, 2.35, z0 + float(depth) - 1.3), 0.0, Vector3(0.5, 0.12, 0.5)])
+	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + 1.5, OFFICE_WALL_HEIGHT - 0.05, z0 + 1.3), 0.0, Vector3(0.5, 0.12, 0.5)])
+	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + float(width) * 0.5, OFFICE_WALL_HEIGHT - 0.05, z0 + minf(3.0, float(depth) - 0.7)), 0.0, Vector3(0.5, 0.12, 0.5)])
+	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + float(width) - 1.3, OFFICE_WALL_HEIGHT - 0.05, z0 + float(depth) - 1.3), 0.0, Vector3(0.5, 0.12, 0.5)])
 
 
 static func _office_spec(

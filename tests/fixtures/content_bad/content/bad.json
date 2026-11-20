@@ -1,0 +1,38 @@
+{
+  "content": [
+    {
+      "type": "weapon",
+      "id": "test.bad:bueno",
+      "name": "Arma valida",
+      "damage": 20.0,
+      "fire_rate": 5.0,
+      "range": 50.0,
+      "mag": 10,
+      "auto": false,
+      "spread": 1.0,
+      "pellets": 1,
+      "tags": ["test"],
+      "reload_time": 1.0,
+      "weight": 1.0,
+      "impulse": 0.05,
+      "uses_ammo": true,
+      "penetration": 0.5,
+      "falloff_start": 10.0,
+      "falloff_end": 50.0,
+      "falloff_min": 0.4,
+      "projectile_speed": 0.0,
+      "projectile_gravity": 0.0,
+      "projectile_min_distance": 30.0,
+      "impact_speed": 100.0,
+      "effect_scale": 1.0,
+      "max_penetrations": 1,
+      "max_ricochets": 0
+    },
+    {
+      "type": "weapon",
+      "id": "test.bad:roto",
+      "name": "Arma invalida",
+      "damage": "mucho"
+    }
+  ]
+}

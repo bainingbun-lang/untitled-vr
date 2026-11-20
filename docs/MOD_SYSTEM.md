@@ -26,6 +26,57 @@ build/mods/untitled.example-hello/
 
 `ModRegistry.scan(root_dir)` recorre solo los subdirectorios inmediatos de `root_dir` y toma cada uno que contenga `mod.json`. El manifiesto se lee del directorio, no del pack. `pack` y `entry` son opcionales: un mod sin `entry` carga su pack pero no instancia script; un mod sin `pack` puede registrar un script de entrada que ya exista en el proyecto.
 
+### Contenido data-driven
+
+`mods/example.weapon/` muestra un mod sin pack ni script:
+
+```
+mods/example.weapon/
+  mod.json
+  content/weapons.json
+  content/items.json
+  content/ammo.json
+```
+
+`ContentRegistry` (`res://core/game/content_registry.gd`) lee los `*.json` de `content/`
+y del raíz del mod (excepto `mod.json`). Cada entrada lleva `type` e `id` canónico:
+
+```json
+{
+  "content": [{
+    "type": "weapon",
+    "id": "untitled.example-weapon:rust_pistol",
+    "name": "Pistola oxidada",
+    "damage": 22.0
+  }]
+}
+```
+
+Tipos admitidos: `weapon`, `ammo`, `item`, `npc_type`, `surface`, `vehicle`,
+`sound_bank` y `gore_profile`. El contenido base vive en `data/base/*.json` con el
+mod virtual `untitled.base` y prioridad `0`; los mods normales usan prioridad `100`.
+
+Reglas del registro:
+
+- El id canónico es `modid:nombre`, en minúsculas. El id público es solo `nombre`,
+  por lo que `rust_pistol` sustituye a las APIs actuales `WeaponDb.get_def("rust_pistol")`.
+- La validación es estricta: campos desconocidos, tipos incorrectos, rangos fuera de
+  límite o ids de otro mod se rechazan. Una entrada inválida no afecta a las demás
+  ni al contenido base.
+- Para sustituir contenido existente hace falta `replaces` explícito con el id canónico
+  previo **y** mayor prioridad. Dos mods con la misma prioridad para el mismo id público
+  se rechazan sin alterar el contenido ya cargado.
+- `ModRegistry.load_all` y `unload` sincronizan el registro; `ModReloader.reload`
+  conserva el contenido del mod tras la recarga.
+- Los archivos visuales deben vivir fuera de `mods/` porque `mods/.gdignore` impide que
+  Godot genere `.import` allí. El ejemplo referencia
+  `res://assets/models/weapons/v2/rust_pistol.gltf` (Quaternius CC0, registrado en
+  `assets/CREDITS.md`).
+
+`WeaponDb`, `ItemDb`, `VehicleDb` y `SurfaceMaterialDef` son adaptadores sobre este
+registro. Sus APIs estáticas anteriores siguen devolviendo los mismos ids base;
+`ItemDb.new()` sigue empezando vacío y `ItemDb.load_content()` registra los items de datos.
+
 ## Manifiesto `mod.json`
 
 | Campo | Tipo | Obligatorio | Regla |
@@ -220,7 +271,16 @@ En Android y VR todas las combinaciones devuelven `UNVERIFIED` (`native_extensio
 bash tools/build_example_mod.sh
 ```
 
-Genera `build/mods/untitled.example-hello/example_hello.pck` y copia `mod.json` junto al pack. El script usa el editor en `$HOME/tools/godot-4.7-stable/Godot_v4.7-stable_linux.arm64` y termina con `BUILD_OK`. El PCK de referencia mide 1336 bytes.
+Genera `build/mods/untitled.example-hello/example_hello.pck` y copia `mod.json` junto al pack. El script usa el editor en `$HOME/tools/godot-4.7-stable/Godot_v4.7-stable_linux.arm64` y termina con `BUILD_OK`. El PCK de referencia mide 1336 bytes. `mods/example.weapon` no necesita construcción: se instala como directorio con sus JSON de contenido.
+
+Tras añadir un asset visual:
+
+```bash
+grun ~/tools/godot-4.7-stable/Godot_v4.7-stable_linux.arm64 --headless --path ~/UNTITLED --import
+```
+
+El importador puede terminar con un error final conocido de `daemon`/fontconfig en Termux;
+lo importante es que aparezca el `.import` junto al archivo fuente.
 
 ## Ejecutar las pruebas
 
@@ -228,20 +288,70 @@ Genera `build/mods/untitled.example-hello/example_hello.pck` y copia `mod.json` 
 bash tests/run_all.sh
 ```
 
-El script construye el mod de ejemplo y ejecuta cada `tests/test_*.gd` en headless. Resultado esperado en esta rama:
+El script construye el mod de ejemplo y ejecuta cada `tests/test_*.gd` en headless. Incluye `test_content_registry.gd` (validación, prioridad, reemplazos y APIs base) y `test_example_weapon_mod.gd` (carga, disparo y recarga en caliente del mod de contenido). La prueba del ejemplo carga `example.hello` por `load_resource_pack`, comprueba que el handler de `game.started` se ejecuta y que la descarga lo desactiva.
 
-```
-PASS test_event_bus.gd
-PASS test_example_mod.gd
-PASS test_mod_backup.gd
-PASS test_mod_capabilities.gd
-PASS test_mod_manifest.gd
-PASS test_mod_profile.gd
-PASS test_mod_registry.gd
-PASS test_mod_resolver.gd
+En el estado D1 todas las pruebas relevantes pasan, incluidas las de mods y contenido. Queda un fallo preexistente y no relacionado: `test_vr_scale.gd` marca `pistol` (0.55 m) y `submachine_gun` (0.64 m) fuera del rango real esperado según `assets/models/weapons/v2/manifest.json`; no fue introducido por el registro de contenido. Por ese fallo, `tests/run_all.sh` termina con código `1` aunque el resto de pruebas den `PASS`.
+
+## Eventos y hooks de juego (D2)
+
+### Implementado
+
+`ModHooks` (`res://core/game/mod_hooks.gd`) publica 14 eventos con payload documentado en `ModHooks.EVENTS`. Los permisos declarados en el manifiesto se comprueban antes de suscribir, modificar o emitir.
+
+| Evento | Payload | Modificable |
+|---|---|---|
+| `weapon_fired` | `weapon_id`, `origin`, `direction`, `pellets`, `damage`, `ammo`, `projectile` | `damage` |
+| `weapon_reloaded` | `weapon_id`, `mag`, `reserve`, `duration` | — |
+| `weapon_jammed` | `weapon_id`, `reason` | — |
+| `projectile_hit` | `weapon_id`, `hit`, `position`, `damage`, `distance`, `surface` | `damage` |
+| `damage_dealt` | `target`, `zone`, `amount`, `point`, `source`, `weapon_id`, `lethal` | `amount` |
+| `wound_created` | `target`, `zone`, `severity`, `point`, `amount` | — |
+| `limb_severed` | `target`, `limb`, `point`, `severity` | — |
+| `npc_spawned` | `npc_id`, `npc_type`, `position`, `faction` | — |
+| `npc_died` | `npc_id`, `npc_type`, `killer`, `position` | — |
+| `player_died` | `player_id`, `killer`, `position` | — |
+| `item_picked` | `item_id`, `amount`, `inventory_owner`, `position` | — |
+| `vehicle_entered` | `vehicle_id`, `player_id`, `seats` | — |
+| `map_loaded` | `map_id`, `map_name`, `path`, `seed` | — |
+| `wave_started` | `wave`, `total_waves`, `mode`, `enemy_count` | — |
+
+Permisos: `read_events` (suscribirse), `modify_damage` (cambiar `damage`/`amount` en los tres eventos marcados), `spawn_entities`, `inventory` y `network`. `network` siempre se deniega. `ModApi.network_request()` devuelve `false`.
+
+`ModApi` amplía su API retrocompatible con `subscribe_declared()`, `bind_target()`, `set_value()`, `request()`, `fail()`, `permissions()`, `manifest()` y `checkpoint()`. Un manifiesto puede declarar hooks sin script:
+
+```json
+{
+  "permissions": ["read_events", "modify_damage"],
+  "hooks": [
+    {"event": "weapon_fired", "method": "on_weapon_fired", "priority": 100},
+    {"event": "damage_dealt", "method": "on_damage_dealt", "priority": 100}
+  ]
+}
 ```
 
-Código de salida `0`. La prueba del ejemplo carga el mod por `load_resource_pack`, comprueba que el handler de `game.started` se ejecuta y que la descarga lo desactiva.
+`mods/example.hook/` es el ejemplo funcional: cuenta disparos y multiplica el daño recibido por `1.5`.
+
+`EventBus.emit()` comprueba el payload antes y después de cada handler. Si un mod sin `modify_damage` lo cambia, restaura la copia, reporta la violación y desactiva al mod retirando sus suscripciones. También detecta handlers que devuelven `{ok: false, error: ...}`, exceden el presupuesto de instrucciones (`checkpoint()`) o superan el límite de tiempo. El resultado incluye `modified_by`, `violations` y `elapsed_us`.
+
+`ModHooks.register_manifest()` aplica los hooks declarativos, respeta `depends` mediante `dependency_order()`, y `ModHooks.emit()` permite a los sistemas del juego publicar eventos con payloads completados con valores por defecto. Los emisores conectados están en `weapon_system.gd`, `damageable.gd` y `player.gd`.
+
+### Probado
+
+- `tests/test_mod_hooks.gd`: `PASS (78 assertions)`, `EXIT=0`. Cubre catálogo, payloads, hooks declarativos, permisos denegados, restauración ante modificación ilegal, desactivación por error/timeout/instrucciones, orden por dependencias e integración con `Damageable`.
+- Retrocompatibilidad verificada: `test_event_bus`, `test_example_mod`, `test_mod_registry`, `test_mod_reloader`, `test_boot`, `test_weapons`, `test_player` y `test_armed_npc` siguen pasando.
+- `bash tests/run_all.sh`: todas las pruebas de mods y juego pasan. Queda el fallo preexistente de `test_vr_scale.gd` por dimensiones de armas, ajeno a D2.
+
+### Verificado
+
+- Godot 4.7 stable, Linux arm64 headless.
+- Los errores `ERROR: ModHooks: ... desactivado` en `test_mod_hooks.gd` son esperados: prueban el aislamiento. No hay `SCRIPT ERROR` ni abort.
+- No se añadieron assets, por lo que no hubo que importar nada.
+
+### Limitaciones de D2
+
+- GDScript no es un sandbox: no puede interrumpir bucles no cooperativos. La defensa es cooperativa (`checkpoint()`) y depende de que el handler llame a `api.checkpoint()`.
+- No se capturan errores internos del motor dentro de un handler; sí se reportan valores de retorno `{ok: false}`.
+- `npc_spawned`, `map_loaded` y `wave_started` están definidos y probados en el catálogo, pero aún no tienen emisores en el juego. Conectar `npc_spawned` en `armed_npc.gd` queda pendiente porque el brief prohíbe tocar ese archivo.
 
 ## Errores frecuentes
 
@@ -267,6 +377,9 @@ Código de salida `0`. La prueba del ejemplo carga el mod por `load_resource_pac
 | `x: la entrada 'res://...' no implementa _mod_init` | El script no define `_mod_init` | Implementar el método |
 | `no se puede descargar 'x': los modulos y dependen de el` | Descarga con dependientes cargados | Descargar primero los dependientes |
 | `evento invalido: 'x'` | Evento sin `ns.nombre` o con caracteres no permitidos | Usar minúsculas, dígitos y `_` |
+| `id: se esperaba 'modid:nombre'` | Entrada de contenido sin namespace | Usar `untitled.base:pistol` o `tumod:arma` |
+| `weapon: campo desconocido 'x'` | Campo no permitido por el esquema de contenido | Quitar el campo o ampliar el esquema en `ContentRegistry` |
+| `id publico 'x' ya lo usa 'y'` | Dos mods registran el mismo id público sin prioridad/replaces | Cambiar el id o declarar `replaces` con mayor prioridad |
 
 ## Limitaciones y compatibilidad
 
@@ -276,9 +389,9 @@ Código de salida `0`. La prueba del ejemplo carga el mod por `load_resource_pac
 - Godot no puede descargar un PCK ya cargado. `unload` desactiva el módulo (shutdown y suscripciones), pero sus recursos siguen en memoria hasta reiniciar el proceso.
 - Los conflictos de `replaces` son error de carga, no una sustitución parcial.
 - `unload` no descarga dependientes de forma automática.
-- El bus no captura errores ni excepciones de los handlers.
+- El bus no captura errores ni excepciones internas del motor en los handlers. Sí detecta retornos `{ok: false}`, modificaciones ilegales, timeouts y agotamiento de instrucciones en los eventos de `ModHooks`.
 - La resolución de dependencias no soporta prerelease ni metadatos semver.
-- `platforms` y `permissions` se validan como datos, pero no se aplican ni se hacen cumplir.
+- `platforms` se valida como dato pero no se aplica. `permissions` se aplica a los eventos de `ModHooks` (D2); los eventos heredados `ns.nombre` conservan su comportamiento abierto por retrocompatibilidad.
 - `engine` solo se comprueba como String; no se compara con la versión del motor.
 - Los mods en GDScript no están aislados: no hay sandbox.
 - Lua, WASM, GDExtension y C# no están integrados ni probados dentro de Godot.

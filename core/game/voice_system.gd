@@ -7,6 +7,7 @@ const MAX_VOICES := 4
 const VOICE_CACHE_LIMIT_BYTES := 1536 * 1024
 const AudioSynthScript = preload("res://core/game/audio_synth.gd")
 const SfxBankScript = preload("res://core/game/sfx_bank.gd")
+const Recorded = preload("res://core/game/recorded_sfx.gd")
 
 const CUES := {
 	"fear": {"text": "¡Aaaaah!", "duration": 0.9, "noise": 0.32, "jitter": 0.055},
@@ -31,17 +32,34 @@ const PHRASES := {
 	"reloading": "Recargando",
 }
 
+const VOICE_BANKS := {
+	"fear": {"male": "voice_fear_male", "female": "voice_fear_female"},
+	"pain": {"male": "voice_pain_male", "female": "voice_pain_female"},
+	"effort": {"male": "voice_effort_male", "female": "voice_effort_female"},
+	"pant": {"male": "voice_pant", "female": "voice_pant"},
+	"cough": {"male": "voice_cough", "female": "voice_cough"},
+	"cry": {"male": "voice_cry", "female": "voice_cry"},
+	"hey": {"male": "voice_alert", "female": "voice_alert"},
+	"laugh": {"male": "voice_laugh", "female": "voice_laugh"},
+	"death": {"male": "voice_death_male", "female": "voice_death_female"},
+	"phrase": {"male": "voice_phrase", "female": "voice_phrase"},
+}
+
 static var tts_voices_override = null
 static var tts_speak_hook: Callable = Callable()
 static var tts_calls: Array = []
+static var tts_prefer := false
 static var _tts_counter := 0
 
+var subtitles_enabled := false
+var tts_enabled := false
 var cooldown := 0.45
 var _now := 0.0
 var _active: Array = []
 var _profiles: Dictionary = {}
 var _last_at: Dictionary = {}
 var _selection_count: Dictionary = {}
+var _voice_variant_count: Dictionary = {}
 var _voice_cache: Dictionary = {}
 var _voice_lru: Array = []
 var _voice_bytes := 0
@@ -72,6 +90,7 @@ func reset() -> void:
 	_profiles.clear()
 	_last_at.clear()
 	_selection_count.clear()
+	_voice_variant_count.clear()
 	_dropped = 0
 	_subtitle_count = 0
 	_last_subtitle = ""
@@ -150,22 +169,35 @@ func profile_for(npc_id: String) -> Dictionary:
 	return _profile(npc_id).duplicate()
 
 
-func voice_stream(npc_id: String, cue: String, profile: Dictionary = {}) -> AudioStreamWAV:
+func voice_stream(npc_id: String, cue: String, profile: Dictionary = {}, variant_round: int = 0) -> AudioStream:
 	var p: Dictionary = profile if not profile.is_empty() else _profile(npc_id)
 	var cue_id := cue if CUES.has(cue) else "effort"
-	var key := "%s|%s|%d|%.3f_%.3f_%.3f_%.3f_%.3f" % [
-		npc_id, cue_id, int(p.get("seed", 1)), float(p.get("pitch", 1.0)),
-		float(p.get("timbre", 1.0)), float(p.get("gender", 0.5)),
-		float(p.get("age", 0.5)), float(p.get("mood", 0.5)),
-	]
+	var bank := voice_bank_for(cue_id, p)
+	var count := Recorded.variant_count(bank) if Recorded.has_bank(bank) else 0
+	var round_index := maxi(variant_round, 0)
+	var index := 0
+	var file_name := ""
+	if count > 0:
+		var seed_value := int(p.get("seed", 1)) + cue_id.hash() + round_index * 7919
+		index = Recorded.variant_index(bank, seed_value)
+		file_name = str((Recorded.bank_files(bank) as Array)[index])
+	var key := "%s|%s|%s|%d|%d" % [npc_id, cue_id, bank, round_index, index]
 	if _voice_cache.has(key):
 		_voice_lru.erase(key)
 		_voice_lru.append(key)
 		return (_voice_cache[key] as Dictionary)["stream"]
-	var samples := _synth_voice(p, cue_id)
-	var audio := AudioSynthScript.wav_from_samples(samples)
+	var audio: AudioStream = null
+	var bytes := 0
+	if count > 0:
+		var path := Recorded.REAL_DIR + file_name
+		audio = Recorded.stream_at(bank, index)
+		if audio != null:
+			bytes = int(FileAccess.get_size(path)) if FileAccess.file_exists(path) else 16384
+	if audio == null:
+		var samples := _synth_voice(p, cue_id)
+		audio = AudioSynthScript.wav_from_samples(samples)
+		bytes = (audio as AudioStreamWAV).data.size()
 	audio.resource_name = key
-	var bytes := audio.data.size()
 	_voice_cache[key] = {"stream": audio, "bytes": bytes}
 	_voice_lru.append(key)
 	_voice_bytes += bytes
@@ -177,6 +209,35 @@ func voice_stream(npc_id: String, cue: String, profile: Dictionary = {}) -> Audi
 		_voice_bytes -= int(old.get("bytes", 0))
 		_voice_cache.erase(old_key)
 	return audio
+
+
+func voice_bank_for(cue: String, profile: Dictionary = {}) -> String:
+	var cue_id := cue if VOICE_BANKS.has(cue) else "effort"
+	var mapping: Dictionary = VOICE_BANKS[cue_id]
+	var gender := clampf(float(profile.get("gender", 0.5)), 0.0, 1.0)
+	var key := "female" if gender >= 0.5 else "male"
+	return str(mapping.get(key, mapping.get("male", "")))
+
+
+func voice_variant_count(cue: String, profile: Dictionary = {}) -> int:
+	return Recorded.variant_count(voice_bank_for(cue, profile))
+
+
+func display_name_for(npc_id: String) -> String:
+	var relation := clampf(float(_profile(npc_id).get("relation", 0.0)), -1.0, 1.0)
+	if relation > 0.2:
+		return "Aliado"
+	if relation < -0.2:
+		return "Enemigo"
+	return "NPC"
+
+
+func set_subtitles_enabled(value: bool) -> void:
+	subtitles_enabled = value
+
+
+func set_tts_enabled(value: bool) -> void:
+	tts_enabled = value
 
 
 func can_play(npc_id: String) -> bool:
@@ -196,7 +257,7 @@ func play_cue(npc_id: String, cue: String, context: Dictionary = {}) -> bool:
 	if _active.size() >= MAX_VOICES:
 		_dropped += 1
 		return false
-	var audio := voice_stream(npc_id, cue, profile)
+	var audio := voice_stream(npc_id, cue, profile, _next_variant(npc_id, cue))
 	_spawn_player(npc_id, cue, audio, profile, context)
 	return true
 
@@ -212,10 +273,10 @@ func speak_phrase(npc_id: String, phrase_id: String, context: Dictionary = {}) -
 	if _active.size() >= MAX_VOICES:
 		_dropped += 1
 		return false
-	if _speak_tts(text, npc_id, profile):
+	if (tts_prefer or not Recorded.has_bank("voice_phrase")) and _speak_tts(text, npc_id, profile):
 		_active.append({"npc": npc_id, "cue": "phrase", "end_at": _now + 0.9, "player": null})
 		return true
-	var audio := voice_stream(npc_id, "phrase", profile)
+	var audio := voice_stream(npc_id, "phrase", profile, _next_variant(npc_id, "phrase"))
 	_spawn_player(npc_id, "phrase", audio, profile, context)
 	return true
 
@@ -304,7 +365,15 @@ static func reset_tts_test_hooks() -> void:
 	tts_voices_override = null
 	tts_speak_hook = Callable()
 	tts_calls.clear()
+	tts_prefer = false
 	_tts_counter = 0
+
+
+func _next_variant(npc_id: String, cue: String) -> int:
+	var slot := npc_id + "|" + cue
+	var value := int(_voice_variant_count.get(slot, 0))
+	_voice_variant_count[slot] = value + 1
+	return value
 
 
 func _begin(npc_id: String) -> bool:
@@ -317,9 +386,11 @@ func _begin(npc_id: String) -> bool:
 
 
 func _emit_subtitle(text: String, npc_id: String) -> void:
+	if not subtitles_enabled:
+		return
 	_last_subtitle = text
 	_subtitle_count += 1
-	subtitle.emit(text, npc_id)
+	subtitle.emit(text, display_name_for(npc_id))
 
 
 func _retire_finished() -> void:
@@ -378,6 +449,8 @@ func _derive_profile(npc_id: String) -> Dictionary:
 
 
 func _speak_tts(text: String, npc_id: String, profile: Dictionary) -> bool:
+	if not (subtitles_enabled or tts_enabled):
+		return false
 	if not tts_available():
 		return false
 	var argc := _tts_arg_count()

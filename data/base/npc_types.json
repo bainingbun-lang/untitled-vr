@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "mod": "untitled.base",
+  "content": [
+    {
+      "type": "npc_type",
+      "id": "untitled.base:civil",
+      "name": "Civil",
+      "role": "civil",
+      "models": [
+        "res://assets/models/characters/v2/civil_man_casual.gltf",
+        "res://assets/models/characters/v2/civil_man_farmer.gltf",
+        "res://assets/models/characters/v2/civil_woman_casual.gltf",
+        "res://assets/models/characters/v2/civil_woman_formal.gltf"
+      ],
+      "aliases": ["civilian", "civil", "worker"],
+      "health": 100.0,
+      "speed": 3.2,
+      "weapon_id": "untitled.base:bat",
+      "zombie": false
+    },
+    {
+      "type": "npc_type",
+      "id": "untitled.base:police",
+      "name": "Policía",
+      "role": "police",
+      "models": ["res://assets/models/characters/v2/police_swat.gltf"],
+      "aliases": ["policia", "cop"],
+      "health": 140.0,
+      "speed": 3.6,
+      "weapon_id": "untitled.base:pistol",
+      "zombie": false
+    },
+    {
+      "type": "npc_type",
+      "id": "untitled.base:soldier",
+      "name": "Soldado",
+      "role": "soldier",
+      "models": ["res://assets/models/characters/v2/soldier_female.gltf"],
+      "aliases": ["soldado", "military"],
+      "health": 180.0,
+      "speed": 3.8,
+      "weapon_id": "untitled.base:assault_rifle",
+      "zombie": false
+    },
+    {
+      "type": "npc_type",
+      "id": "untitled.base:criminal",
+      "name": "Criminal",
+      "role": "criminal",
+      "models": ["res://assets/models/characters/v2/criminal_punk.gltf"],
+      "aliases": ["gangster", "punk"],
+      "health": 120.0,
+      "speed": 4.0,
+      "weapon_id": "untitled.base:submachine_gun",
+      "zombie": false
+    },
+    {
+      "type": "npc_type",
+      "id": "untitled.base:office",
+      "name": "Oficinista",
+      "role": "office",
+      "models": ["res://assets/models/characters/v2/office_suit.gltf"],
+      "aliases": ["office_worker", "worker"],
+      "health": 90.0,
+      "speed": 3.0,
+      "weapon_id": "untitled.base:pistol",
+      "zombie": false
+    },
+    {
+      "type": "npc_type",
+      "id": "untitled.base:zombie",
+      "name": "Zombi",
+      "role": "zombie",
+      "models": [
+        "res://assets/models/characters/v2/zombie_basic.gltf",
+        "res://assets/models/characters/v2/zombie_chubby.gltf",
+        "res://assets/models/characters/v2/zombie_ribcage.gltf"
+      ],
+      "aliases": ["zombie", "enemy", "enemigo", "undead"],
+      "health": 80.0,
+      "speed": 2.1,
+      "zombie": true
+    }
+  ]
+}

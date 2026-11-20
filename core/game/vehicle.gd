@@ -14,15 +14,20 @@ signal ran_over(target: Node, damage: float)
 const DbScript = preload("res://core/game/vehicle_db.gd")
 const GoreFxScript = preload("res://core/game/gore_fx.gd")
 const WHEEL_RADIUS := 0.3
+const CAR_LENGTH := 4.6
+const BUGGY_LENGTH := 3.0
 const MAX_STEER := 0.5
 const STEER_RATE := 2.5
 const ENTER_TIME := 0.35
 const CRASH_THRESHOLD := 4.0
 const RUN_OVER_MIN_SPEED := 3.0
 const SEAT := Vector3(0.3, 0.45, -0.1)
-const HORN_RATE := 22050
+const STEERING_WHEEL_MODEL: String = "res://assets/models/vehicles/steering_wheel.glb"
+const HORN_SOUND: String = "res://assets/audio/real/horn_01.ogg"
+const ENGINE_SOUND: String = "res://assets/audio/real/engine_03.ogg"
 
-static var _horn_stream: AudioStreamWAV = null
+static var _horn_stream: AudioStream = null
+static var _engine_stream: AudioStream = null
 
 var vehicle_id: String = ""
 var def: Dictionary = {}
@@ -36,6 +41,7 @@ var headlights: Array = []
 var brake_lights: Array = []
 var headlights_on: bool = false
 var horn_player: AudioStreamPlayer3D = null
+var engine_player: AudioStreamPlayer3D = null
 var rear_door: Node3D = null
 var body_size: Vector3 = Vector3(1.5, 1.1, 2.6)
 var body_center: Vector3 = Vector3(0.0, 0.7, 0.0)
@@ -47,6 +53,7 @@ var _enter_t: float = 1.0
 var _enter_from: Vector3 = Vector3.ZERO
 var _tail_material: StandardMaterial3D = null
 var _dead: bool = false
+var _car_scale: Vector3 = Vector3.ONE
 
 
 func setup(id: String) -> bool:
@@ -78,6 +85,7 @@ func _build_model(packed: PackedScene) -> void:
 	add_child(model)
 	var found: Array = []
 	_collect(source, Transform3D.IDENTITY, found)
+	_car_scale = _fit_scale(found)
 	var body_box := AABB()
 	var has_box := false
 	for entry in found:
@@ -92,6 +100,7 @@ func _build_model(packed: PackedScene) -> void:
 		if lname.begins_with("wheel-") and lname != "wheel-back":
 			_make_wheel(node, xform, lname)
 			continue
+		xform = Transform3D(Basis.from_scale(_car_scale), Vector3.ZERO) * xform
 		node.transform = xform
 		model.add_child(node)
 		if lname == "door":
@@ -113,6 +122,24 @@ func _build_model(packed: PackedScene) -> void:
 	add_child(shape)
 
 
+# El kit de coches es "chibi" (sedan 1.5 x 1.15 x 2.55 m): el cuerpo se alarga hasta un largo realista
+# (ancho y alto crecen menos, las ruedas conservan su tamano).
+func _fit_scale(found: Array) -> Vector3:
+	var box := AABB()
+	var has_box := false
+	for entry in found:
+		var lname := str((entry["node"] as MeshInstance3D).name).to_lower()
+		if lname == "body" or lname == vehicle_id or lname.begins_with("kart"):
+			var part: AABB = (entry["xform"] as Transform3D) * (entry["node"] as MeshInstance3D).get_aabb()
+			box = part if not has_box else box.merge(part)
+			has_box = true
+	if not has_box or box.size.z < 0.1:
+		return Vector3.ONE
+	var target: float = BUGGY_LENGTH if str(def.get("kind", "")) == "buggy" else CAR_LENGTH
+	var k: float = clampf(target / box.size.z, 1.0, 2.5)
+	return Vector3(1.0 + (k - 1.0) * 0.3, 1.0 + (k - 1.0) * 0.35, k)
+
+
 func _collect(node: Node, parent_xform: Transform3D, out: Array) -> void:
 	for child in node.get_children():
 		var local := parent_xform
@@ -126,6 +153,7 @@ func _collect(node: Node, parent_xform: Transform3D, out: Array) -> void:
 func _make_wheel(node: MeshInstance3D, xform: Transform3D, lname: String) -> void:
 	var front: bool = lname.contains("front")
 	var center: Vector3 = xform * node.get_aabb().get_center()
+	center = Vector3(center.x * _car_scale.x, center.y, center.z * _car_scale.z)
 	var wheel := VehicleWheel3D.new()
 	wheel.name = "Wheel_" + lname
 	wheel.position = center
@@ -146,20 +174,11 @@ func _make_wheel(node: MeshInstance3D, xform: Transform3D, lname: String) -> voi
 
 
 func _build_extras() -> void:
-	# volante visible (anillo) y luces como piezas emisivas pequeñas
 	steering_wheel = Node3D.new()
 	steering_wheel.name = "SteeringWheel"
 	steering_wheel.position = Vector3(SEAT.x, body_center.y + 0.1, SEAT.z + 0.35)
-	var ring := MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = 0.13
-	torus.outer_radius = 0.18
-	torus.rings = 12
-	torus.ring_segments = 6
-	ring.mesh = torus
-	ring.material_override = _flat(Color(0.05, 0.05, 0.06), 0.0)
-	steering_wheel.add_child(ring)
 	add_child(steering_wheel)
+	_attach_steering_wheel_model()
 	_set_wheel_angle(0.0)
 	var front_z: float = body_center.z + body_size.z * 0.5 - 0.02
 	var rear_z: float = body_center.z - body_size.z * 0.5 + 0.02
@@ -190,6 +209,14 @@ func _build_extras() -> void:
 	horn_player.name = "Horn"
 	horn_player.stream = horn_stream()
 	add_child(horn_player)
+	var engine_audio := engine_stream()
+	if engine_audio != null:
+		engine_player = AudioStreamPlayer3D.new()
+		engine_player.name = "Engine"
+		engine_player.stream = engine_audio
+		engine_player.volume_db = -60.0
+		engine_player.max_distance = 30.0
+		add_child(engine_player)
 
 
 func _light_box(label: String, pos: Vector3, material: Material) -> void:
@@ -212,22 +239,70 @@ func _flat(color: Color, metallic: float) -> StandardMaterial3D:
 	return material
 
 
-static func horn_stream() -> AudioStreamWAV:
+func _attach_steering_wheel_model() -> void:
+	if not ResourceLoader.exists(STEERING_WHEEL_MODEL):
+		return
+	var packed := load(STEERING_WHEEL_MODEL) as PackedScene
+	if packed == null:
+		return
+	var instance := packed.instantiate()
+	if not (instance is Node3D):
+		if instance != null:
+			instance.free()
+		return
+	var visual := instance as Node3D
+	var box := _node_aabb(visual)
+	var diameter: float = maxf(box.size.x, box.size.z)
+	if diameter > 0.0001:
+		var factor: float = 0.38 / diameter
+		visual.scale = Vector3.ONE * factor
+		visual.position = -box.get_center() * factor
+	steering_wheel.add_child(visual)
+	steering_wheel.set_meta("model_path", STEERING_WHEEL_MODEL)
+
+
+func _node_aabb(root: Node3D) -> AABB:
+	var result := AABB()
+	var found := false
+	var stack: Array = [{"node": root, "xform": Transform3D.IDENTITY}]
+	while not stack.is_empty():
+		var entry: Dictionary = stack.pop_back()
+		var node: Node = entry["node"]
+		var xform: Transform3D = entry["xform"]
+		if node is Node3D:
+			xform = xform * (node as Node3D).transform
+		if node is MeshInstance3D and (node as MeshInstance3D).mesh != null:
+			var child_box: AABB = xform * (node as MeshInstance3D).mesh.get_aabb()
+			result = child_box if not found else result.merge(child_box)
+			found = true
+		for child in node.get_children():
+			stack.append({"node": child, "xform": xform})
+	return result
+
+
+static func horn_stream() -> AudioStream:
 	if _horn_stream != null:
 		return _horn_stream
-	var count := int(HORN_RATE * 0.5)
-	var data := PackedByteArray()
-	data.resize(count * 2)
-	for i in count:
-		var t := float(i) / HORN_RATE
-		var envelope := minf(t * 60.0, 1.0) * minf((0.5 - t) * 20.0, 1.0)
-		var wave := sin(TAU * 420.0 * t) + 0.8 * sin(TAU * 525.0 * t) + 0.3 * sin(TAU * 840.0 * t)
-		data.encode_s16(i * 2, int(clampf(wave * envelope * 0.3, -1.0, 1.0) * 32767.0))
-	var stream := AudioStreamWAV.new()
-	stream.format = AudioStreamWAV.FORMAT_16_BITS
-	stream.mix_rate = HORN_RATE
-	stream.data = data
-	_horn_stream = stream
+	_horn_stream = _load_audio(HORN_SOUND, false)
+	return _horn_stream
+
+
+static func engine_stream() -> AudioStream:
+	if _engine_stream != null:
+		return _engine_stream
+	_engine_stream = _load_audio(ENGINE_SOUND, true)
+	return _engine_stream
+
+
+static func _load_audio(path: String, loop: bool) -> AudioStream:
+	if not ResourceLoader.exists(path):
+		return null
+	var source := load(path)
+	if not (source is AudioStream):
+		return null
+	var stream: AudioStream = (source as AudioStream).duplicate()
+	if loop and stream is AudioStreamOggVorbis:
+		(stream as AudioStreamOggVorbis).loop = true
 	return stream
 
 
@@ -263,6 +338,7 @@ func _physics_process(delta: float) -> void:
 	_set_wheel_angle(steering)
 	var braking: bool = _brake_input > 0.05 or (_throttle < 0.0 and forward_speed() > 0.5)
 	_tail_material.emission_energy_multiplier = 3.0 if braking else (1.0 if headlights_on else 0.2)
+	_update_engine_audio(top)
 	if driver != null and is_instance_valid(driver):
 		_follow_driver(delta)
 
@@ -280,6 +356,28 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 func _set_wheel_angle(angle: float) -> void:
 	if steering_wheel != null:
 		steering_wheel.transform.basis = Basis(Vector3.RIGHT, deg_to_rad(-65.0)) * Basis(Vector3.UP, angle * 4.0)
+
+
+func engine_rpm(top: float = 0.0) -> float:
+	var limit: float = maxf(maxf(top, float(def.get("max_speed", 30.0))), 1.0)
+	return clampf(absf(forward_speed()) / limit, 0.0, 1.0)
+
+
+func engine_pitch(top: float = 0.0) -> float:
+	var rpm: float = engine_rpm(top)
+	return 0.72 + rpm * 0.92 + absf(_throttle) * 0.14
+
+
+func _update_engine_audio(top: float) -> void:
+	if engine_player == null:
+		return
+	engine_player.pitch_scale = engine_pitch(top)
+	var running: bool = driver != null and is_instance_valid(driver) and not _dead
+	engine_player.volume_db = (-26.0 + engine_rpm(top) * 11.0 + absf(_throttle) * 3.0) if running else -60.0
+	if running and not engine_player.playing:
+		engine_player.play()
+	elif not running and engine_player.playing:
+		engine_player.stop()
 
 
 func _follow_driver(delta: float) -> void:

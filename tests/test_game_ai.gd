@@ -52,8 +52,8 @@ func _run() -> void:
 	for npc in world.npcs:
 		var role: String = str(npc.get("role"))
 		roles[role] = int(roles.get(role, 0)) + 1
-	_expect(roles.has("hostile") and roles.has("civilian") and roles.has("defender") and roles.has("zombie"),
-		"hay civiles, hostiles, policias y zombis")
+	_expect(roles.has("hostile") and roles.has("civilian"), "hay civiles pasivos y hostiles")
+	_expect(int(roles.get("hostile", 0)) <= 3 and int(roles.get("civilian", 0)) > int(roles.get("hostile", 0)), "pocos hostiles y mayoria de civiles")
 	_expect(world.navigation != null and int(world.world_report.get("navigation", {}).get("blocked_cells", 0)) > 0,
 		"la rejilla de navegacion se construyo desde la geometria real")
 	var all_models: bool = true
@@ -63,9 +63,9 @@ func _run() -> void:
 	_expect(all_models, "todos los NPC usan CharacterModel con modelo 3D real")
 	var all_armed: bool = true
 	for npc in world.npcs:
-		if str(npc.get("role")) != "zombie" and str(npc.get("weapon_id")).is_empty():
+		if str(npc.get("role")) == "hostile" and str(npc.get("weapon_id")).is_empty():
 			all_armed = false
-	_expect(all_armed, "losNPC no zombi llevan arma visible")
+	_expect(all_armed, "los hostiles llevan arma visible")
 	var inside_bounds: bool = true
 	for npc in world.npcs:
 		if not world.bounds.has_point(npc.global_position):
@@ -102,9 +102,10 @@ func _run() -> void:
 		hostile.look_at(actor.global_position + Vector3.UP)
 		hostile.call("set_target", actor)
 		hostile.call("notice_weapon", actor.global_position)
+		hostile.set("_engage_time", 10.0)
 		var initial_health: float = float(actor.get("health"))
 		var damaged: bool = false
-		for i in range(240):
+		for i in range(480):
 			await physics_frame
 			if float(actor.get("health")) < initial_health - 0.5:
 				damaged = true

@@ -60,6 +60,8 @@ func start(p_viewport: Viewport, p_iface: Object = null, p_tree: SceneTree = nul
 		return _result(false, "no_viewport")
 	if iface is XRInterface:
 		XRServer.primary_interface = iface as XRInterface
+		# Rastreo de suelo (local-floor): la cabeza reporta su altura real sobre el suelo.
+		(iface as XRInterface).play_area_mode = XRInterface.XR_PLAY_AREA_ROOMSCALE
 		# El runtime OpenXR marca el ritmo; vsync propio añade latencia.
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	viewport.use_xr = true
@@ -179,3 +181,31 @@ func resume_game() -> void:
 		return
 	tree.paused = false
 	paused_by_xr = false
+
+
+func shutdown() -> void:
+	# Desconectar todas las seniales del ciclo de vida
+	if iface != null:
+		for name in ["session_begun", "session_visible", "session_focussed", "session_stopping",
+				"session_loss_pending", "pose_recentered", "user_presence_changed"]:
+			if iface.has_signal(name) and iface.is_connected(name, Callable(self, "_on_" + name)):
+				iface.disconnect(name, Callable(self, "_on_" + name))
+		# Desinicializar interfaz XR si tiene el metodo
+		if iface.has_method("uninitialize"):
+			iface.call("uninitialize")
+	# Limpiar viewport
+	if viewport != null and is_instance_valid(viewport):
+		viewport.use_xr = false
+	# Limpiar XRServer
+	if XRServer.primary_interface != null:
+		XRServer.primary_interface = null
+	# Restaurar vsync
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED)
+	# Limpiar estado estatico
+	active = null
+	last_result = {"xr_active": false, "reason": "shutdown"}
+	iface = null
+	tree = null
+	viewport = null
+	paused_by_xr = false
+	focused = false

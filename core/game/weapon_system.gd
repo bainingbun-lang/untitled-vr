@@ -12,6 +12,7 @@ const DbScript = preload("res://core/game/weapon_db.gd")
 const GoreFxScript = preload("res://core/game/gore_fx.gd")
 const SurfaceScript = preload("res://core/game/surface_material.gd")
 const ImpactFxScript = preload("res://core/game/impact_fx.gd")
+const ModHooksScript = preload("res://core/game/mod_hooks.gd")
 
 const CYCLE_REASON := "montar arma"
 const CYCLE_BACK := 0.06
@@ -23,6 +24,7 @@ const MAX_RICOCHETS := 2
 const VERY_FAR := 1.0e30
 
 var spread_scale: float = 1.0
+var damage_scale: float = 1.0
 var impulse_scale: float = 1.0
 var projectile_mode: String = "auto"
 var dismember_on_kill: bool = false
@@ -130,6 +132,10 @@ func set_manual_lock(weapon_id: String, reason: String = "recargando") -> void:
 	if reason.is_empty():
 		_manual_locks.erase(weapon_id)
 	else:
+		if not _manual_locks.has(weapon_id):
+			var lower := reason.to_lower()
+			if lower.contains("encasquill") or lower.contains("jam"):
+				ModHooksScript.emit("weapon_jammed", {"weapon_id": weapon_id, "reason": reason})
 		_manual_locks[weapon_id] = reason
 
 
@@ -260,12 +266,21 @@ func fire(weapon_id: String, origin: Vector3, direction: Vector3, space: Physics
 
 	var count: int = maxi(int(def.get("pellets", 1)), 1)
 	result["pellets"] = count
+	var fired_event := ModHooksScript.emit("weapon_fired", {
+		"weapon_id": weapon_id, "origin": origin, "direction": base_direction,
+		"pellets": count, "damage": maxf(float(def.get("damage", 0.0)), 0.0),
+		"ammo": int(_magazines.get(weapon_id, -1)), "projectile": false,
+	})
+	var fired_payload: Dictionary = fired_event.get("payload", {})
+	var hooked_damage := maxf(
+		float(fired_payload.get("damage", float(def.get("damage", 0.0)))) * damage_scale, 0.0
+	)
 	var excluded := _to_rids(exclude)
 	if _use_projectile(def, origin, base_direction, space, excluded):
-		_spawn_projectiles(weapon_id, def, origin, base_direction, excluded, space, result)
+		_spawn_projectiles(weapon_id, def, origin, base_direction, excluded, space, result, hooked_damage)
 		return result
 
-	var damage: float = maxf(float(def.get("damage", 0.0)), 0.0)
+	var damage: float = hooked_damage
 	var shot_range: float = maxf(float(def.get("range", 10.0)), 0.01)
 	var spread: float = maxf(float(def.get("spread", 0.0)), 0.0) * clampf(spread_scale, 0.0, 4.0)
 	for i in range(count):
@@ -288,6 +303,7 @@ func _resolve_reloads() -> void:
 		if _time < float(_reload_ready[key]):
 			continue
 		var def: Dictionary = DbScript.get_def(weapon_id)
+		var duration := float(_reload_total.get(weapon_id, 0.0))
 		_reload_ready.erase(key)
 		_reload_total.erase(key)
 		if def.is_empty():
@@ -298,6 +314,10 @@ func _resolve_reloads() -> void:
 		var taken: int = mini(need, stored)
 		_magazines[weapon_id] = int(_magazines.get(weapon_id, 0)) + taken
 		_reserves[weapon_id] = stored - taken
+		ModHooksScript.emit("weapon_reloaded", {
+			"weapon_id": weapon_id, "mag": int(_magazines[weapon_id]),
+			"reserve": int(_reserves[weapon_id]), "duration": duration,
+		})
 		reload_finished.emit(weapon_id)
 
 
@@ -398,10 +418,10 @@ func _use_projectile(def: Dictionary, origin: Vector3, direction: Vector3, space
 	return origin.distance_to(probe.get("position", origin)) >= minimum
 
 
-func _spawn_projectiles(weapon_id: String, def: Dictionary, origin: Vector3, direction: Vector3, excluded: Array[RID], space: PhysicsDirectSpaceState3D, result: Dictionary) -> void:
+func _spawn_projectiles(weapon_id: String, def: Dictionary, origin: Vector3, direction: Vector3, excluded: Array[RID], space: PhysicsDirectSpaceState3D, result: Dictionary, base_damage: float = -1.0) -> void:
 	var speed := float(def.get("projectile_speed", 0.0))
 	var gravity := 9.81 * clampf(float(def.get("projectile_gravity", 0.0)), 0.0, 2.0)
-	var damage := maxf(float(def.get("damage", 0.0)), 0.0)
+	var damage := base_damage if base_damage >= 0.0 else maxf(float(def.get("damage", 0.0)), 0.0)
 	var spread := maxf(float(def.get("spread", 0.0)), 0.0) * clampf(spread_scale, 0.0, 4.0)
 	var shot_range := maxf(float(def.get("range", 100.0)), 0.01)
 	var count: int = mini(maxi(int(def.get("pellets", 1)), 1), MAX_PROJECTILES)
@@ -472,6 +492,13 @@ func _step_projectile_batch(dt: float) -> void:
 				"penetrations": step_result["penetrations"],
 				"ricochets": step_result["ricochets"],
 			})
+			if bool(step_result["hit"]):
+				ModHooksScript.emit("projectile_hit", {
+					"weapon_id": str(projectile["weapon_id"]), "hit": true,
+					"position": step_result["position"], "damage": float(step_result["damage"]),
+					"distance": float(step_result["distance"]),
+					"surface": str(step_result.get("surface_name", "concrete")),
+				})
 	for projectile in done:
 		_projectiles.erase(projectile)
 

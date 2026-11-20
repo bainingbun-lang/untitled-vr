@@ -47,10 +47,11 @@ func discover(dir: String) -> Dictionary:
 		var text := file.get_as_text()
 		file.close()
 
-		var data: Variant = JSON.parse_string(text)
-		if data == null:
-			rejected[subdir] = "JSON invalido en mod.json"
+		var parse_result: Variant = JSON.parse_string(text)
+		if typeof(parse_result) == TYPE_DICTIONARY and parse_result.has("error"):
+			rejected[subdir] = "JSON invalido en mod.json: %s" % parse_result["error_string"]
 			continue
+		var data: Variant = parse_result
 		if typeof(data) != TYPE_DICTIONARY:
 			rejected[subdir] = "mod.json debe ser un objeto JSON"
 			continue

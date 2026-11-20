@@ -1,0 +1,13 @@
+{
+  "content": [
+    {
+      "type": "item",
+      "id": "untitled.example-weapon:rust_pistol",
+      "nombre": "Pistola oxidada",
+      "apilable": false,
+      "max_stack": 1,
+      "peso": 1.0,
+      "tags": ["sidearm", "example", "weapon"]
+    }
+  ]
+}

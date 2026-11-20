@@ -15,6 +15,7 @@ const InventoryScript = preload("res://core/game/inventory.gd")
 const LoadoutScript = preload("res://core/game/loadout.gd")
 const DbScript = preload("res://core/game/weapon_db.gd")
 const GeneratorScript = preload("res://core/maps/map_generator.gd")
+const ThemesScript = preload("res://core/maps/map_themes.gd")
 const VrVehicleInputScript = preload("res://core/vr/vr_vehicle_input.gd")
 
 const PAUSE_BUTTONS: Array = [
@@ -24,9 +25,18 @@ const PAUSE_BUTTONS: Array = [
 	{"id": "quit", "label": "SALIR", "rect": Rect2(-0.13, 0.15, 0.26, 0.07)},
 ]
 const START_BUTTONS: Array = [
-	{"id": "play", "label": "JUGAR", "rect": Rect2(-0.2, 0.05, 0.4, 0.08)},
+	{"id": "play", "label": "JUGAR: OFICINA", "rect": Rect2(-0.2, 0.05, 0.4, 0.08)},
 	{"id": "map_next", "label": "OTRO MAPA", "rect": Rect2(-0.2, -0.06, 0.4, 0.08)},
 	{"id": "recalibrate", "label": "RECALIBRAR", "rect": Rect2(-0.2, -0.17, 0.4, 0.08)},
+]
+
+# La oficina (Ciudad con la Oficina Central) es siempre la primera opcion.
+const MAP_CHOICES: Array = [
+	{"label": "OFICINA", "theme": "urbano", "seed": 1001, "office": true},
+	{"label": "CIUDAD", "theme": "urbano", "seed": 1001, "office": false},
+	{"label": "INDUSTRIAL", "theme": "industrial", "seed": 2002, "office": false},
+	{"label": "RURAL", "theme": "rural", "seed": 3003, "office": false},
+	{"label": "ARENA", "theme": "", "seed": 4242, "office": false},
 ]
 
 static var xr_available_override: Callable = Callable()
@@ -53,6 +63,8 @@ class State extends Node:
 	var _interact_button_down: bool = false
 	var _grab_prev: bool = false
 	var _last_camera_basis: Basis = Basis.IDENTITY
+	var _eye_timer: float = 0.0
+	var _eye_done: bool = false
 
 
 	func configure(p_world: Node3D, p_rig: Node3D, p_ws: Node, p_meta: Dictionary) -> void:
@@ -151,6 +163,7 @@ class State extends Node:
 			if flat_ui_guard.is_valid():
 				flat_ui_removed += int(flat_ui_guard.call(world))
 		rig.call("step", delta)
+		_auto_eye_height(delta)
 		if weapon_system != null and is_instance_valid(weapon_system):
 			weapon_system.call("advance", maxf(delta, 0.0))
 		_update_vehicle_control(maxf(delta, 0.0))
@@ -159,6 +172,27 @@ class State extends Node:
 		_update_pointer()
 		if hud != null:
 			hud.decay_vignette(delta)
+
+
+	# Sin perfil guardado: fundas y bolso se ajustan a la altura real de la cabeza (sin calibracion guiada).
+	func _auto_eye_height(delta: float) -> void:
+		if _eye_done or rig == null or rig.xr_camera == null:
+			return
+		_eye_timer += maxf(delta, 0.0)
+		if _eye_timer < 2.0:
+			return
+		_eye_done = true
+		var calibration = rig.get_meta("calibration", null)
+		if calibration == null or calibration.last_status == "ok":
+			return
+		var eye: float = rig.xr_camera.global_position.y - rig.global_position.y
+		if eye < CalibrationScript.EYE_RANGE.x or eye > CalibrationScript.EYE_RANGE.y:
+			return
+		calibration.profile["eye_height"] = eye
+		calibration.apply_to_bag(bag)
+		for hand in hands.values():
+			if hand != null and hand.holsters != null and "offsets" in hand.holsters:
+				hand.holsters.offsets = calibration.slot_offsets()
 
 
 	func refresh_hud() -> void:
@@ -428,11 +462,8 @@ class State extends Node:
 
 
 	func _start_next_map() -> void:
-		var seed_value: int = int(selected_meta.get("seed", 4242)) + 101
-		var next_meta: Dictionary = GeneratorScript.generate(seed_value, {
-			"width": 24, "height": 18, "obstacle_density": 0.18, "spawn_count": 4,
-		})
-		if not bool(next_meta.get("ok", false)):
+		var next_meta: Dictionary = VrGameMode.map_choice_meta(int(selected_meta.get("choice_index", 0)) + 1)
+		if next_meta.is_empty():
 			return
 		GameSession.vr_menu_confirmed = true
 		GameSession.start(next_meta, get_tree())
@@ -512,16 +543,17 @@ class StartMenuHost extends Node3D:
 	func on_button(button_id: String) -> void:
 		if button_id == "recalibrate":
 			return
-		var meta: Dictionary = chosen_meta.duplicate(true)
 		if button_id == "map_next":
-			var seed_value: int = int(chosen_meta.get("seed", 4242)) + 101
-			var generated: Dictionary = GeneratorScript.generate(seed_value, {
-				"width": 24, "height": 18, "obstacle_density": 0.18, "spawn_count": 4,
-			})
-			if bool(generated.get("ok", false)):
-				meta = generated
+			var next_meta: Dictionary = VrGameMode.map_choice_meta(int(chosen_meta.get("choice_index", 0)) + 1)
+			if not next_meta.is_empty():
+				chosen_meta = next_meta
+				if menu != null and menu.has_method("set_buttons"):
+					var labeled: Array = START_BUTTONS.duplicate(true)
+					(labeled[0] as Dictionary)["label"] = "JUGAR: " + str(chosen_meta.get("choice_label", "MAPA"))
+					menu.call("set_buttons", labeled)
+			return
 		GameSession.vr_menu_confirmed = true
-		GameSession.start(meta, get_tree())
+		GameSession.start(chosen_meta.duplicate(true), get_tree())
 
 
 	func _unhandled_input(event: InputEvent) -> void:
@@ -697,9 +729,12 @@ static func setup(world: Node3D, rig: Node3D, meta: Dictionary) -> Dictionary:
 	world.add_child(state)
 	state.configure(world, rig, ws, meta)
 
-	for h in (state.hands as Dictionary).values():
-		if h != null:
-			h.auto_equip = true
+	# Solo la mano dominante nace armada (con ambas, la izquierda se llevaba la pistola).
+	var calibration = rig.get_meta("calibration", null)
+	var dominant: String = calibration.dominant_hand() if calibration != null else "right"
+	var main_hand = (state.hands as Dictionary).get(dominant, null)
+	if main_hand != null:
+		main_hand.auto_equip = true
 	result["state"] = state
 	result["weapon_system"] = ws
 	result["hud"] = state.hud
@@ -745,8 +780,41 @@ static func build_start_menu(meta: Dictionary, tree: SceneTree):
 	return menu
 
 
-static func default_map_meta(seed_value: int = 4242) -> Dictionary:
-	var meta: Dictionary = GeneratorScript.generate(seed_value, {
-		"width": 24, "height": 18, "obstacle_density": 0.18, "spawn_count": 4,
-	})
-	return meta if bool(meta.get("ok", false)) else {}
+static func default_map_meta(_seed_value: int = 4242) -> Dictionary:
+	return map_choice_meta(0)
+
+
+static func map_choice_meta(index: int) -> Dictionary:
+	var choice: Dictionary = MAP_CHOICES[posmod(index, MAP_CHOICES.size())]
+	var params: Dictionary = {
+		"width": 24, "height": 18, "obstacle_density": 0.12, "spawn_count": 4,
+	}
+	var meta: Dictionary
+	var theme: String = str(choice["theme"])
+	if theme.is_empty():
+		meta = GeneratorScript.generate(int(choice["seed"]), params)
+	else:
+		params["theme"] = theme
+		params["theme_density"] = 0.55
+		params["time_of_day"] = "dia"
+		meta = ThemesScript.generate(int(choice["seed"]), params)
+	if not bool(meta.get("ok", false)):
+		return {}
+	meta["choice_index"] = posmod(index, MAP_CHOICES.size())
+	meta["choice_label"] = str(choice["label"])
+	if bool(choice["office"]):
+		_spawn_inside_office(meta)
+	return meta
+
+
+# El jugador nace dentro de la oficina; el resto de aparicion sigue como estaba.
+static func _spawn_inside_office(meta: Dictionary) -> void:
+	var office: Dictionary = (meta.get("theme_data", {}) as Dictionary).get("office", {})
+	var inside: Array = office.get("spawns", [])
+	if inside.is_empty():
+		return
+	var points: Array = (meta.get("spawn_points", []) as Array).duplicate()
+	var spot: Vector3 = inside[0]
+	points.push_front(Vector3(spot.x, 0.0, spot.z))
+	meta["spawn_points"] = points
+	meta["office_spawn"] = true

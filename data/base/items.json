@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "mod": "untitled.base",
+  "content": [
+    {"type": "item", "id": "untitled.base:pistol", "nombre": "Pistola", "apilable": false, "max_stack": 1, "peso": 1.2, "tags": ["sidearm", "weapon"]},
+    {"type": "item", "id": "untitled.base:submachine_gun", "nombre": "Subfusil", "apilable": false, "max_stack": 1, "peso": 2.8, "tags": ["smg", "weapon"]},
+    {"type": "item", "id": "untitled.base:assault_rifle", "nombre": "Rifle de asalto", "apilable": false, "max_stack": 1, "peso": 3.5, "tags": ["rifle", "weapon"]},
+    {"type": "item", "id": "untitled.base:shotgun", "nombre": "Escopeta", "apilable": false, "max_stack": 1, "peso": 3.2, "tags": ["shotgun", "weapon"]},
+    {"type": "item", "id": "untitled.base:sniper_rifle", "nombre": "Rifle de francotirador", "apilable": false, "max_stack": 1, "peso": 4.0, "tags": ["sniper", "weapon"]},
+    {"type": "item", "id": "untitled.base:bat", "nombre": "Bate", "apilable": false, "max_stack": 1, "peso": 1.5, "tags": ["melee", "weapon"]}
+  ]
+}

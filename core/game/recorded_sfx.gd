@@ -49,14 +49,14 @@ const BANKS := {
 	"melee": ["melee_01.ogg", "melee_02.ogg", "melee_03.ogg", "melee_04.ogg"],
 	"voice_pain_male": ["voice_pain_male_01.ogg", "voice_pain_male_02.ogg", "voice_pain_male_03.ogg", "voice_pain_male_04.ogg", "voice_pain_male_05.ogg", "voice_pain_male_06.ogg", "voice_pain_male_07.ogg", "voice_pain_male_08.ogg", "voice_pain_male_09.ogg", "voice_pain_male_10.ogg", "voice_pain_male_11.ogg"],
 	"voice_pain_female": ["voice_pain_female_01.ogg", "voice_pain_female_02.ogg", "voice_pain_female_03.ogg", "voice_pain_female_04.ogg"],
-	"voice_fear_male": ["voice_fear_male_01.ogg", "voice_fear_male_02.ogg", "voice_fear_male_03.ogg", "voice_fear_male_04.ogg", "voice_fear_male_05.ogg", "voice_fear_male_06.ogg", "voice_fear_male_07.ogg", "voice_fear_male_08.ogg", "voice_fear_male_09.ogg", "voice_fear_male_10.ogg", "voice_fear_male_11.ogg", "voice_fear_male_12.ogg", "voice_fear_male_13.ogg"],
+	"voice_fear_male": ["voice_fear_male_01.ogg", "voice_fear_male_02.ogg", "voice_fear_male_03.ogg", "voice_fear_male_04.ogg", "voice_fear_male_05.ogg", "voice_fear_male_06.ogg", "voice_fear_male_07.ogg", "voice_fear_male_08.ogg", "voice_fear_male_09.ogg", "voice_fear_male_10.ogg", "voice_fear_male_11.ogg"],
 	"voice_fear_female": ["voice_fear_female_01.ogg", "voice_fear_female_02.ogg", "voice_fear_female_03.ogg"],
 	"voice_death_male": ["voice_death_male_01.ogg", "voice_death_male_02.ogg", "voice_death_male_03.ogg", "voice_death_male_04.ogg", "voice_death_male_05.ogg", "voice_death_male_06.ogg", "voice_death_male_07.ogg", "voice_death_male_08.ogg"],
-	"voice_death_female": ["voice_death_female_01.ogg", "voice_death_female_02.ogg", "voice_death_female_03.ogg", "voice_death_female_04.ogg", "voice_death_female_05.ogg", "voice_death_female_06.ogg"],
+	"voice_death_female": ["voice_death_female_02.ogg", "voice_death_female_03.ogg", "voice_death_female_04.ogg", "voice_death_female_05.ogg", "voice_death_female_06.ogg"],
 	"voice_effort_male": ["voice_effort_male_01.ogg", "voice_effort_male_02.ogg", "voice_effort_male_03.ogg", "voice_effort_male_04.ogg"],
 	"voice_effort_female": ["voice_effort_female_01.ogg", "voice_effort_female_02.ogg", "voice_effort_female_03.ogg"],
 	"voice_pant": ["voice_pant_01.ogg", "voice_pant_02.ogg", "voice_pant_03.ogg"],
-	"voice_growl": ["voice_growl_01.ogg", "voice_growl_02.ogg", "voice_growl_03.ogg", "voice_growl_04.ogg", "voice_growl_05.ogg", "voice_growl_06.ogg", "voice_growl_07.ogg", "voice_growl_08.ogg", "voice_growl_09.ogg", "voice_growl_10.ogg", "voice_growl_11.ogg", "voice_growl_12.ogg", "voice_growl_13.ogg"],
+	"voice_growl": ["voice_growl_01.ogg", "voice_growl_02.ogg", "voice_growl_03.ogg", "voice_growl_04.ogg", "voice_growl_05.ogg", "voice_growl_06.ogg", "voice_growl_07.ogg", "voice_growl_08.ogg", "voice_growl_09.ogg", "voice_growl_10.ogg", "voice_growl_11.ogg", "voice_growl_12.ogg"],
 	"voice_laugh": ["voice_laugh_01.ogg", "voice_laugh_02.ogg", "voice_laugh_03.ogg", "voice_laugh_04.ogg", "voice_laugh_05.ogg", "voice_laugh_06.ogg"],
 	"voice_cough": ["voice_cough_01.ogg", "voice_cough_02.ogg", "voice_cough_03.ogg"],
 	"voice_cry": ["voice_cry_01.ogg", "voice_cry_02.ogg", "voice_cry_03.ogg"],
@@ -96,6 +96,10 @@ static func stream_for(weapon_id: String, kind: String) -> AudioStream:
 	var s: AudioStream = load(path)
 	_cache[path] = s
 	return s
+
+
+static func clear_cache() -> void:
+	_cache.clear()
 
 
 static func bank_names() -> Array:
