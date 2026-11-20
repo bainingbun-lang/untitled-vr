@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "id": "lint.traversal",
+  "version": "1.0.0",
+  "engine": "4.7",
+  "entry": "res://tests/fixtures/mods_lint/../escape/main.gd"
+}

@@ -3,14 +3,17 @@ class_name RuntimeLua extends RuntimeAdapter
 var sandbox
 
 func load(manifest: Dictionary, dir: String) -> String:
+	if not ClassDB.class_exists("LuaSandbox"):
+		return "LuaSandbox extension not available"
+
 	var entry_file = manifest.get("entry", "main.lua")
 	var path = dir.path_join(entry_file)
-	
+
 	if not FileAccess.file_exists(path):
 		return "entry file not found: " + path
-	
+
 	var source = FileAccess.get_file_as_string(path)
-	
+
 	sandbox = ClassDB.instantiate("LuaSandbox")
 	var load_res = sandbox.load(source)
 	if load_res is bool and load_res == true:

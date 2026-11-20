@@ -1,6 +1,24 @@
 extends SceneTree
 
 func _init():
+	if not ClassDB.class_exists("WasmSandbox"):
+		print("Test 0: Extension absent")
+		var runtime_absent = RuntimeWasm.new()
+		var res_absent = runtime_absent.load({"entry": "valid.wasm"}, "res://tests/fixtures/wasm/")
+		if res_absent == "":
+			print("FAIL: Expected controlled error when WasmSandbox extension is unavailable")
+			quit(1)
+		if res_absent.find("not available") == -1:
+			print("FAIL: Unexpected absent-extension error: " + res_absent)
+			quit(1)
+		if runtime_absent.sandbox != null:
+			print("FAIL: Sandbox should remain null when extension is unavailable")
+			quit(1)
+		print("PASS: Extension absent handled: " + res_absent)
+		print("SKIP: Real WASM runtime tests require WasmSandbox extension")
+		quit(0)
+		return
+
 	var result = run_tests()
 	if result:
 		quit(0)
@@ -9,7 +27,7 @@ func _init():
 
 func run_tests() -> bool:
 	var all_passed = true
-	var abs_dir = "/data/data/com.termux/files/home/UNTITLED/tests/fixtures/wasm/"
+	var abs_dir = "res://tests/fixtures/wasm/"
 	var mock_api = ModApi.new("test_mod", null, [])
 	mock_api.set_meta("permissions", {"emit": false})
 

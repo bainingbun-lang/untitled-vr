@@ -5,14 +5,17 @@ const CONTRACT_VERSION = 1
 var sandbox
 
 func load(manifest: Dictionary, dir: String) -> String:
+	if not ClassDB.class_exists("WasmSandbox"):
+		return "WasmSandbox extension not available"
+
 	var entry_path = dir.path_join(manifest.get("entry", "module.wasm"))
 	if not FileAccess.file_exists(entry_path):
 		return "entry file not found: " + entry_path
-	
+
 	var bytes = FileAccess.get_file_as_bytes(entry_path)
 	if bytes.is_empty():
 		return "could not read entry file: " + entry_path
-	
+
 	sandbox = ClassDB.instantiate("WasmSandbox")
 	var res = sandbox.load(bytes)
 	if res is bool and res == true:

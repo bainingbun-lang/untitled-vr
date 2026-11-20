@@ -228,16 +228,9 @@ func _init() -> void:
 	_expect(scope_ok, "el analisis debe cubrir solo core/ y tests/")
 	_expect(checker.findings.size() > 0, "el analisis debe reportar los hallazgos presentes en el codigo")
 
-	_expect(_finding_exists(checker.findings, "res://core/runtime_lua.gd", "CLASSDB_SIN_GUARDA"), \
-		"debe hallar ClassDB sin guarda en core/runtime_lua.gd")
-	_expect(_finding_exists(checker.findings, "res://core/runtime_wasm.gd", "CLASSDB_SIN_GUARDA"), \
-		"debe hallar ClassDB sin guarda en core/runtime_wasm.gd")
-	_expect(_finding_exists(checker.findings, "res://tests/test_example_mod.gd", "PROCESO_EXTERNO"), \
-		"debe hallar proceso externo en tests/test_example_mod.gd")
-	_expect(_finding_exists(checker.findings, "res://tests/test_runtime_lua.gd", "RUTA_ABSOLUTA"), \
-		"debe hallar ruta absoluta en tests/test_runtime_lua.gd")
-	_expect(_finding_exists(checker.findings, "res://tests/test_runtime_wasm.gd", "RUTA_ABSOLUTA"), \
-		"debe hallar ruta absoluta en tests/test_runtime_wasm.gd")
+	# hallazgos graves ya corregidos (A12): no deben reaparecer
+	for f in ["res://core/runtime_lua.gd", "res://core/runtime_wasm.gd", "res://tests/test_example_mod.gd", "res://tests/test_runtime_lua.gd", "res://tests/test_runtime_wasm.gd"]:
+		_expect(not _finding_exists(checker.findings, f, ""), "sin hallazgos en " + f)
 	_expect(_finding_exists(checker.findings, "res://tests/test_mod_manifest.gd", "BACKSLASH"), \
 		"debe hallar el literal con backslash en tests/test_mod_manifest.gd")
 	_expect(not _finding_exists(checker.findings, SELF_FILE, ""), \

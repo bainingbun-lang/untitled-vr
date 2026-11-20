@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "id": "lint.valid",
+  "version": "1.0.0",
+  "engine": "4.7",
+  "entry": "res://tests/fixtures/mods_lint/valid/entry.gd",
+  "platforms": ["android", "pc", "vr"],
+  "permissions": []
+}

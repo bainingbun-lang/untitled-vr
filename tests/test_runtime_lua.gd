@@ -1,20 +1,42 @@
 extends SceneTree
 
 func _init():
+	var dir_lua = "res://tests/fixtures/lua/"
+
+	# Extension-absent path (controlled error, no crash)
+	if not ClassDB.class_exists("LuaSandbox"):
+		print("Test 0: Extension absent")
+		var runtime_absent = RuntimeLua.new()
+		var manifest_absent = {"entry": "valid.lua", "permissions": []}
+		var res_absent = runtime_absent.load(manifest_absent, dir_lua)
+		if res_absent == "":
+			print("FAIL: Expected controlled error when LuaSandbox extension is unavailable")
+			quit(1)
+		if res_absent.find("not available") == -1:
+			print("FAIL: Unexpected absent-extension error: " + res_absent)
+			quit(1)
+		if runtime_absent.sandbox != null:
+			print("FAIL: Sandbox should remain null when extension is unavailable")
+			quit(1)
+		print("PASS: Extension absent handled: " + res_absent)
+		print("SKIP: Real Lua runtime tests require LuaSandbox extension")
+		print("ALL TESTS PASSED")
+		quit(0)
+		return
+
 	var runtime = RuntimeLua.new()
-	var dir_lua = "/data/data/com.termux/files/home/UNTITLED/tests/fixtures/lua/"
-	
+
 	# Test 1: Valid mod load and init
 	print("Test 1: Valid mod load and init")
 	var manifest_valid = {"entry": "valid.lua", "permissions": ["emit", "subscribe"]}
 	var bus = ModEventBus.new()
 	var mock_api_valid = ModApi.new("test_valid", bus, manifest_valid["permissions"])
-	
+
 	var res_load = runtime.load(manifest_valid, dir_lua)
 	if res_load != "":
 		print("FAIL: Valid load failed: " + res_load)
 		quit(1)
-	
+
 	var res_init = runtime.init(mock_api_valid)
 	if res_init != "":
 		print("FAIL: Valid init failed: " + res_init)
