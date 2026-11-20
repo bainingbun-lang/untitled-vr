@@ -1,6 +1,8 @@
 class_name MapWorldBuilder
 extends RefCounted
 
+const WorldMaterialsScript = preload("res://core/maps/world_materials.gd")
+
 const MAX_NODES: int = 180
 const MAX_OBSTACLES: int = 32
 const MAX_PROPS: int = 6
@@ -19,7 +21,8 @@ const GEOMETRY_CONVENTION: String = (
 	+ "obstacles > obstacle_cells > grid ('#' es obstaculo, 'S' es spawn); "
 	+ "obstaculos muestreados por paso deterministico para no exceder MAX_NODES; "
 	+ "GAMEPLAY_NODES reserva hueco para HUD, hotbar y maniquies; "
-	+ "props RigidBody3D del grupo physics_props distribuidos por meta.seed evitando spawns"
+	+ "props RigidBody3D del grupo physics_props distribuidos por meta.seed evitando spawns; "
+	+ "superficies PBR triplanar y props glTF reales con colision convexa simple y set_meta('surface')"
 )
 
 
@@ -53,21 +56,25 @@ static func build(meta: Dictionary, parent: Node3D) -> Dictionary:
 	root.name = "WorldGeometry"
 	parent.add_child(root)
 
-	var ground_material := _material(Color(0.24, 0.34, 0.22))
-	var wall_material := _material(Color(0.38, 0.36, 0.32))
-	var obstacle_material := _material(Color(0.44, 0.43, 0.40))
-	var prop_material := _material(Color(0.55, 0.32, 0.18))
+	var ground_material := WorldMaterialsScript.surface_material("ground")
+	var wall_material := WorldMaterialsScript.surface_material("brick")
+	var obstacle_materials := [
+		WorldMaterialsScript.surface_material("concrete"),
+		WorldMaterialsScript.surface_material("wood"),
+		WorldMaterialsScript.surface_material("metal"),
+	]
+	var obstacle_surfaces := ["concrete", "wood", "metal"]
 
 	_build_floor(root, bounds, ground_material)
-	_build_walls(root, bounds, wall_material)
-	_build_obstacles(root, obstacle_points, obstacle_material)
+	_build_walls(root, bounds, wall_material, "brick")
+	_build_obstacles(root, obstacle_points, obstacle_materials, obstacle_surfaces)
 	_build_environment(root)
 	_build_spawn_markers(root, spawn_points, marker_count)
 	var props: Array = populate_physics_props(
-		root, meta, bounds, spawn_points, prop_limit, prop_material
+		root, meta, bounds, spawn_points, prop_limit
 	)
 
-	return {
+	var report: Dictionary = {
 		"ok": true,
 		"spawn_points": spawn_points,
 		"bounds": bounds,
@@ -76,50 +83,47 @@ static func build(meta: Dictionary, parent: Node3D) -> Dictionary:
 		"obstacle_count": obstacle_points.size(),
 		"node_count": count_nodes(root),
 	}
+	if meta.has("theme") and ResourceLoader.exists("res://core/maps/map_themes.gd"):
+		var theme_script: Script = load("res://core/maps/map_themes.gd") as Script
+		if theme_script != null and theme_script.has_method("decorate_builder_report"):
+			report = theme_script.call("decorate_builder_report", root, meta, report)
+	return report
 
 
 static func create_physics_prop(
-	parent: Node3D, position: Vector3, kind: String = "box", size: float = 0.6,
+	parent: Node3D, position: Vector3, kind: String = "barrel_metal", size: float = 0.6,
 	material: StandardMaterial3D = null
 ) -> RigidBody3D:
+	var config := WorldMaterialsScript.prop_config(kind)
+	var base_height := maxf(0.05, float(config.get("height", 0.8)))
+	var ratio := clampf(size / 0.6, 0.4, 3.0)
+	var height := base_height * ratio
+
 	var body := RigidBody3D.new()
-	body.name = "Prop_%s" % kind
+	body.name = "Prop_%s" % str(config.get("kind", kind))
 	body.collision_layer = 2
 	body.collision_mask = 1
 	body.position = position
-
-	var shape: Shape3D
-	var mesh: Mesh
-	if kind == "barrel":
-		var radius: float = size * 0.5
-		var height: float = size * 1.4
-		var cylinder_shape := CylinderShape3D.new()
-		cylinder_shape.radius = radius
-		cylinder_shape.height = height
-		shape = cylinder_shape
-		var cylinder_mesh := CylinderMesh.new()
-		cylinder_mesh.top_radius = radius
-		cylinder_mesh.bottom_radius = radius
-		cylinder_mesh.height = height
-		mesh = cylinder_mesh
-	else:
-		var box_shape := BoxShape3D.new()
-		box_shape.size = Vector3(size, size, size)
-		shape = box_shape
-		var box_mesh := BoxMesh.new()
-		box_mesh.size = Vector3(size, size, size)
-		mesh = box_mesh
+	body.mass = maxf(0.5, float(config.get("mass", 8.0)) * ratio)
+	body.set_meta("surface", str(config.get("surface", "metal")))
+	body.set_meta("prop_kind", str(config.get("kind", kind)))
 
 	var collision := CollisionShape3D.new()
-	collision.shape = shape
+	collision.shape = _collision_shape(config, height)
 	body.add_child(collision)
-	var visual := MeshInstance3D.new()
-	visual.mesh = mesh
-	if material != null:
-		visual.material_override = material
-	body.add_child(visual)
+
+	var packed := WorldMaterialsScript.prop_scene(str(config.get("kind", kind)))
+	if packed != null:
+		var visual: Node = packed.instantiate()
+		if visual is Node3D:
+			body.add_child(visual)
+			_fit_visual(visual as Node3D, height)
+		else:
+			visual.queue_free()
+
 	body.add_to_group("physics_props")
-	parent.add_child(body)
+	if parent != null:
+		parent.add_child(body)
 	return body
 
 
@@ -151,11 +155,68 @@ static func populate_physics_props(
 			0.7,
 			rng.randf_range(min_z, max_z)
 		)
-		if _too_close(point, spawn_points, 2.0) or _too_close(point, placed, 1.4):
+		if _too_close_planar(point, spawn_points, 2.8) or _too_close(point, placed, 1.4):
 			continue
-		var kind: String = "barrel" if rng.randi_range(0, 1) == 0 else "box"
+		var kind: String = WorldMaterialsScript.prop_kind(rng.randi())
 		placed.append(point)
-		result.append(create_physics_prop(parent, point, kind, 0.6, material))
+		result.append(create_physics_prop(parent, point, kind, 0.6))
+	return result
+
+
+static func _collision_shape(config: Dictionary, height: float) -> Shape3D:
+	var dims: Array = config.get("collision", [0.6, height, 0.6])
+	var base_height := maxf(0.05, float(config.get("height", height)))
+	var ratio := height / base_height
+	var width := maxf(0.05, float(dims[0]) * ratio)
+	var depth := maxf(0.05, float(dims[2]) * ratio)
+	var shape_height := maxf(0.05, float(dims[1]) * ratio)
+	if str(config.get("shape", "box")) == "cylinder":
+		var cylinder := CylinderShape3D.new()
+		cylinder.radius = width * 0.5
+		cylinder.height = shape_height
+		return cylinder
+	var box := BoxShape3D.new()
+	box.size = Vector3(width, shape_height, depth)
+	return box
+
+
+static func _fit_visual(visual: Node3D, target_height: float) -> void:
+	var bounds := _visual_aabb(visual)
+	if bounds.size.y <= 0.0001:
+		return
+	var scale := clampf(target_height / bounds.size.y, 0.05, 20.0)
+	visual.scale = Vector3(scale, scale, scale)
+	visual.position = Vector3(
+		-bounds.get_center().x * scale,
+		-bounds.position.y * scale + 0.01,
+		-bounds.get_center().z * scale
+	)
+
+
+static func _visual_aabb(root: Node3D) -> AABB:
+	var result := AABB()
+	var found := false
+	var stack: Array = [root]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		if node is MeshInstance3D:
+			var instance := node as MeshInstance3D
+			if instance.mesh != null:
+				var box: AABB = instance.mesh.get_aabb()
+				var transform: Transform3D = instance.transform
+				var cursor: Node = instance.get_parent()
+				while cursor != null and cursor != root:
+					if cursor is Node3D:
+						transform = (cursor as Node3D).transform * transform
+					cursor = cursor.get_parent()
+				box = transform * box
+				if found:
+					result = result.merge(box)
+				else:
+					result = box
+					found = true
+		for child in node.get_children():
+			stack.append(child)
 	return result
 
 
@@ -180,19 +241,12 @@ static func _failure(errors: Array) -> Dictionary:
 	}
 
 
-static func _material(color: Color) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = 0.9
-	material.metallic = 0.0
-	return material
-
-
 static func _build_floor(root: Node3D, bounds: AABB, material: StandardMaterial3D) -> void:
 	var body := StaticBody3D.new()
 	body.name = "Ground"
 	body.collision_layer = 1
 	body.collision_mask = 0
+	body.set_meta("surface", "dirt")
 	var shape := BoxShape3D.new()
 	shape.size = Vector3(bounds.size.x, FLOOR_THICKNESS, bounds.size.z)
 	var collision := CollisionShape3D.new()
@@ -212,7 +266,9 @@ static func _build_floor(root: Node3D, bounds: AABB, material: StandardMaterial3
 	root.add_child(body)
 
 
-static func _build_walls(root: Node3D, bounds: AABB, material: StandardMaterial3D) -> void:
+static func _build_walls(
+	root: Node3D, bounds: AABB, material: StandardMaterial3D, surface: String
+) -> void:
 	var center_x: float = bounds.position.x + bounds.size.x * 0.5
 	var center_z: float = bounds.position.z + bounds.size.z * 0.5
 	var span_x: float = bounds.size.x + WALL_THICKNESS * 2.0
@@ -221,33 +277,34 @@ static func _build_walls(root: Node3D, bounds: AABB, material: StandardMaterial3
 	_static_box(
 		root, "WallNorth",
 		Vector3(center_x, center_y, bounds.position.z - WALL_THICKNESS * 0.5),
-		Vector3(span_x, WALL_HEIGHT, WALL_THICKNESS), material
+		Vector3(span_x, WALL_HEIGHT, WALL_THICKNESS), material, surface
 	)
 	_static_box(
 		root, "WallSouth",
 		Vector3(center_x, center_y, bounds.end.z + WALL_THICKNESS * 0.5),
-		Vector3(span_x, WALL_HEIGHT, WALL_THICKNESS), material
+		Vector3(span_x, WALL_HEIGHT, WALL_THICKNESS), material, surface
 	)
 	_static_box(
 		root, "WallWest",
 		Vector3(bounds.position.x - WALL_THICKNESS * 0.5, center_y, center_z),
-		Vector3(WALL_THICKNESS, WALL_HEIGHT, span_z), material
+		Vector3(WALL_THICKNESS, WALL_HEIGHT, span_z), material, surface
 	)
 	_static_box(
 		root, "WallEast",
 		Vector3(bounds.end.x + WALL_THICKNESS * 0.5, center_y, center_z),
-		Vector3(WALL_THICKNESS, WALL_HEIGHT, span_z), material
+		Vector3(WALL_THICKNESS, WALL_HEIGHT, span_z), material, surface
 	)
 
 
 static func _static_box(
 	root: Node3D, node_name: String, center: Vector3, size: Vector3,
-	material: StandardMaterial3D
+	material: StandardMaterial3D, surface: String = "concrete"
 ) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.name = node_name
 	body.collision_layer = 1
 	body.collision_mask = 0
+	body.set_meta("surface", surface)
 	var shape := BoxShape3D.new()
 	shape.size = size
 	var collision := CollisionShape3D.new()
@@ -265,43 +322,37 @@ static func _static_box(
 
 
 static func _build_obstacles(
-	root: Node3D, points: Array, material: StandardMaterial3D
+	root: Node3D, points: Array, materials: Array, surfaces: Array
 ) -> void:
 	for i in range(points.size()):
 		var point: Vector3 = points[i]
+		var index := i % maxi(1, materials.size())
 		_static_box(
 			root, "Obstacle_%d" % i,
 			Vector3(point.x, point.y + OBSTACLE_HEIGHT * 0.5, point.z),
-			Vector3(OBSTACLE_SIZE, OBSTACLE_HEIGHT, OBSTACLE_SIZE), material
+			Vector3(OBSTACLE_SIZE, OBSTACLE_HEIGHT, OBSTACLE_SIZE),
+			materials[index] as StandardMaterial3D,
+			str(surfaces[index])
 		)
 
 
 static func _build_environment(root: Node3D) -> void:
-	var sky := Sky.new()
-	var sky_material := ProceduralSkyMaterial.new()
-	sky_material.sky_top_color = Color(0.24, 0.42, 0.72)
-	sky_material.sky_horizon_color = Color(0.64, 0.78, 0.88)
-	sky_material.ground_bottom_color = Color(0.16, 0.18, 0.20)
-	sky_material.ground_horizon_color = Color(0.40, 0.42, 0.44)
-	sky.sky_material = sky_material
-
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_SKY
-	environment.sky = sky
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	environment.ambient_light_energy = 0.5
+	var mobile := WorldMaterialsScript.is_mobile()
 	var world_environment := WorldEnvironment.new()
 	world_environment.name = "WorldEnvironment"
-	world_environment.environment = environment
+	world_environment.environment = WorldMaterialsScript.make_environment(mobile)
 	root.add_child(world_environment)
 
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
-	sun.light_energy = 1.0
-	sun.rotation_degrees = Vector3(-45.0, -35.0, 0.0)
+	sun.light_color = Color(1.0, 0.72, 0.48)
+	sun.light_energy = 1.25 if not mobile else 1.1
+	sun.rotation_degrees = Vector3(-24.0, -38.0, 0.0)
 	sun.shadow_enabled = true
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-	sun.shadow_bias = 0.04
+	sun.directional_shadow_max_distance = 45.0
+	sun.shadow_bias = 0.035
+	sun.shadow_normal_bias = 0.02
 	root.add_child(sun)
 
 
@@ -427,6 +478,16 @@ static func _too_close(point: Vector3, others: Array, distance: float) -> bool:
 	for other in others:
 		var other_point: Vector3 = other
 		if point.distance_to(other_point) < distance:
+			return true
+	return false
+
+
+static func _too_close_planar(point: Vector3, others: Array, distance: float) -> bool:
+	for other in others:
+		var other_point: Vector3 = other
+		var dx: float = point.x - other_point.x
+		var dz: float = point.z - other_point.z
+		if dx * dx + dz * dz < distance * distance:
 			return true
 	return false
 

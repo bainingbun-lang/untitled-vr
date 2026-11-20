@@ -7,6 +7,9 @@ const WEAPON_DB_PATH := "res://core/game/weapon_db.gd"
 const ITEM_DB_PATH := "res://core/game/item_db.gd"
 const INVENTORY_PATH := "res://core/game/inventory.gd"
 const LOADOUT_PATH := "res://core/game/loadout.gd"
+const VIEWMODEL_PATH := "res://core/game/weapon_viewmodel.gd"
+const SFX_BANK_PATH := "res://core/game/sfx_bank.gd"
+const AUDIO_SYNTH_PATH := "res://core/game/audio_synth.gd"
 const TOUCH_SIGNALS := [
 	["move", "_on_touch_move"],
 	["look", "_on_touch_look"],
@@ -49,6 +52,7 @@ var head: Node3D
 var camera: Camera3D
 var touch_controls: Node
 var loadout_report: Dictionary = {}
+var viewmodel = null
 
 var _move_input := Vector2.ZERO
 var _drive_input := Vector3.ZERO
@@ -138,6 +142,41 @@ func _build_body() -> void:
 	camera.name = "Camera"
 	camera.current = true
 	head.add_child(camera)
+	_setup_viewmodel()
+
+
+func _setup_viewmodel() -> void:
+	if viewmodel != null and is_instance_valid(viewmodel):
+		return
+	var script := _safe_script(VIEWMODEL_PATH)
+	if script == null or camera == null:
+		return
+	var node: Node = script.new() as Node
+	if node == null or not (node is Node3D):
+		return
+	node.name = "WeaponViewmodel"
+	camera.add_child(node)
+	viewmodel = node
+	var fx = null
+	if viewmodel.has_method("muzzle_fx"):
+		fx = viewmodel.call("muzzle_fx")
+	if fx != null:
+		fx.casing_parent = get_parent() if get_parent() != null else self
+
+
+func _viewmodel_has_model(item_id: String) -> bool:
+	if viewmodel == null or not is_instance_valid(viewmodel):
+		return false
+	var script := _safe_script(VIEWMODEL_PATH)
+	return script != null and script.has_method("has_model_for") and bool(script.call("has_model_for", item_id))
+
+
+func _update_viewmodel_walk() -> void:
+	if viewmodel == null or not is_instance_valid(viewmodel) or not viewmodel.has_method("set_walk_intensity"):
+		return
+	var reference: float = run_speed if _running or Input.is_key_pressed(KEY_SHIFT) else walk_speed
+	var speed: float = Vector2(velocity.x, velocity.z).length() / maxf(reference, 0.01)
+	viewmodel.call("set_walk_intensity", maxf(clampf(speed, 0.0, 1.0), _move_input.length()))
 
 
 func _is_touch_platform() -> bool:
@@ -346,6 +385,7 @@ func _physics_process(delta: float) -> void:
 			velocity.y = jump_velocity
 		_jump_queued = false
 	move_and_slide()
+	_update_viewmodel_walk()
 
 
 func _process(delta: float) -> void:
@@ -429,6 +469,8 @@ func equip(item_id: String) -> bool:
 	if inventory != null and inventory.has_method("count") and int(inventory.count(item_id)) <= 0:
 		return false
 	equipped_weapon = item_id
+	if _viewmodel_has_model(item_id) and viewmodel.has_method("set_weapon"):
+		viewmodel.call("set_weapon", item_id)
 	weapon_changed.emit(item_id)
 	_emit_ammo()
 	return true
@@ -501,6 +543,15 @@ func reload() -> bool:
 		return false
 	var started := bool(ws.call("reload", equipped_weapon))
 	if started:
+		var duration: float = maxf(float(_weapon_def(equipped_weapon).get("reload_time", 1.0)), 0.05)
+		if viewmodel != null and is_instance_valid(viewmodel) and viewmodel.has_method("on_reload_started"):
+			viewmodel.call("on_reload_started", duration)
+		var synth := _safe_script(SFX_BANK_PATH)
+		var audio_host: Node3D = get_parent() as Node3D
+		if audio_host == null:
+			audio_host = self
+		if synth != null and synth.has_method("play_synth"):
+			synth.call("play_synth", audio_host, "reload", equipped_weapon, global_position, "sfx")
 		reloaded.emit(equipped_weapon)
 	return started
 
@@ -521,7 +572,7 @@ func fire() -> void:
 		return
 	var def := _weapon_def(equipped_weapon)
 	if bool(def.get("uses_ammo", true)) and int(ws.call("ammo", equipped_weapon)) <= 0:
-		empty.emit(equipped_weapon)
+		_on_empty_fire()
 		return
 	var world := get_world_3d()
 	if world == null:
@@ -537,15 +588,30 @@ func fire() -> void:
 	var shot: Dictionary = result
 	_emit_ammo()
 	if bool(shot.get("fired", false)):
+		if viewmodel != null and is_instance_valid(viewmodel) and viewmodel.has_method("on_fired"):
+			viewmodel.call("on_fired")
 		fired.emit(shot)
 		_play_shot_sound(origin)
 	elif str(shot.get("error", "")).find("municion") >= 0:
-		empty.emit(equipped_weapon)
+		_on_empty_fire()
+
+
+func _on_empty_fire() -> void:
+	if viewmodel != null and is_instance_valid(viewmodel) and viewmodel.has_method("on_empty"):
+		viewmodel.call("on_empty")
+	empty.emit(equipped_weapon)
 
 
 func _play_shot_sound(pos: Vector3) -> void:
 	var host: Node = get_parent() if get_parent() != null else self
 	RecordedSfx.play(equipped_weapon, "fire", host, pos)
+	if not RecordedSfx.has_sample(equipped_weapon, "fire"):
+		var bank := _safe_script(SFX_BANK_PATH)
+		var audio_host: Node3D = get_parent() as Node3D
+		if audio_host == null:
+			audio_host = self
+		if bank != null and bank.has_method("play_synth"):
+			bank.call("play_synth", audio_host, "shot", equipped_weapon, pos, "sfx")
 	if RecordedSfx.has_sample(equipped_weapon, "pump"):
 		var id := equipped_weapon
 		get_tree().create_timer(0.4).timeout.connect(func() -> void:

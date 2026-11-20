@@ -17,6 +17,30 @@ static var _decal_material = null
 static var _puddle_material = null
 static var _part_material = null
 static var _forced_gore = null
+static var limit_decals: int = MAX_DECALS
+static var limit_active: int = MAX_ACTIVE
+static var limit_puddles: int = MAX_PUDDLES
+static var limit_parts: int = MAX_PARTS
+
+
+static func apply_profile(profile: Dictionary) -> void:
+	if profile.has("decals"):
+		limit_decals = clampi(int(profile["decals"]), 4, MAX_DECALS)
+	if profile.has("particles"):
+		limit_active = clampi(int(profile["particles"]) / 8, 2, MAX_ACTIVE)
+		limit_puddles = clampi(int(profile["particles"]) / 12, 2, MAX_PUDDLES)
+	enforce_limits()
+
+
+static func enforce_limits() -> void:
+	while _decals.size() > limit_decals:
+		_retire(_decals.pop_front())
+	while _active.size() > limit_active:
+		_retire(_active.pop_front())
+	while _puddles.size() > limit_puddles:
+		_retire(_puddles.pop_front())
+	while _parts.size() > limit_parts:
+		_retire(_parts.pop_front())
 
 
 static func gore_enabled() -> bool:
@@ -66,7 +90,7 @@ static func blood_hit(parent: Node, pos: Vector3, normal: Vector3, amount: float
 	anchor.add_child(particles)
 
 	_active.append(anchor)
-	while _active.size() > MAX_ACTIVE:
+	while _active.size() > limit_active:
 		_retire(_active.pop_front())
 	_add_decal(parent, pos, flow, clampf(0.12 + amount * 0.004, 0.12, 0.4))
 
@@ -97,7 +121,7 @@ static func puddle(parent: Node, pos: Vector3, normal: Vector3, size: float) -> 
 	puddle_node.position = pos + up * 0.006
 	parent.add_child(puddle_node)
 	_puddles.append(puddle_node)
-	while _puddles.size() > MAX_PUDDLES:
+	while _puddles.size() > limit_puddles:
 		_retire(_puddles.pop_front())
 	return puddle_node
 
@@ -109,7 +133,7 @@ static func dismember(parent: Node, pos: Vector3, size: float, zone: String = ""
 	var pieces: int = clampi(count, 1, 4)
 	var scale := clampf(size, 0.2, 3.0)
 	for i in range(pieces):
-		if _parts.size() >= MAX_PARTS:
+		if _parts.size() >= limit_parts:
 			_retire(_parts.pop_front())
 		var body := RigidBody3D.new()
 		body.name = "GorePart_%s" % (zone if not zone.is_empty() else str(i))
@@ -131,7 +155,7 @@ static func dismember(parent: Node, pos: Vector3, size: float, zone: String = ""
 		body.apply_impulse(outward * (1.5 + randf() * 2.0), Vector3(0.0, 0.1 * scale, 0.0))
 		_parts.append(body)
 		created.append(body)
-		if _parts.size() > MAX_PARTS:
+		if _parts.size() > limit_parts:
 			_retire(_parts.pop_front())
 	blood_hit(parent, pos, Vector3.UP, 30.0 * scale, Vector3.UP, true)
 	return created
@@ -214,7 +238,7 @@ static func _add_decal(parent: Node, pos: Vector3, normal: Vector3, size: float)
 	decal.position = pos + direction * 0.01
 	parent.add_child(decal)
 	_decals.append(decal)
-	while _decals.size() > MAX_DECALS:
+	while _decals.size() > limit_decals:
 		_retire(_decals.pop_front())
 
 

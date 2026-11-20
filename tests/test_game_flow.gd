@@ -5,6 +5,9 @@ const WorldScene = preload("res://scenes/world/game_world.tscn")
 const SessionScript = preload("res://core/game/game_session.gd")
 const WeaponsDbScript = preload("res://core/game/weapon_db.gd")
 const GoreFxScript = preload("res://core/game/gore_fx.gd")
+const MuzzleFxScript = preload("res://core/game/muzzle_fx.gd")
+const CharacterModelScript = preload("res://core/game/character_model.gd")
+const ArmedNpcScript = preload("res://core/game/armed_npc.gd")
 const DummyScript = preload("res://core/game/target_dummy.gd")
 const TouchScene = preload("res://scenes/ui/touch_controls.tscn")
 
@@ -70,9 +73,27 @@ func _run() -> void:
 	_expect(world.get_node_or_null("HudLayer/GameHud/AmmoLabel") != null, "municion en el HUD")
 	_expect(world.get_node_or_null("HudLayer/GameHud/WeaponLabel") != null, "nombre del arma en el HUD")
 	_expect(world.get_node_or_null("HudLayer/GameHud/Crosshair") != null, "mira en el HUD")
+	_expect(world.hud.ui_scale() >= 0.85, "HUD escala con el viewport con minimo")
+	_expect((world.get_node("HudLayer/GameHud/HealthLabel") as Label).get_theme_font_size("font_size") >= 28,
+		"fuente base legible en el HUD")
+	_expect((world.get_node("HudLayer/GameHud/AmmoLabel") as Label).get_theme_font_size("font_size") >= 38,
+		"municion destacada en el HUD")
 	_expect(world.target_dummies().size() == 6, "seis maniquies colocados")
 	_expect(world.props().size() > 0, "props fisicos cerca del spawn")
 	_expect(world.get_node_or_null("Dummies") != null, "raiz de maniquies presente")
+	_expect(world.performance != null and world.performance.has_method("current_profile"), "perfil de rendimiento activo")
+	_expect(GoreFxScript.limit_decals <= GoreFxScript.MAX_DECALS, "topes de gore aplicados para movil/VR")
+	_expect(world.target_dummies()[0].find_children("CharacterModel_*", "Node3D", true, false).size() > 0,
+		"maniqui usa modelo 3D real")
+
+	_case = "viewmodel y armas visibles"
+	_expect(player.viewmodel != null, "WeaponViewmodel colgado del jugador")
+	_expect(player.camera.get_node_or_null("WeaponViewmodel") == player.viewmodel, "viewmodel bajo la camara")
+	_expect(player.viewmodel != null and player.viewmodel.call("has_model"), "modelo 3D del arma instanciado")
+	_expect(player.viewmodel != null and player.viewmodel.call("current_weapon") == str(player.equipped_weapon),
+		"viewmodel muestra el arma equipada")
+	_expect(player.viewmodel != null and player.viewmodel.call("muzzle_fx") != null,
+		"MuzzleFx conectado al arma")
 
 	_case = "disparo, municion y dano"
 	player.gravity = 0.0
@@ -96,10 +117,22 @@ func _run() -> void:
 	var ammo_before: int = ws.ammo("pistol")
 	var health_before: float = dummy.health()
 	_fired = 0
+	var casings_before: int = MuzzleFxScript.active_casing_count()
+	var flashes_before: int = MuzzleFxScript.flash_count()
+	var smoke_before: int = MuzzleFxScript.smoke_count()
+	var audio_before: int = world.find_children("G12Audio3D", "AudioStreamPlayer3D", true, false).size()
 	player.fire()
 	_expect(ws.ammo("pistol") == ammo_before - 1, "disparar consume una bala del cargador")
 	_expect(dummy.health() < health_before, "el disparo dana al maniqui")
 	_expect(_fired == 1, "senal fired emitida")
+	player.viewmodel.advance(0.016)
+	_expect(player.viewmodel.call("recoil_offset").length() > 0.01, "el disparo genera retroceso real")
+	_expect(MuzzleFxScript.active_casing_count() > casings_before, "el disparo suelta un casquillo")
+	_expect(MuzzleFxScript.casing_at(0) is RigidBody3D, "el casquillo es un RigidBody3D")
+	_expect(MuzzleFxScript.flash_count() > flashes_before, "el disparo crea fogonazo")
+	_expect(MuzzleFxScript.smoke_count() > smoke_before, "el disparo crea humo")
+	_expect(world.find_children("G12Audio3D", "AudioStreamPlayer3D", true, false).size() > audio_before,
+		"la pistola sin muestra grabada usa sonido sintetizado")
 
 	_case = "cargador vacio y recarga"
 	ws.set_ammo("pistol", 0, 0)
@@ -113,15 +146,24 @@ func _run() -> void:
 	ws.set_ammo("pistol", 0, 6)
 	_expect(player.reload(), "recarga iniciada por el jugador")
 	_expect(ws.is_reloading("pistol"), "estado recargando activo")
+	_expect(player.viewmodel.call("is_reloading"), "animacion de recarga activa en el viewmodel")
+	var reload_def: Dictionary = WeaponsDbScript.get_def("pistol")
+	player.viewmodel.advance(float(reload_def.get("reload_time", 1.0)) * 0.5)
+	_expect(player.viewmodel.call("is_reloading"), "la recarga dura el tiempo real del arma")
+	player.viewmodel.advance(float(reload_def.get("reload_time", 1.0)))
 	_expect(not bool(ws.fire("pistol", Vector3(0.0, 30.0, 0.0), Vector3.UP, world.get_world_3d().direct_space_state, [])["fired"]), "no se dispara mientras recarga")
 	ws.advance(1.2)
 	_expect(ws.ammo("pistol") == 6, "la recarga restaura el cargador")
 	_expect(ws.reserve("pistol") == 0, "la reserva se descuenta")
 
-	_case = "muerte del maniqui"
+	_case = "muerte del maniqui: ragdoll, gore y voz"
 	dummy.configure(40.0, 5.0)
 	dummy.global_position = player.global_position + Vector3(0.0, 0.0, -6.0)
 	_dummy_deaths = 0
+	var ragdolls_before: int = CharacterModelScript.ragdoll_count()
+	var decals_before_death: int = GoreFxScript.decal_count()
+	var puddles_before_death: int = GoreFxScript.puddle_count()
+	var subtitles_before: int = world.voice.subtitle_count() if world.voice != null else 0
 	ws.set_ammo("pistol", 12, 12)
 	ws.advance(1.0)
 	player.fire()
@@ -129,6 +171,20 @@ func _run() -> void:
 	player.fire()
 	_expect(dummy.is_dead(), "suficientes disparos matan al maniqui")
 	_expect(_dummy_deaths == 1, "senal died del maniqui emitida una vez")
+	_expect(CharacterModelScript.ragdoll_count() > ragdolls_before, "la muerte crea un ragdoll del modelo 3D")
+	_expect(dummy.find_children("CharacterRagdoll_*", "Node3D", true, false).size() > 0,
+		"el ragdoll queda colgado del objetivo")
+	_expect(dummy.find_children("DetachedLimb_*", "RigidBody3D", true, false).size() > 0,
+		"un miembro se desprende como cuerpo rigido")
+	_expect(dummy.find_children("CharacterWound*", "MeshInstance3D", true, false).size() > 0,
+		"el impacto deja una herida visible")
+	_expect(GoreFxScript.decal_count() > decals_before_death, "la muerte genera sangre/decales")
+	_expect(GoreFxScript.puddle_count() > puddles_before_death, "la muerte genera un charco de sangre")
+	_expect(world.voice != null and world.voice.subtitle_count() > subtitles_before,
+		"VoiceSystem emite un grito con subtitulo")
+	_expect(world.get_node("HudLayer/GameHud/SubtitleLabel") is Label
+		and (world.get_node("HudLayer/GameHud/SubtitleLabel") as Label).visible,
+		"el subtitulo se muestra en el HUD")
 
 	_case = "impulso sobre caja fisica"
 	dummy.global_position = Vector3(0.0, 20.0, -40.0)

@@ -25,3 +25,6 @@ Claude = orquestador/verificador. OpenCode (`opencode run`) = programador, agent
 
 ## Decisiones
 Núcleo modificable (sin barrera PCK). Extensión nativa solo en el proyecto de pruebas de runtimes, no en el principal. Licencia SDK Android aceptada por autorización explícita del usuario (2026-11-19).
+
+## Operacion (planificador)
+Tras un reinicio del contenedor: `setsid nohup bash ~/untitled-control/sched.sh </dev/null >/dev/null 2>&1 &`. Cola y dependencias dentro de sched.sh; terminadas = cycle2/<t>.exit con 0. Godot limitado a 2 procesos por ~/.local/bin/grun. Telefono: 10 nucleos A520, 7.2 GB RAM.

@@ -4,6 +4,10 @@ extends Control
 const FULL_RECT := Control.PRESET_FULL_RECT
 const HEALTH_COLOR := Color(0.25, 0.82, 0.35)
 const DAMAGE_COLOR := Color(0.85, 0.12, 0.12)
+const REFERENCE_HEIGHT := 1080.0
+const MIN_UI_SCALE := 0.85
+const BASE_FONT_SIZE := 30
+const AMMO_FONT_SIZE := 46
 
 var player: Node = null
 var health_bar: ProgressBar = null
@@ -13,11 +17,16 @@ var weapon_label: Label = null
 var damage_label: Label = null
 var damage_flash: ColorRect = null
 var crosshair: Control = null
+var subtitle_label: Label = null
 
 var _crosshair_lines: Array = []
 var _crosshair_spread := 0.0
 var _damage_time := 0.0
 var _built := false
+var _ui_scale := 1.0
+var _base_layout: Dictionary = {}
+var _base_font_sizes: Dictionary = {}
+var _subtitle_time := 0.0
 
 
 func _ready() -> void:
@@ -99,6 +108,61 @@ func _build() -> void:
 	_anchor(damage_label, 0.30, 0.70, 1.0, 1.0, 0.0, -340.0, 0.0, -290.0)
 	add_child(damage_label)
 
+	subtitle_label = _make_label("SubtitleLabel", "", 32)
+	subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle_label.visible = false
+	_anchor(subtitle_label, 0.12, 0.88, 0.78, 0.78, 0.0, 0.0, 0.0, 72.0)
+	add_child(subtitle_label)
+
+	if not resized.is_connected(_on_resized):
+		resized.connect(_on_resized)
+	_apply_ui_scale()
+
+
+func show_subtitle(text: String, npc: String = "") -> void:
+	if subtitle_label == null or text.is_empty():
+		return
+	subtitle_label.text = ("%s: " % npc if not npc.is_empty() else "") + text
+	subtitle_label.visible = true
+	_subtitle_time = 2.6
+
+
+func ui_scale() -> float:
+	return _ui_scale
+
+
+func _on_resized() -> void:
+	_apply_ui_scale()
+
+
+func _apply_ui_scale() -> void:
+	var viewport := get_viewport_rect()
+	var height: float = viewport.size.y if viewport.size.y > 0.0 else REFERENCE_HEIGHT
+	_ui_scale = maxf(MIN_UI_SCALE, height / REFERENCE_HEIGHT)
+	for path in _base_layout.keys():
+		var target := get_node_or_null(NodePath(str(path))) as Control
+		var base: Array = _base_layout[path]
+		if target == null:
+			continue
+		target.offset_left = float(base[0]) * _ui_scale
+		target.offset_top = float(base[1]) * _ui_scale
+		target.offset_right = float(base[2]) * _ui_scale
+		target.offset_bottom = float(base[3]) * _ui_scale
+	for path in _base_font_sizes.keys():
+		var label := get_node_or_null(NodePath(str(path))) as Label
+		if label == null:
+			continue
+		var size := int(_base_font_sizes[path])
+		var minimum: int = 28 if str(path) != "DamageNotice" else 40
+		if str(path).find("Ammo") >= 0:
+			minimum = 38
+		label.add_theme_font_size_override("font_size", maxi(roundi(float(size) * _ui_scale), minimum))
+	if crosshair != null:
+		var size: float = 96.0 * _ui_scale
+		crosshair.size = Vector2(size, size)
+		crosshair.position = -crosshair.size * 0.5
+	_update_crosshair()
+
 
 func _make_label(node_name: String, text: String, font_size: int) -> Label:
 	var label := Label.new()
@@ -106,6 +170,7 @@ func _make_label(node_name: String, text: String, font_size: int) -> Label:
 	label.text = text
 	label.add_theme_font_size_override("font_size", font_size)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_base_font_sizes[node_name] = font_size
 	return label
 
 
@@ -115,6 +180,7 @@ func _anchor(control: Control, left: float, right: float, top: float, bottom: fl
 	control.anchor_right = right
 	control.anchor_top = top
 	control.anchor_bottom = bottom
+	_base_layout[control.name] = [off_left, off_top, off_right, off_bottom]
 	control.offset_left = off_left
 	control.offset_top = off_top
 	control.offset_right = off_right
@@ -231,6 +297,11 @@ func _process(delta: float) -> void:
 	if _crosshair_spread > 0.0:
 		_crosshair_spread = maxf(_crosshair_spread - delta * 4.0, 0.0)
 		_update_crosshair()
+	if _subtitle_time > 0.0:
+		_subtitle_time = maxf(_subtitle_time - delta, 0.0)
+		if subtitle_label != null and _subtitle_time <= 0.0:
+			subtitle_label.visible = false
+			subtitle_label.text = ""
 	if _damage_time > 0.0:
 		_damage_time = maxf(_damage_time - delta, 0.0)
 		var alpha: float = clampf(_damage_time / 0.5, 0.0, 1.0)

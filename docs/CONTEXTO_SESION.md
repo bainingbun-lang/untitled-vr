@@ -1,0 +1,43 @@
+# CONTEXTO DE SESION — UNTITLED (recuperacion si se pierde la conversacion)
+Generado: 2026-11-19 18:35. Lee esto primero; luego docs/MASTER.md, docs/GAME_CONTRACT.md, TASKS.md.
+
+## 1. Quien y como
+- Usuario: habla español, esta en un telefono (Termux, Samsung S25 FE, aarch64). Dio permiso TOTAL para todo (instalar, ejecutar, descargar, aceptar licencia del SDK Android): NO pedir permiso ni mencionarlo, esta molesto si se hace.
+- Claude = ORQUESTADOR y verificador. OpenCode (`opencode run`) = programador principal, agentes en paralelo con archivos disjuntos. Claude programa directo solo arreglos pequeños/criticos. Respuestas en español, directas, sin relleno.
+- Honestidad: separar Implementado / Compilado / Probado / Verificado / Integrado. Nunca decir que algo funciona en VR/Android/Windows sin probarlo. El usuario se enfado con razon cuando se llamo "juego jugable" a un prototipo de cajas: describir siempre lo que se VE, no solo los tests.
+- Prioridad del proyecto (usuario): VR (Quest/OpenXR) PLATAFORMA PRINCIPAL; Android = pruebas con jugabilidad aceptable; PC despues. Quiere: graficos buenos y "hermosos", modelos 3D reales, armas con retroceso y casquillos, piezas moviles (cargador/corredera/cerrojo), mapas 3D con edificios, gritos/voces de NPC, gore realista, menus bonitos, IA con armas, coches (menu de aparicion), botones tactiles configurables, armas YA en el inventario (en VR se sacan del BOLSO), una mano agarra y dispara, la segunda solo ayuda a apuntar, retroceso fisico real en VR.
+- Quiere recibir: APK de ANDROID y APK de VR. Sonidos de escopeta y AK47: sus propios videos (ya recortados en assets/audio/).
+
+## 2. Entorno (trampas que ya costaron horas)
+- Proyecto: ~/UNTITLED (git, rama feature/mod-system, ultimo commit: cb9bae2 Ciclo 4: juego jugable (menu, mundo 3D, jugador, armas, balistica, gore, inventario) y primer APK; MUCHO trabajo sin commit despues). Control/logs: ~/untitled-control/ (cycle2/ = logs de agentes, builds/ = APK/exe, briefs en UNTITLED/briefs/C2..C5_*.md). Backups: ~/backups/UNTITLED-*.
+- Godot 4.7: SIEMPRE con grun: `grun ~/tools/godot-4.7-stable/Godot_v4.7-stable_linux.arm64 --headless --path ~/UNTITLED --script res://tests/X.gd`. Godot devuelve exit 0 AUNQUE el script no compile: comprobar 'SCRIPT ERROR' y marcador PASS (N assertions). Tests usan _initialize() y await process_frame (el _ready corre en el primer frame).
+- ~/.local/bin/grun (wrapper mio) limita SOLO Godot a 2 procesos; el resto pasa directo (opencode se lanza via grun: NO limitarlo).
+- Shebang /usr/bin/env y #!/bin/bash fallan: ejecutar scripts con `bash script`. Nunca `pkill -f` con patron que aparezca en el propio comando (mata la shell); usar trucos como '[o]pencode'.
+- Telefono: 10 nucleos Cortex-A520, 7.2 GB RAM + 4 GB swap. Mas de ~3 agentes + Godot lo satura y el contenedor SE REINICIA (mata todos los procesos; los archivos persisten). Ya paso 3 veces.
+- opencode run: --auto (permisos fuera del proyecto), briefs DENTRO de ~/UNTITLED/briefs, mensaje corto que apunta al brief (texto con --flag se interpreta como opcion), NO subagentes/Explore (se cuelga), lanzar escalonado >=40 s (si no: 'database is locked'). Los agentes de OpenCode se vigilan por titulo: `pgrep -f 'title C2_<tarea>'`.
+- Export Android: `bash tools/build_android.sh` (copia limpia build/android_project, termux-chroot para /tmp, JDK17, SDK hibrido en ~/Android/Sdk, firma debug, verifica apksigner+estructura, copia a /sdcard/Download/untitled_beta_debug.apk). Escritorio: `bash tools/build_desktop.sh`. Instalar el APK: pm install esta BLOQUEADO; el usuario toca el instalador (termux-open --view ... abre el instalador).
+- Descargas permitidas: github, polyhaven, ambientcg, opengameart, poly.pizza, quaternius, itch, dl.google.com. Solo licencias CC0/MIT/CC-BY, registradas en assets/CREDITS.md.
+
+## 3. Planificador (REACTIVAR tras un reinicio)
+`cd ~/untitled-control && : > sched.log && setsid nohup bash sched.sh </dev/null >/dev/null 2>&1 &`
+- Cola dentro de sched.sh (MAX=3 agentes, reintentos hasta 4, arranque cada 45 s, respeta RAM libre, V1 pesada corre sola, V2 espera a H4). Terminada = cycle2/<tarea>.exit con 0 (.reported evita avisos repetidos). Borrar cycle2/<t>.exit para relanzar una tarea. Tras reinicio los agentes se relanzan con aviso de 'estado a medias' (launch7.sh). Mirar sched.log.
+- Monitor util: `tail -F ~/untitled-control/sched.log`.
+
+## 4. Estado del proyecto (verificado por Claude con comandos propios, headless Linux arm64)
+- 51 archivos de prueba, 83 archivos .gd en core/ y tools/, ~22590 lineas, assets 22M. `bash tests/run_all.sh` es el criterio global (estricto: falla si hay SCRIPT ERROR; integra runtimes Lua/WASM via run_runtime_tests.sh). `bash tools/check_platform_compat.sh` debe estar LIMPIO (0 graves).
+- VERIFICADO: mods (manifest, resolver, registry, loader, reloader con reversion, lint, boot, perfiles, backup); mapas (estandar con platforms/tags/players, validator, registry, loader, adapter, catalog, generador, edificios/temas, builder de mundo 3D, materiales PBR); NPC (nucleo, navegacion A*, utilidad, percepcion, relaciones/facciones, IA armada, voces sintetizadas); juego (menu, seleccion/generacion de mapas, GameSession, mundo, jugador FPS, botones tactiles CONFIGURABLES, HUD, maniquies, armas con municion, balistica por superficie, gore por zonas, inventario/loadout/hotbar, crafteo, guardado versionado, audio sintetizado); VR (action map, bolso VrBag, rig, HUD diegetico, menu laser, rendimiento Quest, retroceso fisico W2); modelos 3D de armas (6 .glb sin piezas moviles), personajes (4 humanoides riggeados, ragdoll), props, texturas PBR, HDRI; sonidos grabados escopeta/AK (core/game/recorded_sfx.gd, origen/licencia desconocidos, ver assets/audio/AUDIO_CREDITS.md).
+- INTEGRADO en el APK Android actual (~/untitled-control/builds/beta_debug.apk, 28899680 bytes, firmado, SIN probar en dispositivo hasta que el usuario lo diga): menu, mapas, jugador tactil, armas con municion, HUD, maniquies de PRIMITIVAS. El usuario lo vio: cajas, sin modelos, sin gore visible, HUD diminuto.
+- NO VERIFICADO NUNCA: APK en el telefono (mas alla de la captura del usuario del APK viejo), TODO el VR en casco, Windows/Linux x86 en ejecucion (.exe y ELF existen, solo formato verificado), voces sin oirlas, aspecto visual.
+
+## 5. Trabajo en curso / pendiente (briefs en UNTITLED/briefs/C5_*.md)
+- H4_integration: conectar armas 3D (viewmodel), MuzzleFx/casquillos, personajes con ragdoll/heridas/miembros, voces, HUD legible (tamaños relativos a pantalla), tope de efectos. W1_weaponparts: separar piezas de armas y animarlas (cargador, corredera, cerrojo, bombeo). V2_vrwiring: modo VR en el juego (rig, bolso, mano con arma, HUD, menu laser, haptica de VrRecoil.haptic_events). V1_vrbuild: APK de Quest (plugin Godot OpenXR Vendors MIT, preset 'Quest VR', Gradle en Termux con android.aapt2FromMavenOverride; puede ser imposible: documentar impedimento exacto).
+- Sin lanzar: G5 (coches + menu de aparicion, brief C4_G5_vehicles.md), G9 (tema visual/menus bonitos, C4_G9_polish.md), G14 (pausa/ajustes/muerte, C4_G14_menus.md). Tras terminar H4: exportar APK Android nuevo con tools/build_android.sh y pasarlo al usuario; pedirle captura.
+- Bloqueado/limites: instalacion automatica de APK; VR sin casco; modelos gratuitos son low-poly (para mas realismo el usuario tendria que aportar packs).
+- Siempre: commitear checkpoints cuando los tests pasen (git identity ya configurada en el repo), no commitear build/, native/*.so ni spikes/.../vendor.
+
+## 6. Como reanudar en un entorno nuevo
+1. `cd ~/UNTITLED && git status --short | head`; `ls ~/untitled-control/cycle2/*.exit`; mira docs/MASTER.md.
+2. Verifica salud: `bash tests/run_all.sh` (en segundo plano, tarda varios minutos) y `bash tools/check_platform_compat.sh`.
+3. Reactiva el planificador (seccion 3). No dupliques agentes: revisa `pgrep -f 'title C2_'`.
+4. Verifica cada entrega de agente con SUS tests mas los existentes antes de aceptarla; reexporta el APK al final.
+5. Memoria persistente de Claude: ~/.claude/projects/-data-data-com-termux-files-home/memory/ (MEMORY.md indice).

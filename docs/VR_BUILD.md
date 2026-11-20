@@ -8,7 +8,7 @@ como pendiente necesita una sesión real con el dispositivo.
 
 ## 1. Qué se ha verificado aquí
 
-- `tests/test_vr_rig.gd`: 77 aserciones, `PASS (77 assertions)`, `EXIT=0`.
+- `tests/test_vr_rig.gd`: 78 aserciones, `PASS (78 assertions)`, `EXIT=0`.
   Cubre: sin OpenXR el rig no se activa ni crashea; construcción del rig con sonda
   simulada; zona del bolso; sacar/guardar; un arma por mano; disparo con una mano;
   locomoción; apuntado a una y dos manos; retroceso/temblor; guardamanos.
@@ -75,7 +75,7 @@ específicos y ajustes de proveedor, y puede ser necesario para publicar en tien
    válida no se instala el APK en el casco.
 8. Exportar con **Export With Debug** desmarcado para release.
 
-Rutas y ajustesXR reproducibles en el proyecto (sin los valores numéricos que el
+Rutas y ajustes XR reproducibles en el proyecto (sin los valores numéricos que el
 editor genera):
 
 - Renderizador móvil, decisión del brief: en `[rendering]`
@@ -145,7 +145,7 @@ grun ~/tools/godot-4.7-stable/Godot_v4.7-stable_linux.arm64 --headless \
 bash tools/check_platform_compat.sh
 ```
 
-Resultados de esta ejecución: `PASS (77 assertions)`, `EXIT=0`, y
+Resultados de esta ejecución: `PASS (78 assertions)`, `EXIT=0`, y
 `RESULTADO: LIMPIO (sin hallazgos graves)`.
 
 ## 9. Pendiente de hardware (criterios de aceptación, NO comprobados)
