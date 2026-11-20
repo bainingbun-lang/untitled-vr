@@ -1,0 +1,65 @@
+name: Build VR APK
+on:
+  push:
+    branches: [main, feature/mod-system]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      GODOT_VERSION: 4.7-stable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - name: Android SDK
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses >/dev/null || true
+          "$SDKM" "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+      - name: Godot y plantillas
+        run: |
+          B="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}"
+          curl -fsSL "$B/Godot_v4.7-stable_linux.x86_64.zip" -o g.zip
+          unzip -q g.zip && sudo mv Godot_v4.7-stable_linux.x86_64 /usr/local/bin/godot && sudo chmod +x /usr/local/bin/godot
+          curl -fsSL "$B/Godot_v4.7-stable_export_templates.tpz" -o t.tpz
+          mkdir -p ~/.local/share/godot/export_templates/4.7.stable
+          unzip -q t.tpz -d tpl && cp -r tpl/templates/* ~/.local/share/godot/export_templates/4.7.stable/
+          godot --version
+      - name: Keystore de depuracion y ajustes del editor
+        run: |
+          mkdir -p ~/.android ~/.config/godot
+          keytool -genkeypair -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          cat > ~/.config/godot/editor_settings-4.7.tres <<EOT
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/debug_keystore = "$HOME/.android/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOT
+          sed -i 's/^          //' ~/.config/godot/editor_settings-4.7.tres
+      - name: Compilar APK de VR
+        run: bash tools/ci_build_vr.sh "$PWD/out/untitled_vr_debug.apk"
+      - name: Verificar APK
+        run: |
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify out/untitled_vr_debug.apk
+          "$ANDROID_HOME/build-tools/34.0.0/aapt2" dump badging out/untitled_vr_debug.apk | grep -E "^package:|headtracking"
+          unzip -l out/untitled_vr_debug.apk | grep -E "libopenxr_loader|libgodot_android|vr_boot" | head
+          sha256sum out/untitled_vr_debug.apk | tee out/SHA256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: untitled-vr-debug-apk
+          path: out/untitled_vr_debug.apk
+          retention-days: 30
+      - name: Publicar en Releases (descarga directa)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete vr-latest --yes --cleanup-tag || true
+          gh release create vr-latest out/untitled_vr_debug.apk out/SHA256.txt --target "$GITHUB_SHA" --prerelease --title "APK VR (ultima compilacion)" --notes "Compilado por GitHub Actions desde $GITHUB_SHA. Build de depuracion para Meta Quest. No probado en casco por el autor del CI."

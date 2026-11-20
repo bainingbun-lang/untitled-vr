@@ -4,3 +4,9 @@
 build/
 # PCK de salida de los spikes (reproducibles con run.sh)
 spikes/*/out/
+
+# no subir binarios nativos ni vendors regenerables
+native/untitled_sandbox/bin/
+spikes/*/vendor/
+*.apk
+*.idsig
