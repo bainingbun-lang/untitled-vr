@@ -15,6 +15,7 @@ const InventoryScript = preload("res://core/game/inventory.gd")
 const LoadoutScript = preload("res://core/game/loadout.gd")
 const DbScript = preload("res://core/game/weapon_db.gd")
 const GeneratorScript = preload("res://core/maps/map_generator.gd")
+const VrVehicleInputScript = preload("res://core/vr/vr_vehicle_input.gd")
 
 const PAUSE_BUTTONS: Array = [
 	{"id": "resume", "label": "REANUDAR", "rect": Rect2(-0.13, -0.12, 0.26, 0.07)},
@@ -46,6 +47,12 @@ class State extends Node:
 	var flat_ui_removed: int = 0
 	var flat_ui_guard: Callable = Callable()
 	var _guard_time: float = 0.0
+	var vehicle_input = null
+	var vehicle_spawn_menu = null
+	var _spawn_button_down: bool = false
+	var _interact_button_down: bool = false
+	var _grab_prev: bool = false
+	var _last_camera_basis: Basis = Basis.IDENTITY
 
 
 	func configure(p_world: Node3D, p_rig: Node3D, p_ws: Node, p_meta: Dictionary) -> void:
@@ -66,6 +73,7 @@ class State extends Node:
 		_setup_menu()
 		_setup_onboarding()
 		_connect_signals()
+		_setup_vehicle_input()
 		refresh_hud()
 
 
@@ -145,6 +153,8 @@ class State extends Node:
 		rig.call("step", delta)
 		if weapon_system != null and is_instance_valid(weapon_system):
 			weapon_system.call("advance", maxf(delta, 0.0))
+		_update_vehicle_control(maxf(delta, 0.0))
+		_sync_input_suspension()
 		refresh_hud()
 		_update_pointer()
 		if hud != null:
@@ -187,24 +197,32 @@ class State extends Node:
 			hud.set_ammo_visible(true)
 
 
+	func _active_menu():
+		if vehicle_spawn_menu != null and is_instance_valid(vehicle_spawn_menu) and bool(vehicle_spawn_menu.get("is_open")):
+			return vehicle_spawn_menu
+		if menu != null and is_instance_valid(menu) and bool(menu.get("is_open")):
+			return menu
+		return null
+
+
 	func _update_pointer() -> void:
-		if menu == null or hud == null or rig == null:
-			return
-		if not bool(menu.get("is_open")):
-			hud.set_laser_enabled(false)
+		var active = _active_menu()
+		if active == null or hud == null or rig == null:
+			if hud != null:
+				hud.set_laser_enabled(false)
 			return
 		var controller = rig.call("controller_for", "right")
 		if controller == null:
 			return
 		var origin: Vector3 = controller.global_transform.origin
 		var direction: Vector3 = -controller.global_transform.basis.z
-		var hit: Dictionary = menu.call("pointer_hit", origin, direction)
+		var hit: Dictionary = active.call("pointer_hit", origin, direction)
 		var length: float = 2.0
 		if bool(hit.get("hit", false)):
 			length = clampf(origin.distance_to(hit.get("point", origin)), 0.15, 3.0)
 		hud.set_laser_length(length)
 		hud.set_laser_enabled(true)
-		menu.call("try_press", origin, direction, bool(rig.call("is_trigger_pressed", "right")))
+		active.call("try_press", origin, direction, bool(rig.call("is_trigger_pressed", "right")))
 
 
 	func toggle_menu() -> void:
@@ -227,8 +245,173 @@ class State extends Node:
 
 
 	func on_menu_closed() -> void:
-		if rig != null:
-			rig.call("set_inputs_suspended", false)
+		_sync_input_suspension()
+
+
+	func _setup_vehicle_input() -> void:
+		if vehicle_input != null:
+			return
+		vehicle_input = VrVehicleInputScript.new()
+		vehicle_input.spawn_requested.connect(Callable(self, "_on_vehicle_spawn_requested"))
+
+
+	func open_vehicle_spawn_menu() -> void:
+		if world == null or not is_instance_valid(world):
+			return
+		_setup_vehicle_input()
+		if vehicle_spawn_menu == null or not is_instance_valid(vehicle_spawn_menu):
+			vehicle_spawn_menu = vehicle_input.build_spawn_menu(world)
+			if vehicle_spawn_menu != null and vehicle_spawn_menu.has_signal("closed"):
+				_connect_once(vehicle_spawn_menu, "closed", Callable(self, "_sync_input_suspension"))
+		if vehicle_spawn_menu == null:
+			return
+		var position := Vector3.ZERO
+		var forward := Vector3.FORWARD
+		var camera = rig.get("xr_camera") if rig != null else null
+		if camera != null:
+			position = camera.global_position
+			forward = -camera.global_transform.basis.z
+		elif rig != null:
+			position = rig.global_position + Vector3(0.0, 1.6, 0.0)
+		vehicle_spawn_menu.call("open_in_front", position, forward)
+		_sync_input_suspension()
+
+
+	func _on_vehicle_spawn_requested(vehicle_id: String) -> void:
+		if world != null and is_instance_valid(world) and world.has_method("spawn_vehicle_in_front"):
+			world.call("spawn_vehicle_in_front", vehicle_id)
+		if vehicle_spawn_menu != null and is_instance_valid(vehicle_spawn_menu) \
+			and bool(vehicle_spawn_menu.get("is_open")):
+			vehicle_spawn_menu.call("close_menu")
+		_sync_input_suspension()
+
+
+	func _controller_button(hand: String, button: StringName) -> bool:
+		if rig == null or not is_instance_valid(rig):
+			return false
+		if rig.has_method("_controller_button"):
+			return bool(rig.call("_controller_button", hand, button))
+		var controller = rig.call("controller_for", hand)
+		if controller != null and controller.has_method("is_button_pressed"):
+			return bool(controller.call("is_button_pressed", button))
+		return false
+
+
+	func _grip_axis(hand: String) -> float:
+		if rig == null or not is_instance_valid(rig):
+			return 0.0
+		var controller = rig.call("controller_for", hand)
+		if controller != null and controller.has_method("get_float"):
+			return clampf(float(controller.call("get_float", &"grip")), 0.0, 1.0)
+		return 1.0 if bool(rig.call("is_grip_pressed", hand)) else 0.0
+
+
+	func _trigger_axis(hand: String) -> float:
+		if rig == null or not is_instance_valid(rig):
+			return 0.0
+		var controller = rig.call("controller_for", hand)
+		if controller != null and controller.has_method("get_float"):
+			return clampf(float(controller.call("get_float", &"trigger")), 0.0, 1.0)
+		return 1.0 if bool(rig.call("is_trigger_pressed", hand)) else 0.0
+
+
+	func _head_yaw_rate(delta: float) -> float:
+		if rig == null or not is_instance_valid(rig) or rig.xr_camera == null or delta <= 0.0:
+			return 0.0
+		var current: Basis = rig.xr_camera.global_transform.basis
+		var previous: Basis = _last_camera_basis
+		_last_camera_basis = current
+		if previous == Basis.IDENTITY:
+			return 0.0
+		var before_yaw: float = atan2(-previous.z.x, previous.z.z)
+		var now_yaw: float = atan2(-current.z.x, current.z.z)
+		return VrVehicleInputScript.wrap_angle(now_yaw - before_yaw) / delta
+
+
+	func _vehicle_near(point: Vector3, radius: float = 1.0) -> Node3D:
+		if world == null or not is_instance_valid(world) or not world.has_method("vehicles"):
+			return null
+		var best: Node3D = null
+		var best_distance: float = radius
+		for vehicle in world.call("vehicles"):
+			if not (vehicle is Node3D) or not is_instance_valid(vehicle):
+				continue
+			if not (vehicle as Node3D).has_method("door_position"):
+				continue
+			var distance: float = (vehicle as Node3D).door_position().distance_to(point)
+			if distance < best_distance:
+				best_distance = distance
+				best = vehicle as Node3D
+		return best
+
+
+	func _spawn_button_pressed() -> bool:
+		return _controller_button("left", &"y")
+
+
+	func _exit_button_pressed() -> bool:
+		return _controller_button("left", &"x") or _controller_button("right", &"b")
+
+
+	func _update_vehicle_control(delta: float) -> void:
+		if rig == null or not is_instance_valid(rig) or vehicle_input == null:
+			return
+		var spawn_down: bool = _spawn_button_pressed()
+		if spawn_down and not _spawn_button_down and not bool(vehicle_input.driving):
+			open_vehicle_spawn_menu()
+		_spawn_button_down = spawn_down
+		if _active_menu() != null:
+			_grab_prev = false
+			_interact_button_down = _exit_button_pressed()
+			return
+		if not bool(vehicle_input.driving):
+			var grabbed: bool = _grip_axis("left") > 0.6 or _trigger_axis("left") > 0.6
+			var target: Node3D = null
+			var hand_position: Vector3 = Vector3.ZERO
+			for hand in ["left", "right"]:
+				var pose: Variant = rig.call("get_pose", hand)
+				if not (pose is Transform3D):
+					continue
+				var candidate: Node3D = _vehicle_near((pose as Transform3D).origin)
+				if candidate != null:
+					target = candidate
+					hand_position = (pose as Transform3D).origin
+					break
+			if grabbed and not _grab_prev and target != null:
+				vehicle_input.try_enter(hand_position, target, rig, true)
+			_grab_prev = grabbed
+			_interact_button_down = false
+			return
+		var poses: Dictionary = {
+			"left": rig.call("get_pose", "left"),
+			"right": rig.call("get_pose", "right"),
+		}
+		var grips: Dictionary = {
+			"left": _grip_axis("left"),
+			"right": _grip_axis("right"),
+		}
+		var triggers: Dictionary = {
+			"left": _trigger_axis("left"),
+			"right": _trigger_axis("right"),
+		}
+		vehicle_input.update(delta, poses, grips, triggers, _head_yaw_rate(delta))
+		var exit_pressed: bool = _exit_button_pressed()
+		var door_grab: bool = false
+		var left_pose: Variant = rig.call("get_pose", "left")
+		if left_pose is Transform3D and grips["left"] > 0.6:
+			door_grab = _vehicle_near((left_pose as Transform3D).origin, 0.6) != null
+		if (exit_pressed or door_grab) and not _interact_button_down:
+			if float(vehicle_input.vehicle.call("speed")) <= VrVehicleInputScript.EXIT_MAX_SPEED:
+				vehicle_input.exit()
+		_interact_button_down = exit_pressed or door_grab
+
+
+	func _sync_input_suspension() -> void:
+		if rig == null or not is_instance_valid(rig):
+			return
+		var wanted: bool = _active_menu() != null or (vehicle_input != null and bool(vehicle_input.driving))
+		if bool(rig.get("inputs_suspended")) != wanted:
+			rig.call("set_inputs_suspended", wanted)
 
 
 	func on_menu_button(button_id: String) -> void:
@@ -514,6 +697,9 @@ static func setup(world: Node3D, rig: Node3D, meta: Dictionary) -> Dictionary:
 	world.add_child(state)
 	state.configure(world, rig, ws, meta)
 
+	for h in (state.hands as Dictionary).values():
+		if h != null:
+			h.auto_equip = true
 	result["state"] = state
 	result["weapon_system"] = ws
 	result["hud"] = state.hud

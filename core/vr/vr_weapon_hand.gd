@@ -85,6 +85,10 @@ var _recoil: float = 0.0
 var _time: float = 0.0
 
 
+var auto_equip: bool = false
+var _auto_done: bool = false
+
+
 func _ready() -> void:
 	if use_physical_grab:
 		configure_handling()
@@ -341,9 +345,13 @@ func step(delta: float) -> void:
 	if grip and not _was_grip:
 		if weapon_id.is_empty() and _in_bag_zone(primary):
 			try_take()
-	elif not grip and _was_grip and not weapon_id.is_empty():
+	elif not grip and _was_grip and not weapon_id.is_empty() and _in_bag_zone(primary):
 		stow()
 	_was_grip = grip
+	if auto_equip and not _auto_done and weapon_id.is_empty() and bag != null and not (bag.items() as Array).is_empty():
+		_auto_done = true
+		var ids: Array = bag.items()
+		try_take("pistol" if ids.has("pistol") else str(ids[0]))
 
 	var secondary_free: bool = bag == null or bag.held_in(other_hand()).is_empty()
 	var in_zone: bool = false
