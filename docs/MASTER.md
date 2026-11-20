@@ -1,5 +1,8 @@
 # MASTER — estado compacto (actualizado 2026-11-19, ciclo 2)
 
+## Prioridad (usuario, 2026-11-20)
+VR (Quest/OpenXR) = plataforma PRINCIPAL. Android = pruebas, jugabilidad aceptable. PC despues. Gore realista, voces de NPC, menus bonitos. Primera entrega Android: menu + mapa + jugador tactil configurable + armas con municion + dianas.
+
 ## Arquitectura de trabajo
 Claude = orquestador/verificador. OpenCode (`opencode run`) = programador, agentes en paralelo con archivos disjuntos. Briefs en `UNTITLED/briefs/C2_*.md`, logs en `~/untitled-control/cycle2/`. Launcher: `bash ~/untitled-control/launch.sh <A#_nombre>`.
 
