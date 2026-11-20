@@ -2,6 +2,7 @@ name: Build VR APK
 on:
   push:
     branches: [main, feature/mod-system]
+    paths-ignore: ['docs/**', 'briefs/**', '**/*.md']
   workflow_dispatch:
 permissions:
   contents: write
