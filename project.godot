@@ -9,3 +9,8 @@ window/size/viewport_height=1920
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=6
+
+[debug]
+
+file_logging/enable_file_logging.mobile=true
+file_logging/max_log_files=6

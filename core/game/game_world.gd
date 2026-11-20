@@ -11,6 +11,7 @@ const CHARACTER_MODEL_PATH: String = "res://core/game/character_model.gd"
 const VOICE_SYSTEM_PATH: String = "res://core/game/voice_system.gd"
 const GORE_FX_PATH: String = "res://core/game/gore_fx.gd"
 const VR_PERFORMANCE_PATH: String = "res://core/vr/vr_performance.gd"
+const RemoteLog = preload("res://core/debug/remote_log.gd")
 const VR_GAME_MODE_PATH: String = "res://core/vr/vr_game_mode.gd"
 const ARMED_NPC_PATH: String = "res://core/game/armed_npc.gd"
 const WORLD_SPAWNER_PATH: String = "res://core/game/world_spawner.gd"
@@ -94,6 +95,7 @@ func _ready() -> void:
 
 
 func setup(meta: Dictionary) -> void:
+	RemoteLog.crumb("world.setup inicio")
 	_discard(_geometry_root)
 	_discard(actor)
 	_discard(_hud_layer)
@@ -134,7 +136,9 @@ func setup(meta: Dictionary) -> void:
 	_wired.clear()
 	_locomotion.clear()
 
+	RemoteLog.crumb("world: construyendo mapa")
 	world_report = MapWorldBuilderScript.build(meta, self)
+	RemoteLog.crumb("world: mapa construido ok=%s" % str(world_report.get("ok", false)))
 	var first_point: Vector3 = Vector3.ZERO
 	if not bool(world_report.get("ok", false)):
 		actor = _create_actor(first_point)
@@ -145,19 +149,26 @@ func setup(meta: Dictionary) -> void:
 		if not spawn_points.is_empty():
 			first_point = spawn_points[0]
 		actor = _create_actor(first_point)
+	RemoteLog.crumb("world: jugador creado")
 	vr_active = actor != null and actor.has_method("is_active") and bool(actor.call("is_active"))
 	if vr_active:
 		vr_result = VrGameModeScript.setup(self, actor, meta)
 		vr_state = vr_result.get("state", null) as Node
 
+	RemoteLog.crumb("world: vr listo, panel depuracion")
 	_setup_debug_panel()
+	RemoteLog.crumb("world: panel listo")
 
 	_collect_physics_props()
 	_setup_performance()
 	_setup_voice()
+	RemoteLog.crumb("world: navegacion")
 	_build_navigation(meta)
+	RemoteLog.crumb("world: npcs")
 	_spawn_living_npcs(first_point, meta)
+	RemoteLog.crumb("world: dianas")
 	_spawn_dummies(first_point, meta)
+	RemoteLog.crumb("world: vehiculos")
 	_park_vehicles(first_point, meta)
 	_block_parked_vehicles()
 	_connect_player_signals()
@@ -175,7 +186,9 @@ func setup(meta: Dictionary) -> void:
 			var callable := Callable(self, "_on_menu_pressed")
 			if not actor.is_connected("menu_pressed", callable):
 				actor.connect("menu_pressed", callable)
+	RemoteLog.crumb("world: conectando objetivos")
 	_wire_targets()
+	RemoteLog.crumb("world.setup FIN")
 
 
 func _process(delta: float) -> void:

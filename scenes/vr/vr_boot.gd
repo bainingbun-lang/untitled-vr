@@ -9,6 +9,7 @@ const GAME_MODE_PATH := "res://core/vr/vr_game_mode.gd"
 const CALIBRATION_PATH := "res://core/vr/vr_calibration.gd"
 const FLOW_PATH := "res://core/vr/vr_calibration_flow.gd"
 const BootstrapScript = preload("res://core/vr/vr_bootstrap.gd")
+const RemoteLog = preload("res://core/debug/remote_log.gd")
 
 static var calibration_path_override: String = ""
 const TRIGGER_ON := 0.6
@@ -38,6 +39,8 @@ var _status_t: float = 0.0
 
 
 func _ready() -> void:
+	RemoteLog.send("crumb", "vr_boot _ready; subiendo logs previos")
+	RemoteLog.upload_previous_logs()
 	result = BootstrapScript.boot(get_viewport(), get_tree())
 	if not bool(result["xr_active"]) or not ResourceLoader.exists(GAME_MODE_PATH):
 		get_tree().call_deferred("change_scene_to_file", MAIN_MENU)

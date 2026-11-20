@@ -27,6 +27,7 @@ static func detect_platform() -> String:
 
 
 static func start(meta: Dictionary, tree: SceneTree) -> Error:
+	preload("res://core/debug/remote_log.gd").crumb("GameSession.start seed=%s tema=%s" % [str(meta.get("seed", "?")), str(meta.get("theme", "?"))])
 	map_meta = meta.duplicate(true)
 	seed = int(meta.get("seed", 0))
 	platform = detect_platform()
