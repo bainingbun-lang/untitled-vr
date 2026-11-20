@@ -826,7 +826,7 @@ func _move_toward_goal(delta: float) -> void:
 		velocity.y = 0.0
 	var previous: Vector3 = global_position
 	move_and_slide()
-	if navigation != null and not bool(navigation.call("is_walkable_world", global_position, nav_cell_size)):
+	if _has_navigation_grid() and not bool(navigation.call("is_walkable_world", global_position, nav_cell_size)):
 		global_position = previous
 		velocity.x = 0.0
 		velocity.z = 0.0
@@ -870,8 +870,9 @@ func _context() -> Dictionary:
 		combat.set("last_threat_position", _threat_position)
 	if role == "civilian" and _threat_memory > 0.0:
 		visible = true
-		target_position = _threat_position
-		distance = minf(distance, maxf(global_position.distance_to(_threat_position), 0.0))
+		if _threat_position.length_squared() > 0.0001:
+			target_position = _threat_position
+		distance = minf(distance, maxf(global_position.distance_to(target_position), 0.0))
 	return {
 		"visible": visible,
 		"distance": distance,
@@ -881,8 +882,12 @@ func _context() -> Dictionary:
 	}
 
 
+func _has_navigation_grid() -> bool:
+	return navigation != null and int(navigation.get("width")) > 0 and int(navigation.get("height")) > 0
+
+
 func _sanitize_goal(action: String) -> void:
-	if navigation == null or _goal.length_squared() <= 0.0001:
+	if not _has_navigation_grid() or _goal.length_squared() <= 0.0001:
 		return
 	var target: Vector3 = _goal
 	if has_world_bounds:
@@ -943,7 +948,7 @@ func _sanitize_goal(action: String) -> void:
 
 func _replan_path() -> void:
 	_repath_cooldown = maxf(0.0, _repath_cooldown - 1.0 / maxf(tick_rate, 1.0))
-	if navigation == null or _goal.length_squared() < 0.0001:
+	if not _has_navigation_grid() or _goal.length_squared() < 0.0001:
 		return
 	var moved: float = global_position.distance_to(_last_position)
 	_last_position = global_position

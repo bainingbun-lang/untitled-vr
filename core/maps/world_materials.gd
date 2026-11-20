@@ -164,8 +164,13 @@ static func make_environment(mobile: bool) -> Environment:
 	environment.fog_density = 0.006 if not mobile else 0.004
 	environment.fog_sun_scatter = 0.18
 
-	environment.glow_enabled = true
-	environment.glow_intensity = 0.16 if mobile else 0.22
+	# tonemap filmic + sin glow en movil/VR: sin esto la escena sale quemada y blanca
+	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	environment.tonemap_exposure = 1.0
+	environment.tonemap_white = 6.0
+	environment.background_energy_multiplier = 0.8
+	environment.glow_enabled = not mobile
+	environment.glow_intensity = 0.16
 	environment.glow_bloom = 0.04
 	environment.glow_hdr_threshold = 1.05
 

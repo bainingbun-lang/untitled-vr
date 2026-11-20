@@ -25,6 +25,7 @@ var controllers: Array = []
 var _beams: Dictionary = {}
 var _trigger_down: Dictionary = {}
 var _placed: bool = false
+var _waited: float = 0.0
 
 
 func _ready() -> void:
@@ -37,14 +38,30 @@ func _ready() -> void:
 	_build_xr_nodes()
 	xr_camera.current = true
 	BootstrapScript.active.lifecycle.connect(_on_lifecycle)
-	if needs_calibration and ResourceLoader.exists(FLOW_PATH):
-		flow = (load(FLOW_PATH) as Script).new()
-		flow.name = "VrCalibrationFlow"
-		add_child(flow)
-		flow.begin(calibration)
-		flow.finished.connect(_on_calibration_finished)
+	if needs_calibration:
+		_start_calibration()
 		return
 	_start_menu()
+
+
+func _start_calibration() -> void:
+	if not ResourceLoader.exists(FLOW_PATH) or calibration == null:
+		_start_menu()
+		return
+	flow = (load(FLOW_PATH) as Script).new()
+	flow.name = "VrCalibrationFlow"
+	add_child(flow)
+	flow.begin(calibration)
+	flow.finished.connect(_on_calibration_finished)
+	flow.confirmed.connect(_on_calibration_confirmed)
+	_placed = false
+	_waited = 0.0
+
+
+func _on_calibration_confirmed(hand: String) -> void:
+	for controller in controllers:
+		if str(controller.tracker) == hand + "_hand" and controller.has_method("trigger_haptic_pulse"):
+			controller.trigger_haptic_pulse(&"haptic", 0.0, 0.8, 0.12, 0.0)
 
 
 func _on_calibration_finished(_saved: bool) -> void:
@@ -65,7 +82,7 @@ func _start_menu() -> void:
 	_placed = false
 
 
-# true si habia un perfil valido (se carga en silencio).
+# true si habia un perfil valido (se carga en silencio); si falta o esta corrupto se recalibra.
 func _load_calibration() -> bool:
 	if not ResourceLoader.exists(CALIBRATION_PATH):
 		return true
@@ -75,7 +92,8 @@ func _load_calibration() -> bool:
 	calibration = script.new()
 	if not calibration_path_override.is_empty():
 		calibration.profile_path = calibration_path_override
-	return bool(calibration.call("load_profile"))
+	var ok: bool = bool(calibration.call("load_profile"))
+	return ok and calibration.last_status == "ok"
 
 
 func _build_xr_nodes() -> void:
@@ -104,22 +122,28 @@ func _build_xr_nodes() -> void:
 		_trigger_down[hand] = false
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if xr_camera == null:
 		return
+	_waited += delta
 	if flow != null:
 		_process_calibration()
 		return
 	if menu == null:
 		return
-	if not _placed and BootstrapScript.active != null and BootstrapScript.active.focused:
+	if not _placed and _can_place():
 		_place_menu()
 	for controller in controllers:
 		_point(controller)
 
 
+# Si el evento de foco llego antes de conectar la señal, no se espera para siempre.
+func _can_place() -> bool:
+	return _waited > 1.5 or (BootstrapScript.active != null and BootstrapScript.active.focused)
+
+
 func _process_calibration() -> void:
-	if not _placed and BootstrapScript.active != null and BootstrapScript.active.focused:
+	if not _placed and _can_place():
 		flow.place_in_front(xr_camera.global_position, -xr_camera.global_transform.basis.z)
 		_placed = true
 	var inverse := origin.global_transform.affine_inverse()
@@ -166,7 +190,10 @@ func _on_lifecycle(event: String) -> void:
 
 
 # El host del menu cuelga de root y sobreviviria al cambio de escena.
-func _on_menu_button(_button_id: String) -> void:
+func _on_menu_button(button_id: String) -> void:
 	if host != null and is_instance_valid(host):
 		host.queue_free()
 	menu = null
+	if button_id == "recalibrate" and calibration != null:
+		calibration.delete_saved()
+		_start_calibration()

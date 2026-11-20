@@ -6,6 +6,9 @@ const MAX_RAGDOLLS: int = 8
 const MAX_WOUNDS: int = 12
 const MAX_DETACHED_LIMBS: int = 8
 const GAME_SESSION_PATH: String = "res://core/game/game_session.gd"
+const V2_MANIFEST_PATH: String = "res://assets/models/characters/v2/manifest.json"
+const V2_SCALE_MIN: float = 0.95
+const V2_SCALE_MAX: float = 1.05
 
 const SKINS: Dictionary = {
 	"civil": "res://assets/models/characters/civil_casual_hoodie.gltf",
@@ -79,11 +82,14 @@ const RAGDOLL_BONES: Array = [
 static var _ragdolls: Array = []
 static var _wound_material: StandardMaterial3D = null
 static var _logged_skins: Dictionary = {}
+static var _v2_manifest: Dictionary = {}
+static var _v2_manifest_loaded: bool = false
 
 var skin_id: String = ""
 var model_root: Node3D = null
 var skeleton: Skeleton3D = null
 var animation_player: AnimationPlayer = null
+var v2_entry: Dictionary = {}
 
 var _visual: Node3D = null
 var _bounds: AABB = AABB()
@@ -93,10 +99,98 @@ var _current_anim: String = ""
 var _wounds: Array = []
 var _limbs: Array = []
 var _ragdolled: bool = false
+var _variation_scale: float = 1.0
+var _variation_tint: Color = Color.WHITE
 
 
 static func skin_ids() -> Array:
 	return SKINS.keys()
+
+
+static func v2_manifest() -> Dictionary:
+	if _v2_manifest_loaded:
+		return _v2_manifest
+	_v2_manifest_loaded = true
+	if not FileAccess.file_exists(V2_MANIFEST_PATH):
+		return _v2_manifest
+	var file := FileAccess.open(V2_MANIFEST_PATH, FileAccess.READ)
+	if file == null:
+		return _v2_manifest
+	var text := file.get_as_text()
+	file.close()
+	var parsed = JSON.parse_string(text)
+	if typeof(parsed) == TYPE_DICTIONARY:
+		_v2_manifest = parsed
+	return _v2_manifest
+
+
+static func v2_skin_ids() -> Array:
+	var models: Dictionary = v2_manifest().get("models", {}) as Dictionary
+	if typeof(models) != TYPE_DICTIONARY:
+		return []
+	return (models as Dictionary).keys()
+
+
+static func v2_roles() -> Array:
+	var roles: Dictionary = v2_manifest().get("roles", {}) as Dictionary
+	if typeof(roles) != TYPE_DICTIONARY:
+		return []
+	return (roles as Dictionary).keys()
+
+
+static func v2_models(role: String) -> Array:
+	var aliases: Dictionary = v2_manifest().get("aliases", {}) as Dictionary
+	var key := role
+	if typeof(aliases) == TYPE_DICTIONARY:
+		key = String((aliases as Dictionary).get(role, role))
+	var roles: Dictionary = v2_manifest().get("roles", {}) as Dictionary
+	if typeof(roles) != TYPE_DICTIONARY:
+		return []
+	var ids = (roles as Dictionary).get(key, [])
+	if typeof(ids) != TYPE_ARRAY:
+		return []
+	var models: Dictionary = v2_manifest().get("models", {}) as Dictionary
+	if typeof(models) != TYPE_DICTIONARY:
+		return []
+	var result: Array = []
+	for id in (ids as Array):
+		if (models as Dictionary).has(id):
+			result.append((models as Dictionary)[id])
+	return result
+
+
+static func v2_resolve(role: String, seed: int) -> Dictionary:
+	var aliases: Dictionary = v2_manifest().get("aliases", {}) as Dictionary
+	var key := role
+	if typeof(aliases) == TYPE_DICTIONARY:
+		key = String((aliases as Dictionary).get(role, role))
+	var candidates := v2_models(key)
+	if candidates.is_empty():
+		return {}
+	var h := _stable_hash("%s:%d" % [key, seed])
+	var entry: Dictionary = candidates[h % candidates.size()]
+	var f1 := float(h & 0xFF) / 255.0
+	var f2 := float((h >> 8) & 0xFF) / 255.0
+	var f3 := float((h >> 16) & 0xFF) / 255.0
+	var f4 := float((h >> 24) & 0xFF) / 255.0
+	var scale := V2_SCALE_MIN + (V2_SCALE_MAX - V2_SCALE_MIN) * f1
+	var tint := Color(0.85 + 0.30 * f2, 0.85 + 0.30 * f3, 0.85 + 0.30 * f4, 1.0)
+	return {
+		"role": key,
+		"id": str(entry.get("id", "")),
+		"entry": entry,
+		"scale": scale,
+		"tint": tint,
+		"seed": seed,
+	}
+
+
+static func _stable_hash(text: String) -> int:
+	var h: int = 2166136261
+	for i in range(text.length()):
+		h = (h ^ text.unicode_at(i)) & 0xFFFFFFFF
+		h = (h * 16777619) & 0xFFFFFFFF
+	return h
 
 
 static func ragdoll_count() -> int:
@@ -110,13 +204,20 @@ static func clear_ragdolls() -> void:
 		_dispose_ragdoll(_ragdolls.pop_back())
 
 
-static func spawn(parent: Node, id: String = "civil") -> CharacterModel:
+static func spawn(parent: Node, id: String = "civil", seed: int = -1) -> CharacterModel:
 	var model := CharacterModel.new()
 	model.name = "CharacterModel_%s" % id
 	if parent != null:
 		parent.add_child(model)
-	model.load_model(id)
+	if seed >= 0 and not v2_models(id).is_empty():
+		model.load_v2(id, seed)
+	else:
+		model.load_model(id)
 	return model
+
+
+static func spawn_v2(parent: Node, role: String, seed: int = 0) -> CharacterModel:
+	return spawn(parent, role, seed)
 
 
 func _ready() -> void:
@@ -126,7 +227,9 @@ func _ready() -> void:
 		load_model(skin_id)
 
 
-func load_model(id: String) -> bool:
+func load_model(id: String, seed: int = -1) -> bool:
+	if seed >= 0 and not v2_models(id).is_empty():
+		return load_v2(id, seed)
 	var key := str(ALIASES.get(id, id))
 	if not SKINS.has(key):
 		return false
@@ -153,6 +256,55 @@ func load_model(id: String) -> bool:
 	_map_animations()
 	_log_bones()
 	return true
+
+
+func load_v2(role: String, seed: int = 0) -> bool:
+	var resolved := v2_resolve(role, seed)
+	if resolved.is_empty():
+		return false
+	var entry: Dictionary = resolved["entry"]
+	var path := str(entry.get("file", ""))
+	if not ResourceLoader.exists(path):
+		return false
+	var packed := load(path) as PackedScene
+	if packed == null:
+		return false
+	var instance := packed.instantiate()
+	if not instance is Node3D:
+		return false
+	if is_instance_valid(_visual):
+		_visual.free()
+	_visual = Node3D.new()
+	_visual.name = "Visual"
+	add_child(_visual)
+	model_root = instance as Node3D
+	_visual.add_child(model_root)
+	skin_id = str(entry.get("id", role))
+	v2_entry = entry.duplicate()
+	skeleton = _find_skeleton(_visual)
+	animation_player = _find_animation_player(_visual)
+	_normalize_height()
+	_map_animations_v2(entry)
+	var tint: Color = resolved["tint"]
+	_apply_variation(float(resolved["scale"]), tint)
+	_log_bones()
+	return true
+
+
+func v2_model_id() -> String:
+	return str(v2_entry.get("id", ""))
+
+
+func v2_role() -> String:
+	return str(v2_entry.get("role", ""))
+
+
+func variation_scale() -> float:
+	return _variation_scale
+
+
+func variation_tint() -> Color:
+	return _variation_tint
 
 
 func height() -> float:
@@ -394,6 +546,54 @@ func _map_animations() -> void:
 	_anim_map.clear()
 	for logical in LOGICAL_ANIMS:
 		_anim_map[logical] = _resolve_animation(String(logical))
+
+
+func _map_animations_v2(entry: Dictionary) -> void:
+	_anim_map.clear()
+	if animation_player == null:
+		return
+	var available: Array = []
+	for name in animation_player.get_animation_list():
+		available.append(String(name))
+	var mapping = entry.get("anim_map", {})
+	if typeof(mapping) != TYPE_DICTIONARY:
+		mapping = {}
+	for logical in LOGICAL_ANIMS:
+		var real := str((mapping as Dictionary).get(logical, ""))
+		if real.is_empty() or not available.has(real):
+			real = _resolve_animation(String(logical))
+		_anim_map[logical] = real
+
+
+func _apply_variation(scale: float, tint: Color) -> void:
+	_variation_scale = clampf(scale, V2_SCALE_MIN, V2_SCALE_MAX)
+	_visual.scale *= _variation_scale
+	_visual.position *= _variation_scale
+	_height = TARGET_HEIGHT * _variation_scale
+	_variation_tint = tint
+	var meshes: Array = []
+	_collect_meshes(_visual, meshes)
+	for mesh in meshes:
+		var instance := mesh as MeshInstance3D
+		var mesh_res := instance.mesh
+		if mesh_res == null:
+			continue
+		for surface in range(mesh_res.get_surface_count()):
+			var mat = null
+			if instance.has_method("get_surface_material"):
+				mat = instance.call("get_surface_material", surface)
+			if mat == null:
+				mat = mesh_res.surface_get_material(surface)
+			if mat is StandardMaterial3D:
+				var cloned := (mat as StandardMaterial3D).duplicate() as StandardMaterial3D
+				var original := cloned.albedo_color
+				cloned.albedo_color = Color(
+					original.r * tint.r,
+					original.g * tint.g,
+					original.b * tint.b,
+					original.a
+				)
+				instance.set_surface_override_material(surface, cloned)
 
 
 func _resolve_animation(logical: String) -> String:

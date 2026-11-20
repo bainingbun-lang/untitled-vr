@@ -59,6 +59,7 @@ for d in core scenes assets mods maps; do
 	[ -d "$ROOT/$d" ] && cp -r "$ROOT/$d" "$P/"
 done
 cp "$ROOT/project.godot" "$ROOT/export_presets.cfg" "$ROOT/icon.svg" "$ROOT/icon.svg.import" "$P/" || fail "copia de archivos base"
+cp "$ROOT/openxr_action_map.tres" "$P/" || fail "copia de openxr_action_map.tres"
 
 cp -r "$VENDOR_CACHE/addons/godotopenxrvendors" "$P/addons/" || fail "copia del addon a vr_project"
 cp "$VENDOR_CACHE/LICENSE" "$P/addons/godotopenxrvendors/LICENSE-MIT.txt" || fail "copia de LICENSE-MIT"

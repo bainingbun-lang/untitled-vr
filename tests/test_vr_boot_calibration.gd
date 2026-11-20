@@ -59,6 +59,9 @@ func _initialize() -> void:
 	_flow_alone()
 	await _boot_without_profile()
 	await _boot_with_profile()
+	await _boot_twice_and_recalibrate()
+	_calibration_applies_to_rig()
+	_corrupt_profile_recalibrates()
 	DirAccess.remove_absolute(PATH)
 	if _fail == 0:
 		print("PASS (%d assertions)" % _n)
@@ -76,13 +79,18 @@ func _flow_alone() -> void:
 	root.add_child(flow)
 	var done: Array = []
 	flow.finished.connect(func(saved): done.append(saved))
+	var confirmed: Array = []
+	flow.confirmed.connect(func(h): confirmed.append(h))
 	flow.begin(cal)
-	_expect(flow.step_number() == 1 and flow.progress.text == "Paso 1/3", "progreso paso 1")
+	var arm_down: float = absf((flow.silhouette_arms[0]["pivot"] as Node3D).rotation.z)
+	_expect(flow.step_number() == 1 and flow.progress.text.begins_with("PASO 1 DE 3") and flow.title.font_size >= 48, "progreso paso 1")
 	_expect(flow.update_inputs(_t(0, 1.7, 0), _t(-0.2, 1.0, 0), _t(0.2, 1.0, 0), 0.3, 0.2).is_empty(), "sin gatillo no avanza")
 	var bad: Dictionary = _press(flow, _t(0, 1.7, 0), _t(-0.2, 1.6, 0), _t(0.2, 1.6, 0))
 	_expect(not bool(bad["ok"]) and flow.step_number() == 1 and flow.hint.text.find("Baja") >= 0, "paso invalido muestra pista")
 	var ok: Dictionary = _press(flow, _t(0, 1.7, 0), _t(-0.2, 1.0, 0), _t(0.2, 1.0, 0))
-	_expect(bool(ok["ok"]) and flow.progress.text == "Paso 2/3", "gatillo confirma y avanza")
+	_expect(bool(ok["ok"]) and flow.progress.text.begins_with("PASO 2 DE 3"), "gatillo confirma y avanza")
+	_expect(confirmed == ["right"] and flow.beep_player != null and flow.beep_player.playing, "aviso haptico (señal) y sonoro al confirmar")
+	_expect(absf((flow.silhouette_arms[0]["pivot"] as Node3D).rotation.z) > arm_down + 0.5, "la silueta abre los brazos en el paso 2")
 	var held: Dictionary = flow.update_inputs(_t(0, 1.7, 0), _t(-0.75, 1.4, 0), _t(0.75, 1.4, 0), 0.0, 1.0)
 	_expect(bool(held["ok"]), "paso 2 con gatillo")
 	_expect(flow.update_inputs(_t(0, 1.7, 0), _t(-0.2, 0.85, 0), _t(0.2, 0.85, 0), 0.0, 1.0).is_empty(), "gatillo mantenido no repite")
@@ -133,3 +141,54 @@ func _boot_with_profile() -> void:
 	_expect(boot.calibration.last_status == "ok", "perfil cargado")
 	_cleanup(boot)
 	await process_frame
+
+
+func _boot_twice_and_recalibrate() -> void:
+	for round in 2:
+		var boot := _boot(MockXR.new())
+		await process_frame
+		_expect(boot.flow == null and root.get_node_or_null("VrStartMenu") != null, "arranque %d con perfil guardado: menu sin bloqueo" % (round + 1))
+		if round == 1:
+			var menu = boot.menu
+			var ids: Array = []
+			for button in menu.buttons:
+				ids.append(button["id"])
+			_expect(ids.has("recalibrate"), "el menu VR tiene boton Recalibrar")
+			boot._on_menu_button("recalibrate")
+			await process_frame
+			_expect(boot.flow != null and not FileAccess.file_exists(PATH), "Recalibrar borra el perfil y reinicia la calibracion")
+			_drive(boot.flow)
+			_expect(FileAccess.file_exists(PATH) and root.get_node_or_null("VrStartMenu") != null, "tras recalibrar vuelve al menu con perfil nuevo")
+		_cleanup(boot)
+		await process_frame
+
+
+func _calibration_applies_to_rig() -> void:
+	var mode = preload("res://core/vr/vr_game_mode.gd")
+	var rig = preload("res://core/vr/vr_rig.gd").new()
+	rig.auto_process = false
+	rig.xr_availability_override = func() -> bool: return true
+	root.add_child(rig)
+	var cal = CalScript.new()
+	cal.profile_path = PATH
+	cal.delete_saved()
+	var flow = FlowScript.new()
+	root.add_child(flow)
+	flow.begin(cal)
+	_drive(flow)
+	flow.free()
+	var side_before: float = rig.bag.bag_side
+	_expect(mode.apply_calibration(rig, PATH), "perfil valido aplicado al rig")
+	_expect(rig.right_hand.holsters != null and rig.right_hand.holsters.offsets.has("hip"), "fundas calibradas en las manos")
+	_expect(rig.right_hand.holsters.offsets["hip"].is_equal_approx(cal.slot_offsets()["hip"]), "la funda de cadera usa la medida del cuerpo")
+	_expect(not is_equal_approx(rig.bag.bag_down, 0.40) or not is_equal_approx(rig.bag.bag_side, side_before), "el bolso se coloca segun el cuerpo")
+	rig.queue_free()
+
+
+func _corrupt_profile_recalibrates() -> void:
+	var f := FileAccess.open(PATH, FileAccess.WRITE)
+	f.store_string("{roto")
+	f.close()
+	var cal = CalScript.new()
+	cal.profile_path = PATH
+	_expect(not cal.load_profile() and cal.eye_height() == 1.65, "perfil corrupto -> defaults")

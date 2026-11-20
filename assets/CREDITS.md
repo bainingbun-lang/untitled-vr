@@ -242,3 +242,88 @@ de 1024x1024 o menos y están por debajo del límite de 5.000 tris por prop.
 | Furniture Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/furniture-kit | CC0 1.0 | `bookcaseOpen.glb`, `chairDesk.glb`, `computerScreen.glb`, `desk.glb`, `floorFull.glb`, `kitchenBar.glb`, `lampSquareCeiling.glb`, `loungeSofa.glb`, `pottedPlant.glb`, `wall.glb`, `wallDoorwayWide.glb`, `wallWindow.glb` (+25 GLB del kit) |
 | Nature Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/nature-kit | CC0 1.0 | `fence_simple.glb`, `grass_large.glb`, `ground_grass.glb`, `ground_pathStraight.glb`, `plant_bush.glb`, `rock_largeA.glb`, `tree_default.glb`, `tree_oak.glb`, `tree_pineDefaultA.glb` |
 | Car Kit (vehiculos jugables G5) | Kenney (Kenney.NL), espejo https://github.com/Arslan12216775/kenney_car-kit | https://kenney.nl/assets/car-kit | CC0 1.0 | `assets/models/vehicles/`: `sedan.glb`, `truck.glb`, `sedan-sports.glb`, `delivery.glb`, `kart-oobi.glb`, `suv.glb`, `race.glb` (ruedas separadas, texturas embebidas; manifest.json) |
+
+---
+
+# Créditos de audio real (A1)
+
+170 grabaciones reales convertidas a Ogg Vorbis mono 44,1 kHz (1,87 MB) en
+`assets/audio/real/`. Cada archivo, su fuente exacta, pico y duración están en
+`assets/audio/real/manifest.json`; el detalle por autor, URL y licencia está en
+`assets/audio/AUDIO_CREDITS.md`.
+
+| Creación | Autor(es) | URL | Licencia | Archivos |
+|---|---|---|---|---|
+| Disparos pistola/fusil/francotirador | Michel Baradari, Vincent Sevedge (Tabasco), kurt, XCVG | https://opengameart.org/content/gunshot-sounds , https://opengameart.org/content/gunshots , https://opengameart.org/content/tactical-weapons-and-tactics-sound-pack | CC BY 3.0 / CC0 | `assets/audio/real/shot_*.ogg`, `body_*.ogg`, `crack_*.ogg` |
+| Recargas y mecanismos | SpringySpringo, zer0_sol, pauliuw, qubodup | https://opengameart.org/content/gun-reload-sounds , https://opengameart.org/content/handgun-reload-sound-effect , https://opengameart.org/content/gun-reload-lock-or-click-sound , https://opengameart.org/content/metal-interactions | CC0 1.0 | `assets/audio/real/reload_*.ogg` |
+| Impactos, pasos, golpes, cristales | rubberduck, congusbongus, dklon, Peludo, Till Behrend | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx , https://opengameart.org/content/footsteps-on-different-surfaces , https://opengameart.org/content/super-foley-pack , https://opengameart.org/content/water-splash-and-sand-footsteps , https://opengameart.org/content/glass-break | CC0 1.0 / CC BY 3.0 | `assets/audio/real/impact_*.ogg`, `step_*.ogg`, `melee_*.ogg`, `glass_break_*.ogg` |
+| Voces: dolor, miedo, muerte, jadeos, gruñidos, risa, tos, llanto, alerta | qubodup, Michel Baradari, congusbongus, thebardofblasphemy, mikeask, StarNinjas, DonkeyMan, Nocturnal_Vanguard, WeaponGuy, AntumDeluge, JeanMyna_VA, Scribe, XCVG | https://opengameart.org/content/15-vocal-male-strainhurtpainjump-sounds , https://opengameart.org/content/11-male-human-paindeath-sounds , https://opengameart.org/content/female-screams , https://opengameart.org/content/aargh-male-screams , https://opengameart.org/content/grunts-male-death-and-pain , https://opengameart.org/content/breathing-tired , https://opengameart.org/content/16-monster-growls , https://opengameart.org/content/zombie-noises , https://opengameart.org/content/maniacal-laughter-pack-1 , https://opengameart.org/content/sinister-laugh , https://opengameart.org/content/old-man-cough , https://opengameart.org/content/crying-female-low-tone-voice-over-vocal-sound-for-character , https://opengameart.org/content/rts-commands-and-reports | CC0 1.0 / CC BY 3.0 / CC BY 4.0 | `assets/audio/real/voice_*.ogg` |
+| Explosiones, motores, bocinas y ambiente | TinyWorlds, XCVG, domasx2, GGBotNet, SketchMan3, Thimras, tcarisland, Wolfgang_ | https://opengameart.org/content/explosion-0 , https://opengameart.org/content/racing-car-engine-sound-loops , https://opengameart.org/content/car-sound-effects-pack-low-quality , https://opengameart.org/content/wind-whoosh-loop , https://opengameart.org/content/park-ambiences , https://opengameart.org/content/city-at-night , https://opengameart.org/content/crickets-ambient-noise-loopable | CC0 1.0 / CC BY 4.0 | `assets/audio/real/explosion_*.ogg`, `engine_*.ogg`, `horn_*.ogg`, `amb_*.ogg` |
+
+Todos se descargaron a directorios temporales vacíos, se inspeccionaron (`file`, `unzip -l`,
+`7z l`, `ffprobe`) y no se ejecutó ningún archivo descargado. Se recomprimieron con ffmpeg
+(`silenceremove`, `agate`, `loudnorm`, `alimiter`, Ogg Vorbis q4 mono 44,1 kHz).
+
+---
+
+# Créditos de personajes 3D v2 (C6 P1 — NPC variados)
+
+Once humanoides **rigged** y animados, descargados (no creados ni construidos por código)
+de tres packs **CC0 1.0 Universal** de **Quaternius (Laulhet)** distribuidos en
+`https://github.com/agentkaerf/FreeModels`. Cada archivo se descargó a un directorio
+temporal **nuevo y vacío** (`~/usr/tmp/opencode/c6p1/stage/pick_<id>/`), se inspeccionó
+como glTF 2.0 (JSON: versión, triángulos, esqueleto, clips, materiales e imágenes) y solo
+después se copió a `res://assets/models/characters/v2/`. Ningún archivo descargado se
+ejecutó. Copia de la licencia: `assets/models/characters/v2/licenses/QUATERNIUS_CC0.txt`.
+
+| Id | Rol | Modelo (pack de origen) | Autor | URL | Licencia | Archivo en proyecto | Tris |
+|---|---|---|---|---|---|---|---:|
+| `civil_man_casual` | civil | Casual 2 (Ultimate Modular Men, Feb 2022) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/packs/ultimatemodularcharacters.html | CC0 1.0 | `assets/models/characters/v2/civil_man_casual.gltf` | 5.776 |
+| `civil_man_farmer` | civil | Farmer (Ultimate Modular Men, Feb 2022) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/packs/ultimatemodularcharacters.html | CC0 1.0 | `assets/models/characters/v2/civil_man_farmer.gltf` | 5.476 |
+| `civil_woman_casual` | civil | Casual (Ultimate Modular Women, April 2022) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/packs/ultimatemodularcharacters.html | CC0 1.0 | `assets/models/characters/v2/civil_woman_casual.gltf` | 6.424 |
+| `civil_woman_formal` | civil | Formal (Ultimate Modular Women, April 2022) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/packs/ultimatemodularcharacters.html | CC0 1.0 | `assets/models/characters/v2/civil_woman_formal.gltf` | 6.108 |
+| `police_swat` | police | Swat (Ultimate Modular Men, Feb 2022) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/packs/ultimatemodularcharacters.html | CC0 1.0 | `assets/models/characters/v2/police_swat.gltf` | 8.794 |
+| `soldier_female` | soldier | Soldier (Ultimate Modular Women, April 2022) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/packs/ultimatemodularcharacters.html | CC0 1.0 | `assets/models/characters/v2/soldier_female.gltf` | 7.900 |
+| `criminal_punk` | criminal | Punk (Ultimate Modular Men, Feb 2022) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/packs/ultimatemodularcharacters.html | CC0 1.0 | `assets/models/characters/v2/criminal_punk.gltf` | 5.500 |
+| `office_suit` | office | Suit (Ultimate Modular Men, Feb 2022) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/packs/ultimatemodularcharacters.html | CC0 1.0 | `assets/models/characters/v2/office_suit.gltf` | 7.674 |
+| `zombie_basic` | zombie | Zombie Basic (Zombie Apocalypse Kit, Mar 2024) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/ | CC0 1.0 | `assets/models/characters/v2/zombie_basic.gltf` | 7.822 |
+| `zombie_chubby` | zombie | Zombie Chubby (Zombie Apocalypse Kit, Mar 2024) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/ | CC0 1.0 | `assets/models/characters/v2/zombie_chubby.gltf` | 6.174 |
+| `zombie_ribcage` | zombie | Zombie Ribcage (Zombie Apocalypse Kit, Mar 2024) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/ | CC0 1.0 | `assets/models/characters/v2/zombie_ribcage.gltf` | 4.774 |
+
+URLs directas de descarga (raw, `https://raw.githubusercontent.com/agentkaerf/FreeModels/main/`):
+
+- `civil_man_casual.gltf`: `Ultimate%20Modular%20Men-%20Feb%202022/Individual%20Characters/glTF/Casual_2.gltf`
+- `civil_man_farmer.gltf`: `Ultimate%20Modular%20Men-%20Feb%202022/Individual%20Characters/glTF/Farmer.gltf`
+- `civil_woman_casual.gltf`: `Ultimate%20Modular%20Women%20-%20April%202022/Individual%20Characters/glTF/Casual.gltf`
+- `civil_woman_formal.gltf`: `Ultimate%20Modular%20Women%20-%20April%202022/Individual%20Characters/glTF/Formal.gltf`
+- `police_swat.gltf`: `Ultimate%20Modular%20Men-%20Feb%202022/Individual%20Characters/glTF/Swat.gltf`
+- `soldier_female.gltf`: `Ultimate%20Modular%20Women%20-%20April%202022/Individual%20Characters/glTF/Soldier.gltf`
+- `criminal_punk.gltf`: `Ultimate%20Modular%20Men-%20Feb%202022/Individual%20Characters/glTF/Punk.gltf`
+- `office_suit.gltf`: `Ultimate%20Modular%20Men-%20Feb%202022/Individual%20Characters/glTF/Suit.gltf`
+- `zombie_basic.gltf`: `Zombie%20Apocalypse%20Kit%20-%20March%202024/Characters/glTF/Zombie_Basic.gltf`
+- `zombie_chubby.gltf`: `Zombie%20Apocalypse%20Kit%20-%20March%202024/Characters/glTF/Zombie_Chubby.gltf`
+- `zombie_ribcage.gltf`: `Zombie%20Apocalypse%20Kit%20-%20March%202024/Characters/glTF/Zombie_Ribcage.gltf`
+
+El manifest `assets/models/characters/v2/manifest.json` documenta id, rol, archivo, altura
+(1,75 m normalizados en juego; `source_height` es la altura original del glTF), huesos
+clave, nombres reales de animaciones y su mapeo a `idle/walk/run/aim/shoot/hit/die`.
+Humanos: `Idle`, `Walk`, `Run`, `Idle_Gun_Pointing`, `Gun_Shoot`, `HitRecieve`, `Death`
+(24 clips por modelo). Zombis: `Idle`, `Walk`, `Run`, `Idle_Attack`, `Punch`, `HitReact`,
+`Death` (16 clips; el `Zombie_Ribcage` no tiene brazos ni ataque: `aim=Idle`, `shoot=Jump`
+como fallback documentado en el manifest).
+
+## Presupuesto móvil verificado (C6 P1)
+
+Máximo 8.794 tris por personaje (límite 15k). Los ocho humanoides usan materiales de
+color (sin imágenes externas; 5-10 materiales); los tres zombis comparten un atlas PNG
+embebido de 512×512 (límite 1024). Tamaño total añadido: 29.126.579 bytes (~27,8 MiB)
+en 11 `.gltf` + `manifest.json` + licencia. No se usaron assets de Mixamo ni Sketchfab.
+
+**Honestidad sobre el realismo:** estos modelos son de estilo *low-poly estilizado* de
+Quaternius (con ropa, siluetas y animaciones diferenciadas), no personajes
+fotorrealistas. No se encontraron personajes humanos fotorrealistas, riggeados,
+animados, con licencia CC0/MIT/CC-BY clara y dentro del presupuesto móvil/VR en las
+fuentes permitidas; los sustitutos "realistas" de OpenGameArt/itch.io requieren
+registro o licenses ambiguas. Se priorizó variedad de roles, ropa, edad aparente y
+cumplimiento estricto de licencia y presupuesto.
+

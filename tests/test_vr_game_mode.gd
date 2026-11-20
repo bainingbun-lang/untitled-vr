@@ -125,9 +125,12 @@ func _test_world_vr() -> void:
 	var bar = (load("res://scenes/ui/hotbar.tscn") as PackedScene).instantiate()
 	world.add_child(touch)
 	world.add_child(bar)
-	_expect(VrGameModeScript.flat_ui_nodes(world).size() >= 3, "el detector encuentra HUD plano colado")
+	var stray := Label.new()
+	stray.text = "100"
+	world.add_child(stray)
+	_expect(VrGameModeScript.flat_ui_nodes(world).size() >= 4, "el detector encuentra HUD plano colado")
 	state.call("tick", 1.1)
-	_expect(VrGameModeScript.flat_ui_nodes(world).is_empty() and state.flat_ui_removed >= 3, "el guardia de VR elimina el HUD plano")
+	_expect(VrGameModeScript.flat_ui_nodes(world).is_empty() and state.flat_ui_removed >= 4, "el guardia de VR elimina el HUD plano")
 
 	state.call("toggle_menu")
 	_expect(bool(menu.is_open), "el boton de menu abre VrMenu")
@@ -154,7 +157,7 @@ func _test_start_menu() -> void:
 	_expect(host != null, "se crea el panel de inicio 3D")
 	var menu = host.get_node_or_null("VrStartMenuPanel") if host != null else null
 	_expect(not root.use_xr, "sin XR real el menu de inicio no activa use_xr")
-	_expect(menu != null and menu.buttons.size() == 2, "menu 3D de inicio con dos opciones")
+	_expect(menu != null and menu.buttons.size() == 3, "menu 3D de inicio con tres opciones")
 	_expect(SessionScript.vr_menu_confirmed, "el menu de inicio queda marcado como confirmado")
 	if host != null:
 		host.free()

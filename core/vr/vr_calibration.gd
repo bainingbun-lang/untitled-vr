@@ -247,3 +247,9 @@ func load_profile() -> bool:
 	profile = (parsed as Dictionary).duplicate(true)
 	last_status = "ok"
 	return true
+
+
+func delete_saved() -> void:
+	if FileAccess.file_exists(profile_path):
+		DirAccess.remove_absolute(profile_path)
+	reset_defaults()

@@ -455,13 +455,13 @@ static func _build_environment(root: Node3D, time_of_day: String, theme: String)
 			fallback.ground_bottom_color = Color(0.26, 0.25, 0.23)
 			sky.sky_material = fallback
 	var sun_color := Color(1.0, 0.72, 0.48)
-	var sun_energy := 1.25 if not mobile else 1.1
+	var sun_energy := 1.2 if not mobile else 1.0
 	var sun_rotation := Vector3(-24.0, -38.0, 0.0)
 	var fog_color := Color(0.74, 0.78, 0.82)
 	var fog_density := 0.0025
 	if time_of_day == "dia":
 		sun_color = Color(1.0, 0.90, 0.78)
-		sun_energy = 1.45 if not mobile else 1.25
+		sun_energy = 1.4 if not mobile else 1.2
 		sun_rotation = Vector3(-42.0, -38.0, 0.0)
 		fog_color = Color(0.78, 0.84, 0.88)
 		fog_density = 0.0012
@@ -475,7 +475,7 @@ static func _build_environment(root: Node3D, time_of_day: String, theme: String)
 	environment.fog_light_color = fog_color
 	environment.fog_density = fog_density if not mobile else fog_density * 0.7
 	environment.fog_sun_scatter = 0.03 if time_of_day != "noche" else 0.01
-	environment.ambient_light_energy = 0.35 if time_of_day == "noche" else 1.0
+	environment.ambient_light_energy = 0.3 if time_of_day == "noche" else (0.55 if mobile else 0.7)
 	var world_environment := WorldEnvironment.new()
 	world_environment.name = "WorldEnvironment"
 	world_environment.environment = environment

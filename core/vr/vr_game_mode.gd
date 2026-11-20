@@ -1,6 +1,8 @@
 class_name VrGameMode
 extends RefCounted
 
+const OnboardingScript = preload("res://core/vr/vr_onboarding.gd")
+const CalibrationScript = preload("res://core/vr/vr_calibration.gd")
 const BOOTSTRAP_PATH: String = "res://core/vr/vr_bootstrap.gd"
 const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
 const SESSION_PATH: String = "res://core/game/game_session.gd"
@@ -23,6 +25,7 @@ const PAUSE_BUTTONS: Array = [
 const START_BUTTONS: Array = [
 	{"id": "play", "label": "JUGAR", "rect": Rect2(-0.2, 0.05, 0.4, 0.08)},
 	{"id": "map_next", "label": "OTRO MAPA", "rect": Rect2(-0.2, -0.06, 0.4, 0.08)},
+	{"id": "recalibrate", "label": "RECALIBRAR", "rect": Rect2(-0.2, -0.17, 0.4, 0.08)},
 ]
 
 static var xr_available_override: Callable = Callable()
@@ -39,6 +42,7 @@ class State extends Node:
 	var hands: Dictionary = {}
 	var selected_meta: Dictionary = {}
 	var current_weapon: String = ""
+	var onboarding = null
 	var flat_ui_removed: int = 0
 	var flat_ui_guard: Callable = Callable()
 	var _guard_time: float = 0.0
@@ -60,6 +64,7 @@ class State extends Node:
 				weapon_hand._ensure_reload_system()
 		_setup_hud()
 		_setup_menu()
+		_setup_onboarding()
 		_connect_signals()
 		refresh_hud()
 
@@ -111,9 +116,27 @@ class State extends Node:
 			target.connect(signal_name, callable)
 
 
+	func _setup_onboarding() -> void:
+		var calibration = rig.get_meta("calibration", null)
+		var holsters = hands["right"].holsters if hands["right"] != null else null
+		onboarding = OnboardingScript.new()
+		onboarding.name = "VrOnboarding"
+		world.add_child(onboarding)
+		var ids: Array = bag.call("items") if bag != null else DbScript.list_ids()
+		onboarding.configure(holsters, weapon_system, ids, calibration.dominant_hand() if calibration != null else "right")
+		onboarding.equip_requested.connect(func(id: String) -> void:
+			var hand = hands["right"]
+			if hand != null and str(hand.weapon_id).is_empty():
+				hand.try_take(id))
+
+
 	func tick(delta: float) -> void:
 		if rig == null or not is_instance_valid(rig):
 			return
+		if onboarding != null and rig.xr_camera != null:
+			var poses := {"left": rig.get_pose("left"), "right": rig.get_pose("right")}
+			var triggers := {"left": 1.0 if rig.is_trigger_pressed("left") else 0.0, "right": 1.0 if rig.is_trigger_pressed("right") else 0.0}
+			onboarding.tick(delta, rig.xr_camera.global_transform, poses, triggers)
 		_guard_time += maxf(delta, 0.0)
 		if _guard_time >= 1.0:
 			_guard_time = 0.0
@@ -304,6 +327,8 @@ class StartMenuHost extends Node3D:
 
 
 	func on_button(button_id: String) -> void:
+		if button_id == "recalibrate":
+			return
 		var meta: Dictionary = chosen_meta.duplicate(true)
 		if button_id == "map_next":
 			var seed_value: int = int(chosen_meta.get("seed", 4242)) + 101
@@ -408,10 +433,18 @@ const FLAT_UI_SCRIPTS: Array = [
 static func _is_flat_ui(node: Node) -> bool:
 	if not (node is Control or node is CanvasLayer):
 		return false
-	if FLAT_UI_NAMES.has(str(node.name)):
+	var cursor: Node = node.get_parent()
+	while cursor != null:
+		if cursor is SubViewport:
+			return false
+		cursor = cursor.get_parent()
+	if FLAT_UI_NAMES.has(str(node.name)) or node is CanvasLayer:
 		return true
 	var script: Script = node.get_script() as Script
-	return script != null and FLAT_UI_SCRIPTS.has(script.resource_path)
+	if script != null and FLAT_UI_SCRIPTS.has(script.resource_path):
+		return true
+	# cualquier Control 2D suelto en el viewport principal (p. ej. un "100" de vida)
+	return node.get_parent() != null and not (node.get_parent() is Control)
 
 
 # HUD plano (pantalla) prohibido en VR: la informacion va en VrHud (arma y muñeca).
@@ -435,11 +468,29 @@ static func strip_flat_ui(container: Node) -> int:
 	return removed
 
 
+# Coloca fundas y bolso segun el perfil guardado (defaults si falta o esta corrupto).
+static func apply_calibration(rig: Node3D, path: String = "") -> bool:
+	var calibration = CalibrationScript.new()
+	if not path.is_empty():
+		calibration.profile_path = path
+	var loaded: bool = bool(calibration.load_profile())
+	var bag = rig.get("bag")
+	if bag != null:
+		calibration.apply_to_bag(bag)
+	for hand_name in ["left_hand", "right_hand"]:
+		var hand = rig.get(hand_name)
+		if hand != null:
+			hand.holsters = calibration.make_holsters()
+	rig.set_meta("calibration", calibration)
+	return loaded
+
+
 static func setup(world: Node3D, rig: Node3D, meta: Dictionary) -> Dictionary:
 	var result: Dictionary = {"rig": rig, "state": null, "weapon_system": null, "hud": null, "menu": null}
 	if rig == null or not is_instance_valid(rig) or not bool(rig.call("is_active")):
 		return result
 	strip_flat_ui(world)
+	apply_calibration(rig)
 	var ws := WeaponSystemScript.new()
 	ws.name = "VrWeaponSystem"
 	ws.set_process(false)

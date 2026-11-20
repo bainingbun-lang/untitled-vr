@@ -8,6 +8,7 @@ signal reload_requested(hand: String)
 signal health_changed(current: float, maximum: float)
 signal died()
 
+const VrHandModelScript = preload("res://core/vr/vr_hand_model.gd")
 const VrBagScript = preload("res://core/vr/vr_bag.gd")
 const VrWeaponHandScript = preload("res://core/vr/vr_weapon_hand.gd")
 const DbScript = preload("res://core/game/weapon_db.gd")
@@ -27,10 +28,16 @@ const DbScript = preload("res://core/game/weapon_db.gd")
 var xr_availability_override: Callable = Callable()
 var xr_interface = null
 var xr_origin: XROrigin3D = null
+var floor_fix_delay: float = 1.5
+var default_eye_height: float = 1.65
+var floor_offset: float = 0.0
+var _floor_timer: float = 0.0
+var _floor_checked: bool = false
 var xr_camera: XRCamera3D = null
-var left_controller: XRController3D = null
-var right_controller: XRController3D = null
+var left_controller = null
+var right_controller = null
 var left_hand = null
+var hand_models: Dictionary = {}
 var right_hand = null
 var bag = null
 var weapon_system: Node = null
@@ -80,6 +87,14 @@ func build() -> bool:
 	right_controller.set("tracker", &"right_hand")
 	right_controller.set("pose", &"aim")
 	xr_origin.add_child(right_controller)
+
+	for pair in [["left", left_controller], ["right", right_controller]]:
+		var model = VrHandModelScript.new()
+		if model.build(pair[0]):
+			pair[1].add_child(model)
+			hand_models[pair[0]] = model
+		else:
+			model.free()
 
 	bag = VrBagScript.new(DbScript.list_ids())
 	left_hand = _make_hand("left")
@@ -228,7 +243,43 @@ func _process(delta: float) -> void:
 		step(delta)
 
 
+# Si el runtime reporta el casco a la altura del suelo (espacio Local en vez de Local Floor)
+# todo se ve gigante: se sube el origen a una altura de ojos humana una sola vez.
+func _ensure_floor_height(delta: float) -> void:
+	if _floor_checked or xr_camera == null or xr_origin == null:
+		return
+	_floor_timer += maxf(delta, 0.0)
+	if _floor_timer < floor_fix_delay:
+		return
+	_floor_checked = true
+	var eye: float = xr_camera.position.y
+	if eye < 0.5:
+		floor_offset = default_eye_height - eye
+		xr_origin.position.y += floor_offset
+
+
+func _update_hand_models() -> void:
+	for hand_name in hand_models.keys():
+		var model = hand_models[hand_name]
+		var controller = controller_for(hand_name)
+		var grip: float = 0.0
+		var trigger: float = 0.0
+		if controller != null and controller.has_method("get_float"):
+			grip = float(controller.call("get_float", &"grip"))
+			trigger = float(controller.call("get_float", &"trigger"))
+		else:
+			grip = 1.0 if is_grip_pressed(hand_name) else 0.0
+			trigger = 1.0 if is_trigger_pressed(hand_name) else 0.0
+		var node = left_hand if hand_name == "left" else right_hand
+		var zone := "grip"
+		if node != null and str(node.weapon_id).is_empty():
+			zone = "magazine"
+		model.set_pose(grip, trigger, zone)
+
+
 func step(delta: float) -> void:
+	_ensure_floor_height(delta)
+	_update_hand_models()
 	_poll_buttons()
 	if inputs_suspended:
 		return

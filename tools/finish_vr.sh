@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Un solo comando: comprueba que todo compila, compila el APK de VR, lo verifica y lo copia a Descargas.
-# Ejecutar SOLO cuando ningun agente edite archivos (pgrep -f 'title C2_' vacio).
+# Ejecutar SOLO cuando ningun agente edite archivos (pgrep -f 'title C2_[A-Z]' vacio).
 set -u; R="$(cd "$(dirname "$0")/.." && pwd)"; G="$HOME/tools/godot-4.7-stable/Godot_v4.7-stable_linux.arm64"
-pgrep -f 'title C2_' >/dev/null && { echo "ABORTA: hay agentes OpenCode activos"; exit 1; }
+pgrep -f 'title C2_[A-Z]' >/dev/null && { echo "ABORTA: hay agentes OpenCode activos"; exit 1; }
 for t in test_game_flow test_player test_weapons test_vr_bootstrap test_vr_game_mode test_vehicles test_themed_maps; do
   o=$(grun "$G" --headless --path "$R" --script res://tests/$t.gd 2>&1); echo "$o" | grep -q 'SCRIPT ERROR' && { echo "FALLA $t (SCRIPT ERROR)"; exit 1; }
   echo "$o" | grep -qE '^PASS' && echo "ok $t" || { echo "FALLA $t"; exit 1; }

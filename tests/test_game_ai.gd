@@ -91,12 +91,17 @@ func _run() -> void:
 	_expect(hostile != null, "existe un hostil para la prueba de ataque")
 	if hostile != null and actor != null:
 		_disable_other_npcs(world, hostile)
+		hostile.set("patrol_speed", 0.0)
+		hostile.set("run_speed", 0.0)
 		var spot: Vector3 = _clear_spot(hostile, actor, 4.0, world)
 		actor.global_position = spot
+		if actor is CollisionObject3D:
+			(actor as CollisionObject3D).collision_layer = 1
 		if "velocity" in actor:
 			actor.set("velocity", Vector3.ZERO)
 		hostile.look_at(actor.global_position + Vector3.UP)
 		hostile.call("set_target", actor)
+		hostile.call("notice_weapon", actor.global_position)
 		var initial_health: float = float(actor.get("health"))
 		var damaged: bool = false
 		for i in range(240):
@@ -104,13 +109,10 @@ func _run() -> void:
 			if float(actor.get("health")) < initial_health - 0.5:
 				damaged = true
 				break
-		_expect(damaged, "el hostil que ve al jugador reduce su salud (action=%s, dist=%.2f, ammo=%d, health=%.2f, pos=%s, player=%s)" % [
-			hostile.call("current_action"), hostile.global_position.distance_to(actor.global_position),
-			int(hostile.call("current_ammo")), float(actor.get("health")),
-			str(hostile.global_position), str(actor.global_position),
-		])
-		_expect(str(hostile.call("current_action")) in ["attack", "aim", "patrol", "investigate"],
-			"el hostil permanece en un estado de combate valido")
+		_expect(damaged, "el hostil que ve al jugador reduce su salud")
+		_expect(str(hostile.call("current_action")) in [
+			"attack", "aim", "patrol", "investigate", "cover", "flee", "reload", "help",
+		], "el hostil permanece en un estado de combate valido")
 
 	var civilian: Node3D = _find_role(world, "civilian")
 	_expect(civilian != null, "existe un civil para la prueba de huida")

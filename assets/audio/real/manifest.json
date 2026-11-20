@@ -1,0 +1,1383 @@
+{
+  "files": {
+    "ak47_single.wav": {
+      "category": "user",
+      "credits": "user",
+      "duration": 0.145,
+      "note": "capa (a) aportada por el usuario",
+      "peak": 0.91995,
+      "source": "video del usuario"
+    },
+    "amb_birds_01.ogg": {
+      "category": "ambience",
+      "credits": "thimras",
+      "duration": 5.0,
+      "note": "",
+      "peak": 0.27246,
+      "source": "park_ambience_birds.wav"
+    },
+    "amb_city_01.ogg": {
+      "category": "ambience",
+      "credits": "tcarisland",
+      "duration": 5.0,
+      "note": "",
+      "peak": 0.30496,
+      "source": "city_at_night_0.mp3"
+    },
+    "amb_crickets_01.ogg": {
+      "category": "ambience",
+      "credits": "wolfgang",
+      "duration": 4.9521,
+      "note": "",
+      "peak": 0.16525,
+      "source": "crickets_1.mp3"
+    },
+    "amb_wind_01.ogg": {
+      "category": "ambience",
+      "credits": "sketchman",
+      "duration": 4.9593,
+      "note": "",
+      "peak": 0.27988,
+      "source": "wind woosh loop.ogg"
+    },
+    "amb_wind_02.ogg": {
+      "category": "ambience",
+      "credits": "thimras",
+      "duration": 5.0,
+      "note": "",
+      "peak": 0.45245,
+      "source": "park_ambience_wind.wav"
+    },
+    "body_assault_rifle_01.ogg": {
+      "category": "body",
+      "credits": "derived",
+      "duration": 0.1112,
+      "note": "lowpass 240 Hz de disparo real",
+      "peak": 0.6142,
+      "source": "/data/data/com.termux/files/home/UNTITLED/assets/audio/ak47_single.wav"
+    },
+    "body_assault_rifle_02.ogg": {
+      "category": "body",
+      "credits": "derived",
+      "duration": 0.1112,
+      "note": "lowpass 240 Hz de disparo real",
+      "peak": 0.6142,
+      "source": "/data/data/com.termux/files/home/UNTITLED/assets/audio/ak47_single.wav"
+    },
+    "body_pistol_01.ogg": {
+      "category": "body",
+      "credits": "derived",
+      "duration": 0.8108,
+      "note": "lowpass 240 Hz de disparo real",
+      "peak": 0.62418,
+      "source": "/data/data/com.termux/files/home/UNTITLED/assets/audio/real/shot_pistol_01.ogg"
+    },
+    "body_pistol_02.ogg": {
+      "category": "body",
+      "credits": "derived",
+      "duration": 0.2563,
+      "note": "lowpass 240 Hz de disparo real",
+      "peak": 0.61624,
+      "source": "/data/data/com.termux/files/home/UNTITLED/assets/audio/real/shot_pistol_02.ogg"
+    },
+    "body_rifle_01.ogg": {
+      "category": "body",
+      "credits": "derived",
+      "duration": 0.89,
+      "note": "lowpass 240 Hz de disparo real",
+      "peak": 0.62988,
+      "source": "/data/data/com.termux/files/home/UNTITLED/assets/audio/real/shot_rifle_01.ogg"
+    },
+    "body_rifle_02.ogg": {
+      "category": "body",
+      "credits": "derived",
+      "duration": 0.8802,
+      "note": "lowpass 240 Hz de disparo real",
+      "peak": 0.6297,
+      "source": "/data/data/com.termux/files/home/UNTITLED/assets/audio/real/shot_rifle_02.ogg"
+    },
+    "body_shotgun_01.ogg": {
+      "category": "body",
+      "credits": "derived",
+      "duration": 0.326,
+      "note": "lowpass 240 Hz de disparo real",
+      "peak": 0.62555,
+      "source": "/data/data/com.termux/files/home/UNTITLED/assets/audio/shotgun_fire.wav"
+    },
+    "body_shotgun_02.ogg": {
+      "category": "body",
+      "credits": "derived",
+      "duration": 0.326,
+      "note": "lowpass 240 Hz de disparo real",
+      "peak": 0.62555,
+      "source": "/data/data/com.termux/files/home/UNTITLED/assets/audio/shotgun_fire.wav"
+    },
+    "body_smg_01.ogg": {
+      "category": "body",
+      "credits": "derived",
+      "duration": 0.7061,
+      "note": "lowpass 240 Hz de disparo real",
+      "peak": 0.50943,
+      "source": "/data/data/com.termux/files/home/UNTITLED/assets/audio/real/shot_smg_01.ogg"
+    },
+    "body_smg_02.ogg": {
+      "category": "body",
+      "credits": "derived",
+      "duration": 0.6882,
+      "note": "lowpass 240 Hz de disparo real",
+      "peak": 0.57001,
+      "source": "/data/data/com.termux/files/home/UNTITLED/assets/audio/real/shot_smg_02.ogg"
+    },
+    "body_sniper_01.ogg": {
+      "category": "body",
+      "credits": "derived",
+      "duration": 0.9971,
+      "note": "lowpass 240 Hz de disparo real",
+      "peak": 0.58133,
+      "source": "/data/data/com.termux/files/home/UNTITLED/assets/audio/real/shot_sniper_01.ogg"
+    },
+    "body_sniper_02.ogg": {
+      "category": "body",
+      "credits": "derived",
+      "duration": 0.9971,
+      "note": "lowpass 240 Hz de disparo real",
+      "peak": 0.57806,
+      "source": "/data/data/com.termux/files/home/UNTITLED/assets/audio/real/shot_sniper_02.ogg"
+    },
+    "crack_rifle_01.ogg": {
+      "category": "crack",
+      "credits": "derived",
+      "duration": 0.2177,
+      "note": "highpass 2.6 kHz de disparo real",
+      "peak": 0.5975,
+      "source": "/data/data/com.termux/files/home/UNTITLED/assets/audio/real/shot_rifle_01.ogg"
+    },
+    "crack_sniper_01.ogg": {
+      "category": "crack",
+      "credits": "derived",
+      "duration": 0.2171,
+      "note": "highpass 2.6 kHz de disparo real",
+      "peak": 0.01459,
+      "source": "/data/data/com.termux/files/home/UNTITLED/assets/audio/real/shot_sniper_01.ogg"
+    },
+    "engine_01.ogg": {
+      "category": "engine",
+      "credits": "domasx2",
+      "duration": 0.8612,
+      "note": "",
+      "peak": 0.27472,
+      "source": "loop_0.wav"
+    },
+    "engine_02.ogg": {
+      "category": "engine",
+      "credits": "domasx2",
+      "duration": 0.6638,
+      "note": "",
+      "peak": 0.22171,
+      "source": "loop_1_0.wav"
+    },
+    "engine_03.ogg": {
+      "category": "engine",
+      "credits": "ggbotnet",
+      "duration": 2.966,
+      "note": "",
+      "peak": 0.32193,
+      "source": "Car_Engine_Loop.ogg"
+    },
+    "explosion_01.ogg": {
+      "category": "explosion",
+      "credits": "tinyworlds",
+      "duration": 0.9807,
+      "note": "",
+      "peak": 0.61862,
+      "source": "explosion.wav"
+    },
+    "explosion_02.ogg": {
+      "category": "explosion",
+      "credits": "xcvg",
+      "duration": 1.161,
+      "note": "",
+      "peak": 0.58191,
+      "source": "sfx/ROBOBOOM.ogg"
+    },
+    "explosion_03.ogg": {
+      "category": "explosion",
+      "credits": "xcvg",
+      "duration": 2.1708,
+      "note": "",
+      "peak": 0.66418,
+      "source": "sfx/TURTBOOM.ogg"
+    },
+    "glass_break_01.ogg": {
+      "category": "glass",
+      "credits": "rubberduck",
+      "duration": 0.4993,
+      "note": "",
+      "peak": 0.8157,
+      "source": "bfh1_glass_breaking_01.ogg"
+    },
+    "glass_break_02.ogg": {
+      "category": "glass",
+      "credits": "rubberduck",
+      "duration": 0.3743,
+      "note": "",
+      "peak": 0.79169,
+      "source": "bfh1_glass_breaking_02.ogg"
+    },
+    "glass_break_03.ogg": {
+      "category": "glass",
+      "credits": "rubberduck",
+      "duration": 0.7032,
+      "note": "",
+      "peak": 0.79089,
+      "source": "bfh1_glass_breaking_03.ogg"
+    },
+    "glass_break_04.ogg": {
+      "category": "glass",
+      "credits": "till",
+      "duration": 1.2161,
+      "note": "",
+      "peak": 0.8678,
+      "source": "glass_breaking.wav"
+    },
+    "horn_01.ogg": {
+      "category": "horn",
+      "credits": "ggbotnet",
+      "duration": 0.4814,
+      "note": "",
+      "peak": 0.54495,
+      "source": "Car_Horn.ogg"
+    },
+    "impact_concrete_01.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.1191,
+      "note": "",
+      "peak": 0.85126,
+      "source": "bfh1_rock_hit_01.ogg"
+    },
+    "impact_concrete_02.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.508,
+      "note": "",
+      "peak": 0.81146,
+      "source": "bfh1_hit_01.ogg"
+    },
+    "impact_concrete_03.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.6313,
+      "note": "",
+      "peak": 0.86649,
+      "source": "bfh1_hit_02.ogg"
+    },
+    "impact_dirt_01.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.6971,
+      "note": "",
+      "peak": 0.76685,
+      "source": "bfh1_falling_01.ogg"
+    },
+    "impact_dirt_02.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.7213,
+      "note": "",
+      "peak": 0.86371,
+      "source": "bfh1_rock_falling_01.ogg"
+    },
+    "impact_dirt_03.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.6806,
+      "note": "",
+      "peak": 0.89542,
+      "source": "bfh1_falling_03.ogg"
+    },
+    "impact_flesh_01.ogg": {
+      "category": "impact",
+      "credits": "dklon",
+      "duration": 0.6719,
+      "note": "",
+      "peak": 0.83411,
+      "source": "squishy_sounds.wav"
+    },
+    "impact_flesh_02.ogg": {
+      "category": "impact",
+      "credits": "dklon",
+      "duration": 0.2784,
+      "note": "",
+      "peak": 0.81937,
+      "source": "chest_hit.wav"
+    },
+    "impact_flesh_03.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.4571,
+      "note": "",
+      "peak": 0.89755,
+      "source": "bfh1_hit_07.ogg"
+    },
+    "impact_glass_01.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.2816,
+      "note": "",
+      "peak": 0.89587,
+      "source": "bfh1_glass_hit_01.ogg"
+    },
+    "impact_glass_02.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.3197,
+      "note": "",
+      "peak": 0.90308,
+      "source": "bfh1_glass_hit_02.ogg"
+    },
+    "impact_glass_03.ogg": {
+      "category": "impact",
+      "credits": "till",
+      "duration": 0.7024,
+      "note": "",
+      "peak": 0.8678,
+      "source": "glass_breaking.wav"
+    },
+    "impact_metal_01.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.225,
+      "note": "",
+      "peak": 0.76624,
+      "source": "bfh1_metal_hit_01.ogg"
+    },
+    "impact_metal_02.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.3941,
+      "note": "",
+      "peak": 0.91196,
+      "source": "bfh1_metal_hit_02.ogg"
+    },
+    "impact_metal_03.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.3965,
+      "note": "",
+      "peak": 0.70728,
+      "source": "bfh1_metal_hit_03.ogg"
+    },
+    "impact_water_01.ogg": {
+      "category": "impact",
+      "credits": "peludo",
+      "duration": 0.6676,
+      "note": "",
+      "peak": 0.57108,
+      "source": "splash1_0.wav"
+    },
+    "impact_water_02.ogg": {
+      "category": "impact",
+      "credits": "peludo",
+      "duration": 0.6676,
+      "note": "",
+      "peak": 0.57108,
+      "source": "splash1_0.wav"
+    },
+    "impact_wood_01.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.2271,
+      "note": "",
+      "peak": 0.84808,
+      "source": "bfh1_wood_hit_01.ogg"
+    },
+    "impact_wood_02.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.2686,
+      "note": "",
+      "peak": 0.89001,
+      "source": "bfh1_wood_hit_02.ogg"
+    },
+    "impact_wood_03.ogg": {
+      "category": "impact",
+      "credits": "rubberduck",
+      "duration": 0.3468,
+      "note": "",
+      "peak": 0.8916,
+      "source": "bfh1_wood_hit_03.ogg"
+    },
+    "melee_01.ogg": {
+      "category": "melee",
+      "credits": "dklon",
+      "duration": 0.2784,
+      "note": "",
+      "peak": 0.81937,
+      "source": "chest_hit.wav"
+    },
+    "melee_02.ogg": {
+      "category": "melee",
+      "credits": "dklon",
+      "duration": 0.2235,
+      "note": "",
+      "peak": 0.84256,
+      "source": "wrist_slaps.wav"
+    },
+    "melee_03.ogg": {
+      "category": "melee",
+      "credits": "dklon",
+      "duration": 0.4529,
+      "note": "",
+      "peak": 0.89905,
+      "source": "leather_hits.wav"
+    },
+    "melee_04.ogg": {
+      "category": "melee",
+      "credits": "rubberduck",
+      "duration": 0.1973,
+      "note": "",
+      "peak": 0.94348,
+      "source": "bfh1_hit_05.ogg"
+    },
+    "reload_bolt_01.ogg": {
+      "category": "reload",
+      "credits": "springo",
+      "duration": 0.4733,
+      "note": "",
+      "peak": 0.84052,
+      "source": "assaultriflereload1_0.wav"
+    },
+    "reload_bolt_02.ogg": {
+      "category": "reload",
+      "credits": "qubodup_metal",
+      "duration": 0.5542,
+      "note": "",
+      "peak": 0.63702,
+      "source": "metal_interactions/metal_interaction1.wav"
+    },
+    "reload_mag_01.ogg": {
+      "category": "reload",
+      "credits": "springo",
+      "duration": 0.3469,
+      "note": "",
+      "peak": 0.85693,
+      "source": "gunreload1.wav"
+    },
+    "reload_mag_02.ogg": {
+      "category": "reload",
+      "credits": "zer0",
+      "duration": 0.224,
+      "note": "",
+      "peak": 0.85001,
+      "source": "reload.wav"
+    },
+    "reload_slide_01.ogg": {
+      "category": "reload",
+      "credits": "pauliuw",
+      "duration": 0.3001,
+      "note": "",
+      "peak": 0.49484,
+      "source": "gun_reload_lock_or_click_sound.mp3"
+    },
+    "reload_slide_02.ogg": {
+      "category": "reload",
+      "credits": "springo",
+      "duration": 0.4368,
+      "note": "",
+      "peak": 0.49319,
+      "source": "shotguncock_0.wav"
+    },
+    "shot_pistol_01.ogg": {
+      "category": "shot",
+      "credits": "michelbaradari",
+      "duration": 0.8229,
+      "note": "",
+      "peak": 0.7688,
+      "source": "shots/pistol.wav"
+    },
+    "shot_pistol_02.ogg": {
+      "category": "shot",
+      "credits": "kurt",
+      "duration": 0.2946,
+      "note": "",
+      "peak": 0.69513,
+      "source": "22 Pistol.wav"
+    },
+    "shot_pistol_03.ogg": {
+      "category": "shot",
+      "credits": "vincent",
+      "duration": 0.8011,
+      "note": "",
+      "peak": 0.87698,
+      "source": "sounds/cz.wav"
+    },
+    "shot_rifle_01.ogg": {
+      "category": "shot",
+      "credits": "michelbaradari",
+      "duration": 0.9027,
+      "note": "",
+      "peak": 0.93167,
+      "source": "shots/rifle.wav"
+    },
+    "shot_rifle_02.ogg": {
+      "category": "shot",
+      "credits": "vincent",
+      "duration": 0.9027,
+      "note": "",
+      "peak": 0.92731,
+      "source": "sounds/sks.wav"
+    },
+    "shot_rifle_03.ogg": {
+      "category": "shot",
+      "credits": "xcvg",
+      "duration": 0.7111,
+      "note": "",
+      "peak": 0.55161,
+      "source": "sfx/FXGUNS.ogg"
+    },
+    "shot_smg_01.ogg": {
+      "category": "shot",
+      "credits": "vincent",
+      "duration": 0.7213,
+      "note": "",
+      "peak": 0.06781,
+      "source": "sounds/cz.wav"
+    },
+    "shot_smg_02.ogg": {
+      "category": "shot",
+      "credits": "xcvg",
+      "duration": 0.7024,
+      "note": "",
+      "peak": 0.48792,
+      "source": "sfx/FXGUNS.ogg"
+    },
+    "shot_sniper_01.ogg": {
+      "category": "shot",
+      "credits": "vincent",
+      "duration": 1.2,
+      "note": "",
+      "peak": 0.93881,
+      "source": "sounds/mosin.wav"
+    },
+    "shot_sniper_02.ogg": {
+      "category": "shot",
+      "credits": "vincent",
+      "duration": 1.2,
+      "note": "",
+      "peak": 0.61484,
+      "source": "sounds/mosin.wav"
+    },
+    "shotgun_fire.wav": {
+      "category": "user",
+      "credits": "user",
+      "duration": 0.34,
+      "note": "capa (a) aportada por el usuario",
+      "peak": 0.91995,
+      "source": "video del usuario"
+    },
+    "step_concrete_01.ogg": {
+      "category": "step",
+      "credits": "congusbongus",
+      "duration": 0.1217,
+      "note": "",
+      "peak": 0.62177,
+      "source": "footsteps/boots/0.ogg"
+    },
+    "step_concrete_02.ogg": {
+      "category": "step",
+      "credits": "congusbongus",
+      "duration": 0.1217,
+      "note": "",
+      "peak": 0.62,
+      "source": "footsteps/boots/1.ogg"
+    },
+    "step_dirt_01.ogg": {
+      "category": "step",
+      "credits": "congusbongus",
+      "duration": 0.1757,
+      "note": "",
+      "peak": 0.5993,
+      "source": "footsteps/gravel/0.ogg"
+    },
+    "step_dirt_02.ogg": {
+      "category": "step",
+      "credits": "congusbongus",
+      "duration": 0.2334,
+      "note": "",
+      "peak": 0.63092,
+      "source": "footsteps/grass/0.ogg"
+    },
+    "step_dirt_03.ogg": {
+      "category": "step",
+      "credits": "congusbongus",
+      "duration": 0.4528,
+      "note": "",
+      "peak": 0.63065,
+      "source": "sand_footsteps_0.mp3"
+    },
+    "step_grass_01.ogg": {
+      "category": "step",
+      "credits": "congusbongus",
+      "duration": 0.2334,
+      "note": "",
+      "peak": 0.64304,
+      "source": "footsteps/grass/1.ogg"
+    },
+    "step_grass_02.ogg": {
+      "category": "step",
+      "credits": "congusbongus",
+      "duration": 0.2334,
+      "note": "",
+      "peak": 0.62448,
+      "source": "footsteps/grass/2.ogg"
+    },
+    "step_metal_01.ogg": {
+      "category": "step",
+      "credits": "congusbongus",
+      "duration": 0.2873,
+      "note": "",
+      "peak": 0.59622,
+      "source": "footsteps/metal/0.ogg"
+    },
+    "step_metal_02.ogg": {
+      "category": "step",
+      "credits": "congusbongus",
+      "duration": 0.3353,
+      "note": "",
+      "peak": 0.62396,
+      "source": "footsteps/metal/1.ogg"
+    },
+    "step_water_01.ogg": {
+      "category": "step",
+      "credits": "congusbongus",
+      "duration": 0.2579,
+      "note": "",
+      "peak": 0.60257,
+      "source": "footsteps/water/0.ogg"
+    },
+    "step_water_02.ogg": {
+      "category": "step",
+      "credits": "congusbongus",
+      "duration": 0.2579,
+      "note": "",
+      "peak": 0.59882,
+      "source": "footsteps/water/1.ogg"
+    },
+    "step_wood_01.ogg": {
+      "category": "step",
+      "credits": "congusbongus",
+      "duration": 0.2741,
+      "note": "",
+      "peak": 0.62973,
+      "source": "footsteps/wood/0.ogg"
+    },
+    "step_wood_02.ogg": {
+      "category": "step",
+      "credits": "congusbongus",
+      "duration": 0.2741,
+      "note": "",
+      "peak": 0.62711,
+      "source": "footsteps/wood/1.ogg"
+    },
+    "step_wood_03.ogg": {
+      "category": "step",
+      "credits": "congusbongus",
+      "duration": 0.2741,
+      "note": "",
+      "peak": 0.6257,
+      "source": "footsteps/wood/2.ogg"
+    },
+    "voice_alert_01.ogg": {
+      "category": "voice",
+      "credits": "scribe",
+      "duration": 1.1612,
+      "note": "",
+      "peak": 0.58774,
+      "source": "rts commands_0.mp3"
+    },
+    "voice_alert_02.ogg": {
+      "category": "voice",
+      "credits": "scribe",
+      "duration": 0.9579,
+      "note": "",
+      "peak": 0.65219,
+      "source": "rts commands_0.mp3"
+    },
+    "voice_alert_03.ogg": {
+      "category": "voice",
+      "credits": "scribe",
+      "duration": 1.0731,
+      "note": "",
+      "peak": 0.59473,
+      "source": "rts commands_0.mp3"
+    },
+    "voice_alert_04.ogg": {
+      "category": "voice",
+      "credits": "scribe",
+      "duration": 0.5007,
+      "note": "",
+      "peak": 0.88916,
+      "source": "rts commands_0.mp3"
+    },
+    "voice_alert_05.ogg": {
+      "category": "voice",
+      "credits": "scribe",
+      "duration": 1.2728,
+      "note": "",
+      "peak": 0.64856,
+      "source": "rts commands_0.mp3"
+    },
+    "voice_alert_06.ogg": {
+      "category": "voice",
+      "credits": "scribe",
+      "duration": 1.1267,
+      "note": "",
+      "peak": 0.83072,
+      "source": "rts commands_0.mp3"
+    },
+    "voice_cough_01.ogg": {
+      "category": "voice",
+      "credits": "antum",
+      "duration": 1.0,
+      "note": "",
+      "peak": 0.61035,
+      "source": "old-man-cough_0.ogg"
+    },
+    "voice_cough_02.ogg": {
+      "category": "voice",
+      "credits": "antum",
+      "duration": 1.0,
+      "note": "",
+      "peak": 0.59915,
+      "source": "old-man-cough_0.ogg"
+    },
+    "voice_cough_03.ogg": {
+      "category": "voice",
+      "credits": "antum",
+      "duration": 0.3236,
+      "note": "",
+      "peak": 0.61316,
+      "source": "old-man-cough_0.ogg"
+    },
+    "voice_cry_01.ogg": {
+      "category": "voice",
+      "credits": "jeanmyna",
+      "duration": 1.6111,
+      "note": "",
+      "peak": 0.63931,
+      "source": "4_cry_1.ogg"
+    },
+    "voice_cry_02.ogg": {
+      "category": "voice",
+      "credits": "jeanmyna",
+      "duration": 1.7,
+      "note": "",
+      "peak": 0.6308,
+      "source": "4_cry_1.ogg"
+    },
+    "voice_cry_03.ogg": {
+      "category": "voice",
+      "credits": "jeanmyna",
+      "duration": 1.7,
+      "note": "",
+      "peak": 0.6185,
+      "source": "4_cry_1.ogg"
+    },
+    "voice_death_female_02.ogg": {
+      "category": "voice",
+      "credits": "congus_female",
+      "duration": 0.6455,
+      "note": "",
+      "peak": 0.39221,
+      "source": "2.ogg"
+    },
+    "voice_death_female_03.ogg": {
+      "category": "voice",
+      "credits": "congus_female",
+      "duration": 0.7013,
+      "note": "",
+      "peak": 0.48471,
+      "source": "3.ogg"
+    },
+    "voice_death_female_04.ogg": {
+      "category": "voice",
+      "credits": "xcvg",
+      "duration": 0.9683,
+      "note": "",
+      "peak": 0.44098,
+      "source": "sfx/FRATDETH.ogg"
+    },
+    "voice_death_female_05.ogg": {
+      "category": "voice",
+      "credits": "xcvg",
+      "duration": 0.9787,
+      "note": "",
+      "peak": 0.5477,
+      "source": "sfx/HOSFDETH.ogg"
+    },
+    "voice_death_female_06.ogg": {
+      "category": "voice",
+      "credits": "xcvg",
+      "duration": 1.402,
+      "note": "",
+      "peak": 0.45111,
+      "source": "sfx/THUGDETH.ogg"
+    },
+    "voice_death_male_01.ogg": {
+      "category": "voice",
+      "credits": "michelbaradari",
+      "duration": 0.9487,
+      "note": "",
+      "peak": 0.61395,
+      "source": "player/die1.wav"
+    },
+    "voice_death_male_02.ogg": {
+      "category": "voice",
+      "credits": "michelbaradari",
+      "duration": 1.0917,
+      "note": "",
+      "peak": 0.66187,
+      "source": "player/die2.wav"
+    },
+    "voice_death_male_03.ogg": {
+      "category": "voice",
+      "credits": "michelbaradari",
+      "duration": 0.6602,
+      "note": "",
+      "peak": 0.62924,
+      "source": "player/deathh.wav"
+    },
+    "voice_death_male_04.ogg": {
+      "category": "voice",
+      "credits": "thebard",
+      "duration": 1.0441,
+      "note": "",
+      "peak": 0.40646,
+      "source": "death pain grunts.wav"
+    },
+    "voice_death_male_05.ogg": {
+      "category": "voice",
+      "credits": "thebard",
+      "duration": 0.2779,
+      "note": "",
+      "peak": 0.59958,
+      "source": "death pain grunts.wav"
+    },
+    "voice_death_male_06.ogg": {
+      "category": "voice",
+      "credits": "thebard",
+      "duration": 1.8,
+      "note": "",
+      "peak": 0.56613,
+      "source": "death pain grunts.wav"
+    },
+    "voice_death_male_07.ogg": {
+      "category": "voice",
+      "credits": "thebard",
+      "duration": 1.1395,
+      "note": "",
+      "peak": 0.49167,
+      "source": "death pain grunts.wav"
+    },
+    "voice_death_male_08.ogg": {
+      "category": "voice",
+      "credits": "thebard",
+      "duration": 0.1839,
+      "note": "",
+      "peak": 0.63141,
+      "source": "death pain grunts.wav"
+    },
+    "voice_effort_female_01.ogg": {
+      "category": "voice",
+      "credits": "congus_female",
+      "duration": 0.3991,
+      "note": "",
+      "peak": 0.23013,
+      "source": "1.ogg"
+    },
+    "voice_effort_female_02.ogg": {
+      "category": "voice",
+      "credits": "congus_female",
+      "duration": 0.9971,
+      "note": "",
+      "peak": 0.37234,
+      "source": "2.ogg"
+    },
+    "voice_effort_female_03.ogg": {
+      "category": "voice",
+      "credits": "congus_female",
+      "duration": 0.9971,
+      "note": "",
+      "peak": 0.38565,
+      "source": "3.ogg"
+    },
+    "voice_effort_male_01.ogg": {
+      "category": "voice",
+      "credits": "qubodup_voice",
+      "duration": 0.3544,
+      "note": "",
+      "peak": 0.86105,
+      "source": "slightscream-12.flac"
+    },
+    "voice_effort_male_02.ogg": {
+      "category": "voice",
+      "credits": "qubodup_voice",
+      "duration": 0.5127,
+      "note": "",
+      "peak": 0.66415,
+      "source": "slightscream-13.flac"
+    },
+    "voice_effort_male_03.ogg": {
+      "category": "voice",
+      "credits": "qubodup_voice",
+      "duration": 0.5936,
+      "note": "",
+      "peak": 0.52466,
+      "source": "slightscream-14.flac"
+    },
+    "voice_effort_male_04.ogg": {
+      "category": "voice",
+      "credits": "qubodup_voice",
+      "duration": 0.777,
+      "note": "",
+      "peak": 0.79446,
+      "source": "slightscream-15.flac"
+    },
+    "voice_fear_female_01.ogg": {
+      "category": "voice",
+      "credits": "congus_female",
+      "duration": 0.3236,
+      "note": "",
+      "peak": 0.64395,
+      "source": "1.ogg"
+    },
+    "voice_fear_female_02.ogg": {
+      "category": "voice",
+      "credits": "congus_female",
+      "duration": 0.9455,
+      "note": "",
+      "peak": 0.35513,
+      "source": "2.ogg"
+    },
+    "voice_fear_female_03.ogg": {
+      "category": "voice",
+      "credits": "congus_female",
+      "duration": 1.0013,
+      "note": "",
+      "peak": 0.40298,
+      "source": "3.ogg"
+    },
+    "voice_fear_male_01.ogg": {
+      "category": "voice",
+      "credits": "congus_aargh",
+      "duration": 0.8273,
+      "note": "",
+      "peak": 0.49326,
+      "source": "aargh0.ogg"
+    },
+    "voice_fear_male_02.ogg": {
+      "category": "voice",
+      "credits": "congus_aargh",
+      "duration": 0.6211,
+      "note": "",
+      "peak": 0.35416,
+      "source": "aargh1.ogg"
+    },
+    "voice_fear_male_03.ogg": {
+      "category": "voice",
+      "credits": "congus_aargh",
+      "duration": 0.6872,
+      "note": "",
+      "peak": 0.3147,
+      "source": "aargh2.ogg"
+    },
+    "voice_fear_male_04.ogg": {
+      "category": "voice",
+      "credits": "congus_aargh",
+      "duration": 0.8269,
+      "note": "",
+      "peak": 0.39255,
+      "source": "aargh3.ogg"
+    },
+    "voice_fear_male_05.ogg": {
+      "category": "voice",
+      "credits": "congus_aargh",
+      "duration": 0.8955,
+      "note": "",
+      "peak": 0.3562,
+      "source": "aargh4.ogg"
+    },
+    "voice_fear_male_06.ogg": {
+      "category": "voice",
+      "credits": "congus_aargh",
+      "duration": 1.04,
+      "note": "",
+      "peak": 0.41068,
+      "source": "aargh5.ogg"
+    },
+    "voice_fear_male_07.ogg": {
+      "category": "voice",
+      "credits": "qubodup_voice",
+      "duration": 0.4968,
+      "note": "",
+      "peak": 0.41873,
+      "source": "slightscream-06.flac"
+    },
+    "voice_fear_male_08.ogg": {
+      "category": "voice",
+      "credits": "qubodup_voice",
+      "duration": 0.4727,
+      "note": "",
+      "peak": 0.64059,
+      "source": "slightscream-07.flac"
+    },
+    "voice_fear_male_09.ogg": {
+      "category": "voice",
+      "credits": "qubodup_voice",
+      "duration": 0.3851,
+      "note": "",
+      "peak": 0.87094,
+      "source": "slightscream-08.flac"
+    },
+    "voice_fear_male_10.ogg": {
+      "category": "voice",
+      "credits": "qubodup_voice",
+      "duration": 0.4913,
+      "note": "",
+      "peak": 0.60925,
+      "source": "slightscream-09.flac"
+    },
+    "voice_fear_male_11.ogg": {
+      "category": "voice",
+      "credits": "qubodup_voice",
+      "duration": 0.7006,
+      "note": "",
+      "peak": 0.52371,
+      "source": "slightscream-10.flac"
+    },
+    "voice_growl_01.ogg": {
+      "category": "voice",
+      "credits": "starninjas",
+      "duration": 0.5212,
+      "note": "",
+      "peak": 0.81891,
+      "source": "monster.1.ogg"
+    },
+    "voice_growl_02.ogg": {
+      "category": "voice",
+      "credits": "starninjas",
+      "duration": 0.7417,
+      "note": "",
+      "peak": 0.70569,
+      "source": "monster.2.ogg"
+    },
+    "voice_growl_03.ogg": {
+      "category": "voice",
+      "credits": "starninjas",
+      "duration": 0.7298,
+      "note": "",
+      "peak": 0.58685,
+      "source": "monster.3.ogg"
+    },
+    "voice_growl_04.ogg": {
+      "category": "voice",
+      "credits": "starninjas",
+      "duration": 0.7766,
+      "note": "",
+      "peak": 0.69244,
+      "source": "monster.4.ogg"
+    },
+    "voice_growl_05.ogg": {
+      "category": "voice",
+      "credits": "starninjas",
+      "duration": 0.9152,
+      "note": "",
+      "peak": 0.58755,
+      "source": "monster.5.ogg"
+    },
+    "voice_growl_06.ogg": {
+      "category": "voice",
+      "credits": "starninjas",
+      "duration": 1.1551,
+      "note": "",
+      "peak": 0.63608,
+      "source": "monster.6.ogg"
+    },
+    "voice_growl_07.ogg": {
+      "category": "voice",
+      "credits": "starninjas",
+      "duration": 0.1219,
+      "note": "",
+      "peak": 0.75638,
+      "source": "monster.7.ogg"
+    },
+    "voice_growl_08.ogg": {
+      "category": "voice",
+      "credits": "donkey",
+      "duration": 1.6,
+      "note": "",
+      "peak": 0.6387,
+      "source": "zombie_noises_0.mp3"
+    },
+    "voice_growl_09.ogg": {
+      "category": "voice",
+      "credits": "donkey",
+      "duration": 1.6,
+      "note": "",
+      "peak": 0.48682,
+      "source": "zombie_noises_0.mp3"
+    },
+    "voice_growl_10.ogg": {
+      "category": "voice",
+      "credits": "donkey",
+      "duration": 1.6,
+      "note": "",
+      "peak": 0.57938,
+      "source": "zombie_noises_0.mp3"
+    },
+    "voice_growl_11.ogg": {
+      "category": "voice",
+      "credits": "donkey",
+      "duration": 0.5355,
+      "note": "",
+      "peak": 0.61285,
+      "source": "zombie_noises_0.mp3"
+    },
+    "voice_growl_12.ogg": {
+      "category": "voice",
+      "credits": "donkey",
+      "duration": 1.6,
+      "note": "",
+      "peak": 0.51843,
+      "source": "zombie_noises_0.mp3"
+    },
+    "voice_laugh_01.ogg": {
+      "category": "voice",
+      "credits": "nocturnal",
+      "duration": 2.2,
+      "note": "",
+      "peak": 0.50751,
+      "source": "maniacal_laughter_pack_1.ogg"
+    },
+    "voice_laugh_02.ogg": {
+      "category": "voice",
+      "credits": "nocturnal",
+      "duration": 2.2,
+      "note": "",
+      "peak": 0.63977,
+      "source": "maniacal_laughter_pack_1.ogg"
+    },
+    "voice_laugh_03.ogg": {
+      "category": "voice",
+      "credits": "nocturnal",
+      "duration": 0.8393,
+      "note": "",
+      "peak": 0.68283,
+      "source": "maniacal_laughter_pack_1.ogg"
+    },
+    "voice_laugh_04.ogg": {
+      "category": "voice",
+      "credits": "nocturnal",
+      "duration": 2.2,
+      "note": "",
+      "peak": 0.53458,
+      "source": "maniacal_laughter_pack_1.ogg"
+    },
+    "voice_laugh_05.ogg": {
+      "category": "voice",
+      "credits": "nocturnal",
+      "duration": 2.1868,
+      "note": "",
+      "peak": 0.62091,
+      "source": "maniacal_laughter_pack_1.ogg"
+    },
+    "voice_laugh_06.ogg": {
+      "category": "voice",
+      "credits": "weaponguy",
+      "duration": 2.1727,
+      "note": "",
+      "peak": 0.46704,
+      "source": "evil laugh3.mp3"
+    },
+    "voice_pain_female_01.ogg": {
+      "category": "voice",
+      "credits": "congus_female",
+      "duration": 0.5991,
+      "note": "",
+      "peak": 0.24658,
+      "source": "1.ogg"
+    },
+    "voice_pain_female_02.ogg": {
+      "category": "voice",
+      "credits": "congus_female",
+      "duration": 1.247,
+      "note": "",
+      "peak": 0.37698,
+      "source": "2.ogg"
+    },
+    "voice_pain_female_03.ogg": {
+      "category": "voice",
+      "credits": "congus_female",
+      "duration": 1.3027,
+      "note": "",
+      "peak": 0.37787,
+      "source": "3.ogg"
+    },
+    "voice_pain_female_04.ogg": {
+      "category": "voice",
+      "credits": "congus_female",
+      "duration": 0.9111,
+      "note": "",
+      "peak": 0.34863,
+      "source": "4.ogg"
+    },
+    "voice_pain_male_01.ogg": {
+      "category": "voice",
+      "credits": "qubodup_voice",
+      "duration": 0.4276,
+      "note": "",
+      "peak": 0.57776,
+      "source": "slightscream-01.flac"
+    },
+    "voice_pain_male_02.ogg": {
+      "category": "voice",
+      "credits": "qubodup_voice",
+      "duration": 0.3488,
+      "note": "",
+      "peak": 0.86261,
+      "source": "slightscream-02.flac"
+    },
+    "voice_pain_male_03.ogg": {
+      "category": "voice",
+      "credits": "qubodup_voice",
+      "duration": 0.5411,
+      "note": "",
+      "peak": 0.54666,
+      "source": "slightscream-03.flac"
+    },
+    "voice_pain_male_04.ogg": {
+      "category": "voice",
+      "credits": "qubodup_voice",
+      "duration": 0.5907,
+      "note": "",
+      "peak": 0.54279,
+      "source": "slightscream-04.flac"
+    },
+    "voice_pain_male_05.ogg": {
+      "category": "voice",
+      "credits": "qubodup_voice",
+      "duration": 0.6665,
+      "note": "",
+      "peak": 0.5993,
+      "source": "slightscream-05.flac"
+    },
+    "voice_pain_male_06.ogg": {
+      "category": "voice",
+      "credits": "michelbaradari",
+      "duration": 0.5325,
+      "note": "",
+      "peak": 0.60852,
+      "source": "player/pain1.wav"
+    },
+    "voice_pain_male_07.ogg": {
+      "category": "voice",
+      "credits": "michelbaradari",
+      "duration": 0.6239,
+      "note": "",
+      "peak": 0.61914,
+      "source": "player/pain2.wav"
+    },
+    "voice_pain_male_08.ogg": {
+      "category": "voice",
+      "credits": "michelbaradari",
+      "duration": 0.5293,
+      "note": "",
+      "peak": 0.60898,
+      "source": "player/pain3.wav"
+    },
+    "voice_pain_male_09.ogg": {
+      "category": "voice",
+      "credits": "michelbaradari",
+      "duration": 0.68,
+      "note": "",
+      "peak": 0.61591,
+      "source": "player/pain4.wav"
+    },
+    "voice_pain_male_10.ogg": {
+      "category": "voice",
+      "credits": "michelbaradari",
+      "duration": 0.605,
+      "note": "",
+      "peak": 0.61703,
+      "source": "player/pain5.wav"
+    },
+    "voice_pain_male_11.ogg": {
+      "category": "voice",
+      "credits": "michelbaradari",
+      "duration": 0.5087,
+      "note": "",
+      "peak": 0.55603,
+      "source": "player/pain6.wav"
+    },
+    "voice_pant_01.ogg": {
+      "category": "voice",
+      "credits": "mikeask",
+      "duration": 1.0541,
+      "note": "",
+      "peak": 0.77533,
+      "source": "breathing tired.wav"
+    },
+    "voice_pant_02.ogg": {
+      "category": "voice",
+      "credits": "mikeask",
+      "duration": 1.1,
+      "note": "",
+      "peak": 0.85495,
+      "source": "breathing tired.wav"
+    },
+    "voice_pant_03.ogg": {
+      "category": "voice",
+      "credits": "mikeask",
+      "duration": 0.9566,
+      "note": "",
+      "peak": 0.64417,
+      "source": "breathing tired.wav"
+    },
+    "voice_phrase_01.ogg": {
+      "category": "voice",
+      "credits": "scribe",
+      "duration": 1.2008,
+      "note": "",
+      "peak": 0.68039,
+      "source": "rts commands_0.mp3"
+    },
+    "voice_phrase_02.ogg": {
+      "category": "voice",
+      "credits": "scribe",
+      "duration": 0.8664,
+      "note": "",
+      "peak": 0.50186,
+      "source": "rts commands_0.mp3"
+    },
+    "voice_phrase_03.ogg": {
+      "category": "voice",
+      "credits": "scribe",
+      "duration": 1.4147,
+      "note": "",
+      "peak": 0.52966,
+      "source": "rts commands_0.mp3"
+    },
+    "voice_phrase_04.ogg": {
+      "category": "voice",
+      "credits": "scribe",
+      "duration": 1.0903,
+      "note": "",
+      "peak": 0.5694,
+      "source": "rts commands_0.mp3"
+    }
+  },
+  "format": "Ogg Vorbis mono 44100 Hz q4",
+  "limiter_peak": 0.62,
+  "noise_gate": true
+}
