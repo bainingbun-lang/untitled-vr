@@ -108,6 +108,7 @@ func _boot(mock) -> Node:
 	var boot := BootScene.instantiate()
 	boot.get_script().set("calibration_path_override", PATH)
 	root.add_child(boot)
+	boot.set("_waited", 3.0)
 	return boot
 
 

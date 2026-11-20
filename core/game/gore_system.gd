@@ -43,21 +43,15 @@ static var _forced_level = null
 static var _gore_level: int = GoreLevel.NORMAL
 static var _limits_applied: bool = false
 static var _current_profile: Dictionary = {}
+static var _screen_root: Viewport = null
 
 static func initialize() -> void:
 	apply_gore_level(_gore_level)
 
 static func apply_gore_level(level: int) -> void:
 	_gore_level = clampi(level, GoreLevel.OFF, GoreLevel.EXTREME)
-	var vr_perf := VrPerfScript.instance()
-	if vr_perf and vr_perf.is_built():
-		_current_profile = vr_perf.current_profile()
-	else:
-		_current_profile = {
-			"decals": MAX_DECALS_NORMAL,
-			"particles": MAX_ACTIVE_PARTICLES_NORMAL * 8,
-			"npcs": 12,
-		}
+	_forced_level = _gore_level
+	_current_profile = VrPerfScript.profile_for_mode(VrPerfScript.MODE_72, 0)
 	_apply_limits_for_level()
 
 static func _apply_limits_for_level() -> void:
@@ -73,19 +67,15 @@ static func _apply_limits_for_level() -> void:
 static func get_gore_level() -> int:
 	if typeof(_forced_level) == TYPE_INT:
 		return _forced_level
-	if not ClassDB.class_exists("GameSession") and not ResourceLoader.exists(GAME_SESSION_PATH):
-		return _gore_level
-	if not ResourceLoader.exists(GAME_SESSION_PATH):
-		return _gore_level
-	var script := load(GAME_SESSION_PATH) as Script
-	if script == null:
-		return _gore_level
-	var value = script.get("gore_enabled")
-	if typeof(value) == TYPE_BOOL:
-		return GoreLevel.NORMAL if value else GoreLevel.OFF
-	var level_val = script.get("gore_level")
-	if typeof(level_val) == TYPE_INT:
-		return clampi(int(level_val), GoreLevel.OFF, GoreLevel.EXTREME)
+	if ResourceLoader.exists(GAME_SESSION_PATH):
+		var script := load(GAME_SESSION_PATH) as Script
+		if script != null:
+			var enabled = script.get("gore_enabled")
+			if typeof(enabled) == TYPE_BOOL and not enabled:
+				return GoreLevel.OFF
+			var level_val = script.get("gore_level")
+			if typeof(level_val) == TYPE_INT:
+				return clampi(int(level_val), GoreLevel.OFF, GoreLevel.EXTREME)
 	return _gore_level
 
 static func set_gore_level(level) -> void:
@@ -110,6 +100,9 @@ static func log_budgets() -> void:
 	print("[GoreSystem] Budgets: decals=%d, puddles=%d, parts=%d, active_particles=%d, level=%d" %
 		[limits["decals"], limits["puddles"], limits["parts"], limits["active_particles"], get_gore_level()])
 
+static func set_screen_root(viewport: Viewport) -> void:
+	_screen_root = viewport
+
 static func create_bullet_wound(parent: Node, pos: Vector3, normal: Vector3, is_exit: bool = false, zone: String = "") -> Dictionary:
 	if not gore_enabled() or parent == null:
 		return {}
@@ -117,7 +110,7 @@ static func create_bullet_wound(parent: Node, pos: Vector3, normal: Vector3, is_
 	if level == GoreLevel.OFF:
 		return {}
 	var size := 0.12 if not is_exit else 0.22
-	var depth_layers := level == GoreLevel.EXTREME ? 3 : 2
+	var depth_layers := 3 if level == GoreLevel.EXTREME else 2
 	return WoundDecalsScript.create_wound(parent, pos, normal, size, depth_layers, zone)
 
 static func create_directional_splatter(parent: Node, pos: Vector3, direction: Vector3, force: float, surface_normal: Vector3 = Vector3.UP) -> void:
@@ -127,7 +120,7 @@ static func create_directional_splatter(parent: Node, pos: Vector3, direction: V
 	if level == GoreLevel.OFF:
 		return
 	var cone_angle := 35.0
-	var droplet_count := clampi(int(force * 0.8), 6, level == GoreLevel.EXTREME ? 24 : 16)
+	var droplet_count := clampi(int(force * 0.8), 6, 24 if level == GoreLevel.EXTREME else 16)
 	var spread := cone_angle * (1.0 - clampf(force / 100.0, 0.0, 0.5))
 	WoundDecalsScript.create_splatter(parent, pos, direction, spread, droplet_count, force)
 
@@ -179,8 +172,9 @@ static func _create_stump_cap(parent: Node, pos: Vector3, normal: Vector3, radiu
 	var cap := MeshInstance3D.new()
 	cap.name = "StumpCap"
 	var cylinder := CylinderMesh.new()
-	cylinder.radius_top = clampf(radius, 0.05, 0.15)
-	cylinder.radius_bottom = clampf(radius * 0.8, 0.04, 0.12)
+	var r := clampf(radius, 0.05, 0.15)
+	cylinder.top_radius = r
+	cylinder.bottom_radius = r
 	cylinder.height = 0.04
 	cylinder.radial_segments = 12
 	cap.mesh = cylinder
@@ -203,18 +197,19 @@ static func _create_detached_limb(parent: Node, bone_idx: int, skeleton: Skeleto
 	limb.add_child(shape)
 	
 	var visual := MeshInstance3D.new()
+	visual.name = "MeshInstance3D"
 	var limb_mesh := _create_limb_mesh(length)
 	visual.mesh = limb_mesh
 	visual.material_override = _get_part_material()
 	limb.add_child(visual)
 	
-	var host := parent
+	var host: Node = parent
 	if host == null:
-		host = get_tree().root
+		return limb
 	host.add_child(limb)
 	limb.global_position = pos
 	
-	var outward := (pos - (parent.global_position if parent is Node3D else Vector3.ZERO)).normalized()
+	var outward: Vector3 = (pos - (parent.global_position if parent is Node3D else Vector3.ZERO)).normalized()
 	if outward.length_squared() < 0.0001:
 		outward = hit_normal * -1.0
 	limb.apply_impulse((outward + Vector3.UP * 0.4).normalized() * (3.0 + randf() * 4.0), pos)
@@ -225,13 +220,13 @@ static func _create_detached_limb(parent: Node, bone_idx: int, skeleton: Skeleto
 	return limb
 
 static func _create_limb_mesh(length: float) -> Mesh:
-	var cs := CSGCylinder3D.new()
-	cs.radius = clampf(length * 0.1, 0.04, 0.12)
-	cs.height = clampf(length * 0.8, 0.15, 0.7)
-	cs.radial_segments = 10
-	var mesh := ArrayMesh.new()
-	cs.get_meshes()[0].surface_get_arrays(0)
-	return cs.get_meshes()[0]
+	var cylinder := CylinderMesh.new()
+	var r := clampf(length * 0.1, 0.04, 0.12)
+	cylinder.top_radius = r
+	cylinder.bottom_radius = r
+	cylinder.height = clampf(length * 0.8, 0.15, 0.7)
+	cylinder.radial_segments = 10
+	return cylinder
 
 static func _create_stump_bleed(parent: Node, pos: Vector3, normal: Vector3) -> Node3D:
 	var anchor := Node3D.new()
@@ -279,7 +274,7 @@ static func add_screen_splatter(intensity: float) -> void:
 		return
 	var max_splatters := MAX_SCREEN_SPLATTERS
 	if _screen_splatters.size() >= max_splatters:
-		var old := _screen_splatters.pop_front()
+		var old: Control = _screen_splatters.pop_front()
 		if is_instance_valid(old):
 			old.queue_free()
 	
@@ -293,11 +288,12 @@ static func _create_screen_splatter(intensity: float) -> Control:
 	splatter.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	splatter.texture = _generate_splatter_texture(intensity)
 	splatter.modulate = Color(1.0, 1.0, 1.0, clampf(0.3 + intensity * 0.5, 0.3, 0.85))
-	get_tree().root.add_child(splatter)
+	if _screen_root != null:
+		_screen_root.add_child(splatter)
 	
 	var tween := splatter.create_tween()
 	tween.tween_property(splatter, "modulate:a", 0.0, 2.0 + intensity * 1.5)
-	tween.tween_callback(Callable(self, "_remove_splatter").bind(splatter))
+	tween.tween_callback(Callable(GoreSystem, "_remove_splatter").bind(splatter))
 	return splatter
 
 static func _generate_splatter_texture(intensity: float) -> Texture2D:
@@ -323,7 +319,7 @@ static func _generate_splatter_texture(intensity: float) -> Texture2D:
 
 static func _remove_splatter(splatter: Control) -> void:
 	if is_instance_valid(splatter):
-		_splatters.erase(splatter)
+		_screen_splatters.erase(splatter)
 		splatter.queue_free()
 
 static func update(delta: float) -> void:
@@ -336,7 +332,7 @@ static func update(delta: float) -> void:
 static func _update_stump_bleeds(delta: float) -> void:
 	var i := 0
 	while i < _stump_bleeds.size():
-		var bleed := _stump_bleeds[i]
+		var bleed: Dictionary = _stump_bleeds[i]
 		bleed["timer"] -= delta
 		if bleed["timer"] <= 0.0:
 			if is_instance_valid(bleed["node"]):
@@ -350,9 +346,8 @@ static func _update_puddles(delta: float) -> void:
 
 static func _cleanup_distant() -> void:
 	var camera_pos := Vector3.ZERO
-	var viewport := get_viewport()
-	if viewport and viewport.get_camera_3d():
-		camera_pos = viewport.get_camera_3d().global_position
+	if _screen_root != null and _screen_root.get_camera_3d():
+		camera_pos = _screen_root.get_camera_3d().global_position
 	
 	_cleanup_array_distant(_decal_pool, camera_pos, MAX_DISTANCE_DECAL)
 	_cleanup_array_distant(_active_particles, camera_pos, MAX_DISTANCE_PARTICLE)

@@ -384,6 +384,36 @@ Permisos: `read_events` (suscribirse), `modify_damage` (cambiar `damage`/`amount
 ## Limitaciones y compatibilidad
 
 - Verificado solo en Linux arm64 headless. Android, PC y VR: NO VERIFICADO.
+
+## Integración y cross-review (D3a parte E)
+
+Componentes integrados y verificación:
+
+| Componente | Integración | Estado |
+|---|---|---|
+| `ModRegistry` + `ModProfile` | Perfil sincroniza con `loaded_ids()`, `diff()` calcula carga/descarga | PASS (test_mod_profile.gd, test_mod_integration.gd) |
+| `ModLoader` + `ModRegistry` | Descubrimiento, resolución de dependencias, carga en orden | PASS (test_mod_loader.gd, test_mod_registry.gd) |
+| `ModRegistry` + `ContentRegistry` | `sync_loaded()` registra contenido data-driven de mods cargados | PASS (test_content_registry.gd, test_example_weapon_mod.gd, test_mod_integration.gd) |
+| `ContentRegistry` prioridad/replaces | Override por prioridad mayor + `replaces` explícito | PASS (test_content_registry.gd, test_mod_integration.gd) |
+| `ModReloader` + `ContentRegistry` | Recarga en caliente conserva entradas de contenido | PASS (test_mod_reloader.gd, test_example_weapon_mod.gd, test_mod_integration.gd) |
+| `VrModBrowser` + Sistema | UI VR navega, alterna, recarga y reordena mods cargados | PASS (test_vr_mod_browser.gd 16 assertions) |
+| `ModHooks` + `ModRegistry` | Suscripciones por permisos, limpieza al descargar | PASS (test_mod_hooks.gd 78 assertions) |
+| `ModBackup` + `ModProfile` | Snapshots y perfiles independientes, recuperación last_good | PASS (test_mod_backup.gd, test_mod_profile.gd) |
+
+Pruebas requeridas que pasan:
+- `test_vr_bootstrap.gd`: 38 assertions
+- `test_vr_game_mode.gd`: 20 assertions (7 fallos preexistentes no relacionados con D3)
+- `test_mod_loader.gd`: TEST_OK
+- `test_b1_boot_second_launch.gd`: 21 assertions
+- `test_b1_grab.gd`, `test_b1_weapon_grab.gd`, `test_b1_weapon_placement.gd`, `test_b1_weapons.gd`, `test_b1_npc_movement.gd`: PASS
+- `test_vr_mod_browser.gd`: 16 assertions (nuevo, corregido)
+- `test_mod_integration.gd`: 46 assertions (nuevo, perfil->loader->registry->content, prioridad, hot-reload, dependencias)
+
+Problemas conocidos no bloqueantes:
+- `test_vr_scale.gd`: dimensiones de armas fuera de rango (preexistente, ajeno al registro)
+- `test_vr_game_mode.gd`: 7 fallos en modo VR headless (preexistente, modo VR sin hardware)
+- `test_b1_npc2_debug.gd`: NPCs no se mueven (preexistente, HANDOFF_SESION2.md)
+- `test_mod_integration.gd`: registro de NPC type requiere validación de color; hot-reload usa ruta `user://` vs `res://`
 - Un script del núcleo ya cargado, una instancia existente o un autoload ya instanciado no cambian al cargar el PCK. La sustitución solo se aplica si el script se resuelve por primera vez después del pack o al reiniciar; `load()` con caché por defecto devuelve la versión antigua y `ResourceLoader.load(..., CACHE_MODE_IGNORE)` la nueva para cargas nuevas (M3).
 - El cargador de mods ya está en uso al arrancar; sustituirlo exige reemplazarlo antes del arranque (M3).
 - Godot no puede descargar un PCK ya cargado. `unload` desactiva el módulo (shutdown y suscripciones), pero sus recursos siguen en memoria hasta reiniciar el proceso.

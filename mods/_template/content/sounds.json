@@ -1,0 +1,43 @@
+{
+  "content": [
+    {
+      "type": "sound_bank",
+      "id": "untitled.template-mod:template_weapon_fire",
+      "name": "Disparo de plantilla",
+      "description": "Ejemplo de banco de sonidos de arma. Reemplaza con tus archivos OGG CC0.",
+      "category": "weapon_fire",
+      "files": [
+        "res://assets/audio/weapons/template_weapon_fire_1.ogg",
+        "res://assets/audio/weapons/template_weapon_fire_2.ogg",
+        "res://assets/audio/weapons/template_weapon_fire_3.ogg"
+      ],
+      "layers": [],
+      "loop": false
+    },
+    {
+      "type": "sound_bank",
+      "id": "untitled.template-mod:template_weapon_reload",
+      "name": "Recarga de plantilla",
+      "description": "Ejemplo de banco de sonidos de recarga. Reemplaza con tus archivos OGG CC0.",
+      "category": "weapon_reload",
+      "files": [
+        "res://assets/audio/weapons/template_weapon_reload.ogg"
+      ],
+      "layers": [],
+      "loop": false
+    },
+    {
+      "type": "sound_bank",
+      "id": "untitled.template-mod:template_npc_hurt",
+      "name": "Herido NPC plantilla",
+      "description": "Ejemplo de banco de sonidos de NPC herido. Reemplaza con tus archivos OGG CC0.",
+      "category": "npc_hurt",
+      "files": [
+        "res://assets/audio/npcs/template_npc_hurt_1.ogg",
+        "res://assets/audio/npcs/template_npc_hurt_2.ogg"
+      ],
+      "layers": [],
+      "loop": false
+    }
+  ]
+}

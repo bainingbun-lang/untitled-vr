@@ -9,6 +9,7 @@ static var map_meta: Dictionary = {}
 static var platform: String = ""
 static var platform_override: String = ""
 static var gore_enabled: bool = true
+static var gore_level: int = 1
 static var seed: int = 0
 static var start_override: Callable = Callable()
 static var vr_menu_confirmed: bool = false

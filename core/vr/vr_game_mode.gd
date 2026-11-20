@@ -17,6 +17,7 @@ const DbScript = preload("res://core/game/weapon_db.gd")
 const GeneratorScript = preload("res://core/maps/map_generator.gd")
 const ThemesScript = preload("res://core/maps/map_themes.gd")
 const VrVehicleInputScript = preload("res://core/vr/vr_vehicle_input.gd")
+const VrComfortScript = preload("res://core/vr/vr_comfort.gd")
 
 const PAUSE_BUTTONS: Array = [
 	{"id": "resume", "label": "REANUDAR", "rect": Rect2(-0.13, -0.12, 0.26, 0.07)},
@@ -700,12 +701,39 @@ static func apply_calibration(rig: Node3D, path: String = "") -> bool:
 	return loaded
 
 
+# Perfil de confort VR: valida con VrComfort y aplica al rig.
+static func apply_comfort_profile(rig: Node3D, profile: Dictionary) -> Dictionary:
+	var result := VrComfortScript.validate_profile(profile)
+	if not result["ok"]:
+		return result
+	var canonical: Dictionary = result["profile"]
+	var keys: Array = VrComfortScript.PROFILE_KEYS
+	for key in keys:
+		if canonical.has(key):
+			rig.set(key, canonical[key])
+	rig.set_meta("comfort_profile", canonical)
+	return {"ok": true, "profile": canonical, "errors": []}
+
+
+static func get_comfort_profile(rig: Node3D) -> Dictionary:
+	if rig.has_meta("comfort_profile"):
+		var stored = rig.get_meta("comfort_profile")
+		if stored is Dictionary:
+			return stored
+	return VrComfortScript.default_profile()
+
+
+static func apply_default_comfort_profile(rig: Node3D) -> Dictionary:
+	return apply_comfort_profile(rig, VrComfortScript.default_profile())
+
+
 static func setup(world: Node3D, rig: Node3D, meta: Dictionary) -> Dictionary:
 	var result: Dictionary = {"rig": rig, "state": null, "weapon_system": null, "hud": null, "menu": null}
 	if rig == null or not is_instance_valid(rig) or not bool(rig.call("is_active")):
 		return result
 	strip_flat_ui(world)
 	apply_calibration(rig)
+	apply_default_comfort_profile(rig)
 	var ws := WeaponSystemScript.new()
 	ws.name = "VrWeaponSystem"
 	ws.set_process(false)

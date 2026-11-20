@@ -1,6 +1,10 @@
 class_name GoreFx
 extends RefCounted
 
+const ModHooksScript = preload("res://core/game/mod_hooks.gd")
+const SfxBankScript = preload("res://core/game/sfx_bank.gd")
+const Recorded = preload("res://core/game/recorded_sfx.gd")
+
 const MAX_DECALS := 64
 const MAX_ACTIVE := 32
 const MAX_PUDDLES := 16
@@ -24,6 +28,9 @@ static var limit_decals: int = MAX_DECALS
 static var limit_active: int = MAX_ACTIVE
 static var limit_puddles: int = MAX_PUDDLES
 static var limit_parts: int = MAX_PARTS
+static var _audio_enabled: bool = true
+static var _last_audio_time: float = 0.0
+static var _audio_cooldown: float = 0.05
 
 
 static func apply_profile(profile: Dictionary) -> void:
@@ -32,6 +39,12 @@ static func apply_profile(profile: Dictionary) -> void:
 	if profile.has("particles"):
 		limit_active = clampi(int(profile["particles"]) / 8, 2, MAX_ACTIVE)
 		limit_puddles = clampi(int(profile["particles"]) / 12, 2, MAX_PUDDLES)
+	if profile.has("parts"):
+		limit_parts = clampi(int(profile["parts"]), 2, MAX_PARTS)
+	if profile.has("puddles"):
+		limit_puddles = clampi(int(profile["puddles"]), 2, MAX_PUDDLES)
+	if profile.has("audio_enabled"):
+		_audio_enabled = bool(profile["audio_enabled"])
 	enforce_limits()
 
 
@@ -66,6 +79,10 @@ static func set_gore_enabled(value) -> void:
 	_forced_gore = value if typeof(value) == TYPE_BOOL else null
 
 
+static func set_audio_enabled(value: bool) -> void:
+	_audio_enabled = value
+
+
 static func blood_hit(parent: Node, pos: Vector3, normal: Vector3, amount: float, direction: Vector3 = Vector3.ZERO, jet: bool = false) -> void:
 	if not gore_enabled() or parent == null:
 		return
@@ -96,6 +113,14 @@ static func blood_hit(parent: Node, pos: Vector3, normal: Vector3, amount: float
 	while _active.size() > limit_active:
 		_retire(_active.pop_front())
 	_add_decal(parent, pos, flow, clampf(0.12 + amount * 0.004, 0.12, 0.4))
+	
+	ModHooksScript.emit("gore_blood_spawned", ModHooksScript.payload_for("gore_blood_spawned", {
+		"target": str(parent.get_instance_id()), "position": pos,
+		"normal": normal, "amount": amount, "jet": jet,
+	}))
+	
+	if _audio_enabled:
+		_play_impact_flesh(parent, pos, amount)
 
 
 static func on_death(parent: Node, pos: Vector3, size: float) -> void:
@@ -105,6 +130,9 @@ static func on_death(parent: Node, pos: Vector3, size: float) -> void:
 	blood_hit(parent, pos + Vector3.UP * 0.1, Vector3.UP, 24.0 * scale)
 	_add_decal(parent, pos, Vector3.UP, clampf(0.6 * scale, 0.3, 1.6))
 	puddle(parent, pos, Vector3.UP, clampf(0.5 * scale, 0.25, 1.2))
+	
+	if _audio_enabled:
+		_play_death_sound(parent, pos)
 
 
 static func puddle(parent: Node, pos: Vector3, normal: Vector3, size: float) -> Node3D:
@@ -126,6 +154,11 @@ static func puddle(parent: Node, pos: Vector3, normal: Vector3, size: float) -> 
 	_puddles.append(puddle_node)
 	while _puddles.size() > limit_puddles:
 		_retire(_puddles.pop_front())
+
+	ModHooksScript.emit("gore_puddle_created", ModHooksScript.payload_for("gore_puddle_created", {
+		"target": str(parent.get_instance_id()), "position": impact_pos,
+		"normal": impact_normal, "size": size,
+	}))
 	return puddle_node
 
 
@@ -163,9 +196,23 @@ static func dismember(parent: Node, pos: Vector3, size: float, zone: String = ""
 		body.apply_impulse(outward * (1.5 + randf() * 2.0), Vector3(0.0, 0.1 * scale, 0.0))
 		_parts.append(body)
 		created.append(body)
+
+		ModHooksScript.emit("gore_part_created", ModHooksScript.payload_for("gore_part_created", {
+			"target": str(parent.get_instance_id()), "position": body.global_position,
+			"zone": zone, "size": scale, "count": pieces,
+		}))
 		if _parts.size() > limit_parts:
 			_retire(_parts.pop_front())
+
+	ModHooksScript.emit("gore_dismemberment", ModHooksScript.payload_for("gore_dismemberment", {
+		"target": str(parent.get_instance_id()), "position": pos,
+		"limb": zone, "severity": clampf(scale / 3.0, 0.0, 1.0), "piece_count": pieces,
+	}))
 	blood_hit(parent, pos, Vector3.UP, 30.0 * scale, Vector3.UP, true)
+	
+	if _audio_enabled:
+		_play_dismember_sound(parent, pos)
+	
 	return created
 
 
@@ -255,6 +302,11 @@ static func _add_decal(parent: Node, pos: Vector3, normal: Vector3, size: float)
 	_decals.append(decal)
 	while _decals.size() > limit_decals:
 		_retire(_decals.pop_front())
+
+	ModHooksScript.emit("gore_decal_created", ModHooksScript.payload_for("gore_decal_created", {
+		"target": str(parent.get_instance_id()), "position": impact_pos,
+		"normal": impact_normal, "size": size,
+	}))
 
 
 static func _ground_hit(parent: Node, from: Vector3) -> Dictionary:
@@ -370,3 +422,37 @@ static func _get_part_material() -> Material:
 		material.roughness = 0.85
 		_part_material = material
 	return _part_material
+
+
+static func _play_impact_flesh(parent: Node, pos: Vector3, amount: float) -> void:
+	if not Recorded.has_bank("impact_flesh"):
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _last_audio_time < _audio_cooldown:
+		return
+	_last_audio_time = now
+	var volume_db := linear_to_db(clampf(0.3 + amount * 0.01, 0.2, 0.8))
+	Recorded.play_bank("impact_flesh", parent, pos, null, SfxBankScript.bus_name("sfx"), {"volume_db": volume_db, "max_distance": 30.0})
+
+
+static func _play_death_sound(parent: Node, pos: Vector3) -> void:
+	if not Recorded.has_bank("voice_death_male") and not Recorded.has_bank("voice_death_female"):
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _last_audio_time < _audio_cooldown * 2.0:
+		return
+	_last_audio_time = now
+	var bank := "voice_death_male" if randf() < 0.5 else "voice_death_female"
+	if not Recorded.has_bank(bank):
+		bank = "voice_death_male" if Recorded.has_bank("voice_death_male") else "voice_death_female"
+	Recorded.play_bank(bank, parent, pos, null, SfxBankScript.bus_name("voices"), {"volume_db": -3.0, "max_distance": 50.0})
+
+
+static func _play_dismember_sound(parent: Node, pos: Vector3) -> void:
+	if not Recorded.has_bank("impact_flesh"):
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _last_audio_time < _audio_cooldown:
+		return
+	_last_audio_time = now
+	Recorded.play_bank("impact_flesh", parent, pos, null, SfxBankScript.bus_name("sfx"), {"volume_db": -6.0, "max_distance": 40.0})

@@ -83,7 +83,6 @@ func test_npcs_mobile_debug() -> void:
 			])
 			tick_count += 1
 			await physics_frame
-			tick_count += 1
 		
 		if not is_instance_valid(npc):
 			error_count_npc += 1

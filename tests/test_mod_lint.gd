@@ -9,6 +9,10 @@ const TRAVERSAL := ROOT + "/traversal"
 const NONPORTABLE := ROOT + "/nonportable"
 const BROKEN_JSON := ROOT + "/broken_json"
 const MISSING := ROOT + "/no_existe"
+const CONTENT_VALID := ROOT + "/content_valid"
+const CONTENT_INVALID := ROOT + "/content_invalid"
+const HOOKS_VALID := ROOT + "/hooks_valid"
+const HOOKS_INVALID := ROOT + "/hooks_invalid"
 
 var _failures: Array = []
 var _case := ""
@@ -39,6 +43,18 @@ func _init() -> void:
 
 	_case = "tamano maximo"
 	_test_size_limit()
+
+	_case = "contenido valido"
+	_test_content_valid()
+
+	_case = "contenido invalido"
+	_test_content_invalid()
+
+	_case = "hooks validos"
+	_test_hooks_valid()
+
+	_case = "hooks invalidos"
+	_test_hooks_invalid()
 
 	if _failures.is_empty():
 		print("PASS (%d assertions)" % _assertions)
@@ -118,3 +134,29 @@ func _test_size_limit() -> void:
 		_errors_text(report).contains("demasiado grande"),
 		"se esperaba un error de tamano: %s" % _errors_text(report)
 	)
+
+
+func _test_content_valid() -> void:
+	var report: Dictionary = ModLintScript.check(CONTENT_VALID)
+	_expect(report["ok"], "el mod con contenido valido debe pasar: %s" % _errors_text(report))
+	_expect(report["errors"].is_empty(), "el mod con contenido valido no debe tener errores")
+
+
+func _test_content_invalid() -> void:
+	var report: Dictionary = ModLintScript.check(CONTENT_INVALID)
+	_expect(not report["ok"], "el mod con contenido invalido debe fallar")
+	_expect(_errors_text(report).contains("contenido weapon"), "debe reportar errores de validacion de weapon")
+
+
+func _test_hooks_valid() -> void:
+	var report: Dictionary = ModLintScript.check(HOOKS_VALID)
+	_expect(report["ok"], "el mod con hooks validos debe pasar: %s" % _errors_text(report))
+	_expect(report["errors"].is_empty(), "el mod con hooks validos no debe tener errores")
+
+
+func _test_hooks_invalid() -> void:
+	var report: Dictionary = ModLintScript.check(HOOKS_INVALID)
+	_expect(not report["ok"], "el mod con hooks invalidos debe fallar")
+	_expect(_errors_text(report).contains("evento desconocido"), "debe reportar evento desconocido")
+	_expect(_errors_text(report).contains("entrada invalida"), "debe reportar entrada invalida")
+	_expect(_errors_text(report).contains("falta campo 'method'"), "debe reportar falta de method")

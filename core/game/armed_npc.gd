@@ -880,7 +880,8 @@ func _release_token() -> void:
 func _realistic_goal(action: String) -> Vector3:
 	if _reacting:
 		if action == "patrol" or action == "idle":
-			return _calm_goal()
+			_path.clear()
+			return global_position
 		_path.clear()
 		return global_position
 	if action == "attack" or action == "cover":
@@ -978,11 +979,11 @@ func _investigate_goal() -> Vector3:
 		return threat_pos + Vector3(cos(angle), 0.0, sin(angle)) * radius
 	var from_cell: Vector2i = navigation.call("world_to_cell_2d", Vector2(global_position.x, global_position.z), nav_cell_size)
 	var to_cell: Vector2i = navigation.call("world_to_cell_2d", Vector2(threat_pos.x, threat_pos.z), nav_cell_size)
-	var flat: Vector3 = global_position
+	var flat: Vector3 = Vector3(global_position.x, 0.0, global_position.z)
 	var cache_valid: bool = _last_investigate_goal.length_squared() > 0.0001
 	if cache_valid:
-		var cache_dist: float = flat.distance_to(_last_investigate_goal)
-		if cache_dist > 1.5:
+		var cache_dist: float = flat.distance_to(Vector3(_last_investigate_goal.x, 0.0, _last_investigate_goal.z))
+		if cache_dist < 1.5:
 			return _last_investigate_goal
 	var result: Variant = navigation.call("find_path", from_cell, to_cell, {
 		"position": global_position, "target_position": threat_pos, "cell_size": nav_cell_size,
@@ -1048,19 +1049,19 @@ func _flee_goal() -> Vector3:
 	if _threat_position.length_squared() <= 0.0001:
 		return global_position
 	var threat_pos: Vector3 = _threat_position
-	var flat: Vector3 = global_position
-	var to_threat: Vector3 = threat_pos - flat
-	to_threat.y = 0.0
+	var flat: Vector3 = Vector3(global_position.x, 0.0, global_position.z)
+	var to_threat: Vector3 = Vector3(threat_pos.x, 0.0, threat_pos.z) - flat
 	var dist_to_threat: float = to_threat.length()
 	if dist_to_threat < 0.001:
 		var angle: float = _rng.randf() * TAU
 		return flat + Vector3(cos(angle), 0.0, sin(angle)) * 15.0
 	var cache_valid: bool = _flee_goal_cache.length_squared() > 0.0001
 	if cache_valid:
-		var cache_dist: float = flat.distance_to(_flee_goal_cache)
+		var cache_dist: float = flat.distance_to(Vector3(_flee_goal_cache.x, 0.0, _flee_goal_cache.z))
 		_flee_goal_age += _dt
-		if cache_dist > 1.5 and _flee_goal_age < 8.0:
+		if cache_dist < 1.5 and _flee_goal_age < 8.0:
 			return _flee_goal_cache
+		_flee_goal_age = 0.0
 	var away_dir: Vector3 = (flat - threat_pos).normalized()
 	if _has_navigation_grid():
 		var best: Vector3 = Vector3.ZERO

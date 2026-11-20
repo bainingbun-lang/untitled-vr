@@ -9,6 +9,8 @@ const HOOK_EVENTS := [
 	"weapon_fired", "weapon_reloaded", "weapon_jammed", "projectile_hit",
 	"damage_dealt", "wound_created", "limb_severed", "npc_spawned", "npc_died",
 	"player_died", "item_picked", "vehicle_entered", "map_loaded", "wave_started",
+	"gore_blood_spawned", "gore_puddle_created", "gore_decal_created",
+	"gore_part_created", "gore_dismemberment",
 ]
 
 var _next_id := 1

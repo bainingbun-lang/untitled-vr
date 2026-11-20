@@ -7,11 +7,13 @@ signal menu_pressed()
 signal reload_requested(hand: String)
 signal health_changed(current: float, maximum: float)
 signal died()
+signal recentered()
 
 const VrHandModelScript = preload("res://core/vr/vr_hand_model.gd")
 const VrBagScript = preload("res://core/vr/vr_bag.gd")
 const VrWeaponHandScript = preload("res://core/vr/vr_weapon_hand.gd")
 const DbScript = preload("res://core/game/weapon_db.gd")
+const VrComfortScript = preload("res://core/vr/vr_comfort.gd")
 
 @export var move_speed: float = 2.2
 @export var turn_mode: String = "smooth"
@@ -21,8 +23,13 @@ const DbScript = preload("res://core/game/weapon_db.gd")
 @export var snap_threshold: float = 0.7
 @export var snap_cooldown: float = 0.25
 @export var comfort_vignette_enabled: bool = true
+@export var vignette_intensity: float = 0.85
+@export var vignette_speed_ref: float = 3.0
+@export var vignette_angular_ref: float = 2.0
 @export var teleport_enabled: bool = false
 @export var teleport_max_distance: float = 5.0
+@export var seated_mode: bool = false
+@export var height_offset: float = 0.0
 @export var auto_process: bool = true
 const BODY_RADIUS: float = 0.25
 
@@ -252,8 +259,6 @@ func _process(delta: float) -> void:
 		step(delta)
 
 
-# Si el runtime reporta el casco a la altura del suelo (espacio Local en vez de Local Floor)
-# todo se ve gigante: se sube el origen a una altura de ojos humana una sola vez.
 func _ensure_floor_height(delta: float) -> void:
 	if _floor_checked or xr_camera == null or xr_origin == null:
 		return
@@ -261,7 +266,6 @@ func _ensure_floor_height(delta: float) -> void:
 	if _floor_timer < floor_fix_delay:
 		return
 	_floor_checked = true
-	# Con espacio local-floor/stage el runtime ya da la altura real: no se toca.
 	if xr_interface != null and xr_interface.has_method("get_play_area_mode") \
 			and int(xr_interface.call("get_play_area_mode")) >= 3:
 		return
@@ -366,16 +370,18 @@ func step_locomotion(delta: float) -> void:
 		return
 	var move_stick: Vector2 = _call_provider("get_stick", ["left"], Vector2.ZERO)
 	var turn_stick: Vector2 = _call_provider("get_stick", ["right"], Vector2.ZERO)
-	var velocity := locomotion_velocity(move_stick, _head_forward(), move_speed, stick_deadzone)
+	var forward_ref = _hand_forward() if seated_mode else _head_forward()
+	var velocity := locomotion_velocity(move_stick, forward_ref, move_speed, stick_deadzone)
 	if velocity.length_squared() > 0.000001:
 		xr_origin.global_position += _slide_motion(velocity * delta)
 	var can_step: bool = _snap_timer <= 0.0
 	var yaw := turn_delta(
 		turn_stick.x, turn_mode, smooth_turn_speed, snap_turn_degrees,
-		delta, stick_deadzone, can_step
+		delta, stick_deadzone, can_step, snap_threshold
 	)
 	if absf(yaw) > 0.000001:
-		xr_origin.global_transform = rotate_around_y(xr_origin.global_transform, _head_position(), yaw)
+		var pivot := _hand_position() if seated_mode else _head_position()
+		xr_origin.global_transform = rotate_around_y(xr_origin.global_transform, pivot, yaw)
 		if turn_mode == "snap":
 			_snap_timer = snap_cooldown
 	_snap_timer = maxf(_snap_timer - delta, 0.0)
@@ -383,7 +389,6 @@ func step_locomotion(delta: float) -> void:
 		_snap_timer = 0.0
 
 
-# Cuerpo del jugador contra la geometria del mundo (capa 1): sin esto se atraviesan paredes.
 func _body_blocked(motion: Vector3) -> Vector3:
 	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state if is_inside_tree() else null
 	if space == null or motion.length_squared() <= 0.0000001:
@@ -396,7 +401,6 @@ func _body_blocked(motion: Vector3) -> Vector3:
 	query.shape = _body_shape
 	query.collision_mask = 1
 	query.transform = Transform3D(Basis.IDENTITY, xr_origin.global_position + Vector3(0.0, 0.9, 0.0))
-	# Metido a fondo en la geometria (aparecio dentro): se deja salir; rozar la pared no cuenta.
 	var core := CapsuleShape3D.new()
 	core.radius = BODY_RADIUS * 0.4
 	core.height = 1.0
@@ -404,13 +408,11 @@ func _body_blocked(motion: Vector3) -> Vector3:
 	if _hits_static(space.intersect_shape(query, 4)):
 		return motion
 	query.shape = _body_shape
-	# NPC, dianas y coches comparten capa con el mundo: los que ya rozan al jugador no lo frenan.
 	var passable: Array[RID] = []
 	for entry in space.intersect_shape(query, 8):
 		if not (entry["collider"] is StaticBody3D):
 			passable.append(entry["rid"])
 	query.exclude = passable
-	# Ya en contacto con la pared: cast_motion devuelve 1.0, asi que se quita a mano la parte que empuja hacia ella.
 	var rest: Dictionary = space.get_rest_info(query)
 	if not rest.is_empty():
 		var away: Vector3 = query.transform.origin - (rest["point"] as Vector3)
@@ -457,22 +459,44 @@ func _head_position() -> Vector3:
 	return xr_camera.global_position if xr_camera != null else global_position
 
 
+func _hand_forward() -> Vector3:
+	var controller: XRController3D = controller_for("right") as XRController3D
+	if controller == null:
+		return _head_forward()
+	var forward: Vector3 = -controller.global_transform.basis.z
+	forward.y = 0.0
+	return forward.normalized() if forward.length_squared() > 0.000001 else Vector3.FORWARD
+
+
+func _hand_position() -> Vector3:
+	var controller = controller_for("right")
+	if controller == null:
+		return _head_position()
+	return controller.global_position
+
+
 func _update_vignette(delta: float) -> void:
 	if not comfort_vignette_enabled:
 		_vignette = 0.0
+		if _vignette_ring != null and _vignette_ring.material_override is StandardMaterial3D:
+			var material := _vignette_ring.material_override as StandardMaterial3D
+			var color := material.albedo_color
+			color.a = 0.0
+			material.albedo_color = color
+		vignette_changed.emit(0.0)
 		return
 	var move_stick: Vector2 = _call_provider("get_stick", ["left"], Vector2.ZERO)
 	var turn_stick: Vector2 = _call_provider("get_stick", ["right"], Vector2.ZERO)
 	var linear: float = locomotion_velocity(move_stick, _head_forward(), move_speed, stick_deadzone).length()
 	var angular: float = absf(turn_delta(
 		turn_stick.x, turn_mode, smooth_turn_speed, snap_turn_degrees,
-		delta, stick_deadzone, false
+		delta, stick_deadzone, false, snap_threshold
 	)) / maxf(delta, 0.0001)
-	_vignette = compute_vignette(linear, angular)
+	_vignette = VrComfortScript.compute_vignette(linear, angular, vignette_speed_ref, vignette_angular_ref, vignette_intensity)
 	if _vignette_ring != null and _vignette_ring.material_override is StandardMaterial3D:
 		var material := _vignette_ring.material_override as StandardMaterial3D
 		var color := material.albedo_color
-		color.a = clampf(_vignette, 0.0, 1.0) * 0.85
+		color.a = clampf(_vignette, 0.0, 1.0)
 		material.albedo_color = color
 	vignette_changed.emit(_vignette)
 
@@ -492,10 +516,55 @@ func try_teleport(target: Vector3) -> bool:
 	return true
 
 
+func recenter() -> void:
+	if xr_interface != null and xr_interface.has_method("recenter_pose"):
+		xr_interface.call("recenter_pose")
+	recentered.emit()
+
+
+func set_seated_mode(enabled: bool) -> void:
+	seated_mode = enabled
+	if enabled and height_offset == 0.0:
+		height_offset = -0.3
+	elif not enabled:
+		height_offset = 0.0
+	if xr_origin != null and xr_camera != null:
+		var head_pos := _head_position()
+		var adjusted := VrComfortScript.apply_seated_height(head_pos, height_offset, default_eye_height)
+		xr_origin.global_position.y += (adjusted.y - head_pos.y)
+
+
+func apply_comfort_profile(profile: Dictionary) -> void:
+	var validated := VrComfortScript.validate_profile(profile)
+	if not bool(validated["ok"]):
+		return
+	profile = validated["profile"]
+	move_speed = profile["move_speed"]
+	turn_mode = profile["turn_mode"]
+	smooth_turn_speed = profile["smooth_turn_speed"]
+	snap_turn_degrees = profile["snap_turn_degrees"]
+	snap_cooldown = profile["snap_cooldown"]
+	stick_deadzone = profile["stick_deadzone"]
+	snap_threshold = profile["snap_threshold"]
+	comfort_vignette_enabled = profile["comfort_vignette_enabled"]
+	vignette_intensity = profile["vignette_intensity"]
+	vignette_speed_ref = profile["vignette_speed_ref"]
+	vignette_angular_ref = profile["vignette_angular_ref"]
+	teleport_enabled = profile["teleport_enabled"]
+	teleport_max_distance = profile["teleport_max_distance"]
+	seated_mode = profile["seated_mode"]
+	height_offset = profile["height_offset"]
+	set_seated_mode(seated_mode)
+
+
 static func locomotion_velocity(stick: Vector2, forward: Vector3, speed: float, deadzone: float = 0.0) -> Vector3:
-	if stick.length_squared() <= deadzone * deadzone or forward.length_squared() <= 0.000001:
+	return VrComfortScript.locomotion_velocity(stick, forward, speed, deadzone)
+
+
+static func locomotion_velocity_hand(stick: Vector2, hand_forward: Vector3, speed: float, deadzone: float = 0.0) -> Vector3:
+	if stick.length_squared() <= deadzone * deadzone or hand_forward.length_squared() <= 0.000001:
 		return Vector3.ZERO
-	var flat := Vector3(forward.x, 0.0, forward.z)
+	var flat := Vector3(hand_forward.x, 0.0, hand_forward.z)
 	if flat.length_squared() <= 0.000001:
 		return Vector3.ZERO
 	flat = flat.normalized()
@@ -506,41 +575,22 @@ static func locomotion_velocity(stick: Vector2, forward: Vector3, speed: float, 
 
 static func turn_delta(
 	stick_x: float, mode: String, smooth_speed: float, snap_degrees: float,
-	delta: float, deadzone: float = 0.0, can_step: bool = true
+	delta: float, deadzone: float = 0.0, can_step: bool = true,
+	snap_threshold: float = 0.7
 ) -> float:
-	if mode == "off" or delta <= 0.0 or absf(stick_x) <= deadzone:
-		return 0.0
-	if mode == "snap":
-		if not can_step or absf(stick_x) < maxf(deadzone, 0.7):
-			return 0.0
-		return -signf(stick_x) * deg_to_rad(snap_degrees)
-	if mode == "smooth":
-		var span: float = maxf(1.0 - deadzone, 0.0001)
-		var amount: float = clampf((absf(stick_x) - deadzone) / span, 0.0, 1.0)
-		return -signf(stick_x) * amount * maxf(smooth_speed, 0.0) * delta
-	return 0.0
+	return VrComfortScript.turn_delta(stick_x, mode, smooth_speed, snap_degrees, delta, deadzone, can_step, snap_threshold)
 
 
 static func rotate_around_y(xform: Transform3D, pivot: Vector3, yaw: float) -> Transform3D:
-	var rotation := Basis().rotated(Vector3.UP, yaw)
-	var result := xform
-	result.basis = rotation * xform.basis
-	result.origin = pivot + rotation * (xform.origin - pivot)
-	return result
+	return VrComfortScript.rotate_around_y(xform, pivot, yaw)
 
 
 static func translation_for_teleport(xform: Transform3D, head: Vector3, target: Vector3) -> Transform3D:
-	var shift := target - head
-	shift.y = 0.0
-	var result := xform
-	result.origin += shift
-	return result
+	return VrComfortScript.translation_for_teleport(xform, head, target)
 
 
 static func compute_vignette(
 	linear_speed: float, angular_speed: float,
 	speed_ref: float = 3.0, angular_ref: float = 2.0
 ) -> float:
-	var linear_part: float = clampf(linear_speed / maxf(speed_ref, 0.0001), 0.0, 1.0)
-	var angular_part: float = clampf(angular_speed / maxf(angular_ref, 0.0001), 0.0, 1.0)
-	return clampf(maxf(linear_part, angular_part), 0.0, 1.0)
+	return VrComfortScript.compute_vignette(linear_speed, angular_speed, speed_ref, angular_ref)

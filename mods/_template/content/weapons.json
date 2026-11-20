@@ -1,0 +1,36 @@
+{
+  "content": [
+    {
+      "type": "weapon",
+      "id": "untitled.template-mod:template_weapon",
+      "name": "Arma de plantilla",
+      "description": "Ejemplo de arma data-driven. Reemplaza con tu modelo glTF CC0.",
+      "damage": 25.0,
+      "fire_rate": 6.0,
+      "range": 50.0,
+      "mag": 15,
+      "auto": false,
+      "spread": 1.0,
+      "pellets": 1,
+      "tags": ["weapon", "sidearm", "template"],
+      "reload_time": 1.5,
+      "weight": 1.2,
+      "impulse": 0.06,
+      "uses_ammo": true,
+      "penetration": 0.3,
+      "falloff_start": 15.0,
+      "falloff_end": 50.0,
+      "falloff_min": 0.3,
+      "projectile_speed": 0.0,
+      "projectile_gravity": 0.0,
+      "projectile_min_distance": 30.0,
+      "impact_speed": 120.0,
+      "effect_scale": 0.7,
+      "max_penetrations": 1,
+      "max_ricochets": 1,
+      "model": "res://assets/models/weapons/template_weapon.gltf",
+      "ammo_id": "untitled.template-mod:template_weapon_ammo",
+      "caliber": "9x19mm"
+    }
+  ]
+}

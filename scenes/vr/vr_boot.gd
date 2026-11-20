@@ -30,6 +30,7 @@ var _diag_label: Label3D = null
 var _diag_lines: Array = []
 var _menu_ok: bool = false
 var _auto_started: bool = false
+var _menu_pending: bool = false
 var _status_t: float = 0.0
 
 
@@ -47,7 +48,9 @@ func _ready() -> void:
 	_add_sanity_quad()
 	BootstrapScript.active.lifecycle.connect(_on_lifecycle)
 	# Sin perfil se usan valores por defecto: la calibracion es opcional (RECALIBRAR).
-	_start_menu()
+	# El menu se crea cuando el casco ya esta enfocado (antes de eso no se dibuja bien en el Quest).
+	_menu_pending = true
+	_diag("esperando a que el casco se enfoque...")
 
 
 func _start_calibration() -> void:
@@ -190,6 +193,18 @@ func _process(delta: float) -> void:
 	if xr_camera == null:
 		return
 	_waited += delta
+	if _menu_pending and (_waited > 2.5 or (BootstrapScript.active != null and BootstrapScript.active.focused and _waited > 0.8)):
+		_menu_pending = false
+		_start_menu()
+	if not _menu_ok and not _auto_started and _waited > 14.0 and flow == null:
+		_auto_started = true
+		_diag("Sin menu visible: arrancando la partida directo")
+		var gm := load(GAME_MODE_PATH) as Script
+		var m = gm.call("default_map_meta", 4242) if gm != null else {}
+		var sess := load(SESSION_PATH) as Script
+		if sess != null and typeof(m) == TYPE_DICTIONARY and not (m as Dictionary).is_empty():
+			sess.set("vr_menu_confirmed", true)
+			sess.call("start", (m as Dictionary).duplicate(true), get_tree())
 	if _menu_ok:
 		_status_t += delta
 		if _status_t >= 1.0:

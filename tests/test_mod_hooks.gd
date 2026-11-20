@@ -81,7 +81,7 @@ func _expect(condition: bool, message: String) -> void:
 
 func _test_catalog() -> void:
 	var events: Dictionary = ModHooksScript.EVENTS
-	_expect(events.size() == 14, "deben existir 14 eventos publicos, hay %d" % events.size())
+	_expect(events.size() == 19, "deben existir 19 eventos publicos, hay %d" % events.size())
 	for raw_event in events:
 		var event := str(raw_event)
 		var seen: Array = [0, {}]

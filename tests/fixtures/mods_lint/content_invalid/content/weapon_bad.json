@@ -1,0 +1,32 @@
+{
+  "content": [
+    {
+      "type": "weapon",
+      "id": "lint.content-invalid:bad-weapon",
+      "name": "",
+      "damage": -10.0,
+      "fire_rate": 0.0,
+      "range": 0.0,
+      "mag": -1,
+      "auto": "not_a_bool",
+      "spread": -0.1,
+      "pellets": 0,
+      "tags": "not_an_array",
+      "reload_time": -1.0,
+      "weight": -1.0,
+      "impulse": -1.0,
+      "uses_ammo": "not_a_bool",
+      "penetration": 2.0,
+      "falloff_start": -1.0,
+      "falloff_end": -1.0,
+      "falloff_min": -1.0,
+      "projectile_speed": 0.0,
+      "projectile_gravity": 0.0,
+      "projectile_min_distance": 0.0,
+      "impact_speed": -1.0,
+      "effect_scale": 0.0,
+      "max_penetrations": -1,
+      "max_ricochets": -1
+    }
+  ]
+}

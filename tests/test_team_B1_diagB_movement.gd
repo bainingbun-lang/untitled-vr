@@ -119,14 +119,14 @@ func _check_pathfinding_trigger() -> void:
 		for frame in range(240):
 			await physics_frame
 			if frame % 30 == 0:
-				var path: Array = civilian.get("_path") if "_path" in civilian else []
-				var path_index: int = int(civilian.get("_path_index")) if "_path_index" in civilian else 0
-				var goal: Vector3 = civilian.get("_goal") if "_goal" in civilian else Vector3.ZERO
-				var path_goal: Vector3 = civilian.get("_path_goal") if "_path_goal" in civilian else Vector3.ZERO
-				var repath_cooldown: float = float(civilian.get("_repath_cooldown")) if "_repath_cooldown" in civilian else 0.0
-				var stuck_time: float = float(civilian.get("_stuck_time")) if "_stuck_time" in civilian else 0.0
-				var moving: bool = bool(civilian.get("_moving")) if "_moving" in civilian else false
-				var action: String = str(civilian.call("current_action")) if civilian.has_method("current_action") else "?"
+				var path: Array = civilian._path
+				var path_index: int = civilian._path_index
+				var goal: Vector3 = civilian._goal
+				var path_goal: Vector3 = civilian._path_goal
+				var repath_cooldown: float = civilian._repath_cooldown
+				var stuck_time: float = civilian._stuck_time
+				var moving: bool = civilian._moving
+				var action: String = str(civilian.current_action())
 				var pos: Vector3 = civilian.global_position
 				print("    Frame %d: pos=(%.1f,%.1f) action=%s goal=(%.1f,%.1f) path_goal=(%.1f,%.1f) path=%d/%d repath_cd=%.2f stuck=%.2f moving=%s" % [
 					frame, pos.x, pos.z, action, goal.x, goal.z, path_goal.x, path_goal.z, path_index, path.size(), repath_cooldown, stuck_time, moving
@@ -181,7 +181,7 @@ func _check_sanitize_goal_behavior() -> void:
 		var goal_changes: int = 0
 		for frame in range(120):
 			await physics_frame
-			var goal: Vector3 = civilian.get("_goal") if "_goal" in civilian else Vector3.ZERO
+			var goal: Vector3 = civilian._goal
 			if (goal - last_goal).length() > 0.5:
 				goal_changes += 1
 				print("    Frame %d: goal changed to (%.1f,%.1f,%.1f) delta=%.2f" % [

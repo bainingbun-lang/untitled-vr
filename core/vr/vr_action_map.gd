@@ -2,7 +2,7 @@ class_name VRActionMap extends RefCounted
 
 const VERSION := 1
 const PLATFORMS := ["quest", "pc_vr", "pc_teclado", "android_tactil"]
-const ACTIONS := ["grab", "trigger", "teleport", "menu", "move"]
+const ACTIONS := ["grab", "trigger", "teleport", "menu", "move", "run"]
 const KINDS := ["button", "axis", "key", "touch", "gesture"]
 const HANDS := ["left", "right", "any"]
 const BINDING_KEYS := ["kind", "device", "id", "hand", "source_action", "threshold"]
@@ -16,6 +16,7 @@ const DEFAULT_BINDINGS := {
 		"teleport": {"kind": "button", "device": "quest_controller", "id": "thumbstick_press", "hand": "right", "source_action": "teleport", "threshold": 0.5},
 		"menu": {"kind": "button", "device": "quest_controller", "id": "menu", "hand": "left", "source_action": "menu", "threshold": 0.5},
 		"move": {"kind": "axis", "device": "quest_controller", "id": "thumbstick", "hand": "left", "source_action": "move", "threshold": 0.25},
+		"run": {"kind": "button", "device": "quest_controller", "id": "thumbstick_press", "hand": "left", "source_action": "run", "threshold": 0.5},
 	},
 	"pc_vr": {
 		"grab": {"kind": "button", "device": "pc_vr_controller", "id": "grip", "hand": "left", "source_action": "grip", "threshold": 0.5},
@@ -23,6 +24,7 @@ const DEFAULT_BINDINGS := {
 		"teleport": {"kind": "button", "device": "pc_vr_controller", "id": "thumbstick_press", "hand": "right", "source_action": "teleport", "threshold": 0.5},
 		"menu": {"kind": "button", "device": "pc_vr_controller", "id": "menu", "hand": "left", "source_action": "menu", "threshold": 0.5},
 		"move": {"kind": "axis", "device": "pc_vr_controller", "id": "thumbstick", "hand": "left", "source_action": "move", "threshold": 0.25},
+		"run": {"kind": "button", "device": "pc_vr_controller", "id": "thumbstick_press", "hand": "left", "source_action": "run", "threshold": 0.5},
 	},
 	"pc_teclado": {
 		"grab": {"kind": "key", "device": "keyboard", "id": "E", "hand": "any", "source_action": "", "threshold": 0.5},
@@ -30,6 +32,7 @@ const DEFAULT_BINDINGS := {
 		"teleport": {"kind": "key", "device": "keyboard", "id": "T", "hand": "any", "source_action": "", "threshold": 0.5},
 		"menu": {"kind": "key", "device": "keyboard", "id": "Escape", "hand": "any", "source_action": "", "threshold": 0.5},
 		"move": {"kind": "axis", "device": "keyboard", "id": "WASD", "hand": "any", "source_action": "", "threshold": 0.25},
+		"run": {"kind": "key", "device": "keyboard", "id": "Shift", "hand": "any", "source_action": "", "threshold": 0.5},
 	},
 	"android_tactil": {
 		"grab": {"kind": "touch", "device": "touchscreen", "id": "grab_pad", "hand": "left", "source_action": "", "threshold": 0.5},
@@ -37,6 +40,7 @@ const DEFAULT_BINDINGS := {
 		"teleport": {"kind": "touch", "device": "touchscreen", "id": "teleport_pad", "hand": "right", "source_action": "", "threshold": 0.5},
 		"menu": {"kind": "touch", "device": "touchscreen", "id": "menu_button", "hand": "any", "source_action": "", "threshold": 0.5},
 		"move": {"kind": "axis", "device": "touchscreen", "id": "move_stick", "hand": "left", "source_action": "", "threshold": 0.25},
+		"run": {"kind": "touch", "device": "touchscreen", "id": "run_pad", "hand": "left", "source_action": "", "threshold": 0.5},
 	},
 }
 

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "id": "lint.hooks-valid",
+  "version": "1.0.0",
+  "engine": "4.7",
+  "hooks": {
+    "weapon_fired": "on_weapon_fired",
+    "damage_dealt": [
+      { "method": "on_damage_dealt", "priority": 50 }
+    ],
+    "item_picked": "on_item_picked"
+  }
+}

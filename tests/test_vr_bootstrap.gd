@@ -163,6 +163,7 @@ func _test_boot_scene_xr() -> void:
 	var boot := BootScene.instantiate()
 	boot.get_script().set("calibration_path_override", profile_path)
 	root.add_child(boot)
+	boot.set("_waited", 3.0)
 	await process_frame
 	DirAccess.remove_absolute(profile_path)
 	_expect(bool(boot.get("result").get("xr_active", false)), "vr_boot activa XR")

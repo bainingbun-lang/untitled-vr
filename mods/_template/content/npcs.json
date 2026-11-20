@@ -1,0 +1,19 @@
+{
+  "content": [
+    {
+      "type": "npc_type",
+      "id": "untitled.template-mod:template_npc",
+      "name": "NPC de plantilla",
+      "description": "Ejemplo de tipo de NPC data-driven. Reemplaza con tu modelo glTF CC0.",
+      "role": "enemy",
+      "models": [
+        "res://assets/models/npcs/template_npc.gltf"
+      ],
+      "aliases": [],
+      "health": 100.0,
+      "speed": 3.5,
+      "weapon_id": "",
+      "zombie": false,
+      }
+  ]
+}

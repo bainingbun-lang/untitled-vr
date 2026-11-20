@@ -1,0 +1,32 @@
+{
+  "content": [
+    {
+      "type": "weapon",
+      "id": "lint.content-valid:pistol",
+      "name": "Test Pistol",
+      "damage": 25.0,
+      "fire_rate": 10.0,
+      "range": 50.0,
+      "mag": 15,
+      "auto": false,
+      "spread": 0.02,
+      "pellets": 1,
+      "tags": ["pistol", "semi"],
+      "reload_time": 2.0,
+      "weight": 1.0,
+      "impulse": 50.0,
+      "uses_ammo": true,
+      "penetration": 0.3,
+      "falloff_start": 25.0,
+      "falloff_end": 50.0,
+      "falloff_min": 0.5,
+      "projectile_speed": 400.0,
+      "projectile_gravity": 0.0,
+      "projectile_min_distance": 0.1,
+      "impact_speed": 300.0,
+      "effect_scale": 1.0,
+      "max_penetrations": 2,
+      "max_ricochets": 1
+    }
+  ]
+}

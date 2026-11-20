@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "untitled.template-hook",
+  "version": "0.1.0",
+  "engine": "4.7",
+  "entry": "res://mods/untitled.template-hook/template_hook/main.gd",
+  "priority": 100,
+  "platforms": ["pc", "android", "vr"],
+  "permissions": ["read_events", "modify_damage"],
+  "hooks": {
+    "weapon_fired": {"method": "on_weapon_fired", "priority": 110},
+    "damage_dealt": {"method": "on_damage_dealt", "priority": 150},
+    "npc_spawned": {"method": "on_npc_spawned", "priority": 100},
+    "player_joined": {"method": "on_player_joined", "priority": 100}
+  },
+  "description": "Template mod with hooks - replace with your mod details"
+}

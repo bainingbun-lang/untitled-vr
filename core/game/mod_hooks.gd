@@ -100,6 +100,46 @@ const EVENTS := {
 		"permission": "read_events",
 		"modifiable": [],
 	},
+	"gore_blood_spawned": {
+		"payload": {
+			"target": "", "position": Vector3.ZERO, "normal": Vector3.UP,
+			"amount": 0.0, "jet": false,
+		},
+		"permission": "read_events",
+		"modifiable": [],
+	},
+	"gore_puddle_created": {
+		"payload": {
+			"target": "", "position": Vector3.ZERO, "normal": Vector3.UP,
+			"size": 0.0,
+		},
+		"permission": "read_events",
+		"modifiable": [],
+	},
+	"gore_decal_created": {
+		"payload": {
+			"target": "", "position": Vector3.ZERO, "normal": Vector3.UP,
+			"size": 0.0,
+		},
+		"permission": "read_events",
+		"modifiable": [],
+	},
+	"gore_part_created": {
+		"payload": {
+			"target": "", "position": Vector3.ZERO, "zone": "",
+			"size": 0.0, "count": 0,
+		},
+		"permission": "read_events",
+		"modifiable": [],
+	},
+	"gore_dismemberment": {
+		"payload": {
+			"target": "", "position": Vector3.ZERO, "limb": "",
+			"severity": 0.0, "piece_count": 0,
+		},
+		"permission": "read_events",
+		"modifiable": [],
+	},
 }
 
 const CAPABILITIES := {
