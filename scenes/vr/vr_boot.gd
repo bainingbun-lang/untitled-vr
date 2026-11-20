@@ -29,6 +29,8 @@ var _waited: float = 0.0
 var _diag_label: Label3D = null
 var _diag_lines: Array = []
 var _menu_ok: bool = false
+var _auto_started: bool = false
+var _status_t: float = 0.0
 
 
 func _ready() -> void:
@@ -42,6 +44,7 @@ func _ready() -> void:
 	_build_xr_nodes()
 	xr_camera.current = true
 	_diag("1/4 XR activo, nodos creados")
+	_add_sanity_quad()
 	BootstrapScript.active.lifecycle.connect(_on_lifecycle)
 	# Sin perfil se usan valores por defecto: la calibracion es opcional (RECALIBRAR).
 	_start_menu()
@@ -95,6 +98,33 @@ func _start_menu() -> void:
 	_placed = false
 	_menu_ok = true
 	_diag("4/4 menu creado: apunta con el laser")
+
+
+func _update_status() -> void:
+	if _diag_label == null or menu == null or xr_camera == null:
+		return
+	var panel: Node = menu.get("panel_root")
+	var vis: bool = panel != null and bool(panel.get("visible"))
+	var mp: Vector3 = (menu as Node3D).global_position
+	var cp: Vector3 = xr_camera.global_position
+	var line := "t=%ds fps=%d panel_visible=%s\nmenu=(%.1f,%.1f,%.1f) cam=(%.1f,%.1f,%.1f) dist=%.1f" % [int(_waited), int(Engine.get_frames_per_second()), str(vis), mp.x, mp.y, mp.z, cp.x, cp.y, cp.z, mp.distance_to(cp)]
+	_diag_label.text = "\n".join(_diag_lines) + "\n" + line
+
+
+func _add_sanity_quad() -> void:
+	if xr_camera == null or xr_camera.get_node_or_null("SanityQuad") != null:
+		return
+	var q := MeshInstance3D.new()
+	q.name = "SanityQuad"
+	var m := QuadMesh.new()
+	m.size = Vector2(0.35, 0.35)
+	q.mesh = m
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1.0, 0.45, 0.0)
+	q.material_override = mat
+	q.position = Vector3(0.0, 0.35, -1.5)
+	xr_camera.add_child(q)
 
 
 func _diag(text: String) -> void:
@@ -160,9 +190,15 @@ func _process(delta: float) -> void:
 	if xr_camera == null:
 		return
 	_waited += delta
-	if _diag_label != null and _menu_ok and _waited > 12.0:
-		_diag_label.queue_free()
-		_diag_label = null
+	if _menu_ok:
+		_status_t += delta
+		if _status_t >= 1.0:
+			_status_t = 0.0
+			_update_status()
+		if not _auto_started and _waited > 14.0 and host != null and is_instance_valid(host):
+			_auto_started = true
+			_diag("Sin pulsar nada: arrancando la partida sola")
+			host.call("on_button", "play")
 	if flow != null:
 		_process_calibration()
 		return
