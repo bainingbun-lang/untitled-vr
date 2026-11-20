@@ -31,6 +31,9 @@ var _diag_lines: Array = []
 var _menu_ok: bool = false
 var _auto_started: bool = false
 var _menu_pending: bool = false
+var _simple_root: Node3D = null
+var _simple_play: MeshInstance3D = null
+var _simple_down: bool = false
 var _status_t: float = 0.0
 
 
@@ -77,6 +80,75 @@ func _on_calibration_finished(_saved: bool) -> void:
 	flow.queue_free()
 	flow = null
 	_start_menu()
+
+
+func _build_simple_menu() -> void:
+	if _simple_root != null or xr_camera == null:
+		return
+	_simple_root = Node3D.new()
+	_simple_root.name = "SimpleMenu"
+	add_child(_simple_root)
+	var forward := -xr_camera.global_transform.basis.z
+	forward.y = 0.0
+	forward = forward.normalized() if forward.length() > 0.01 else Vector3.FORWARD
+	var pos := xr_camera.global_position + forward * 1.4 + Vector3(0.0, -0.1, 0.0)
+	_simple_root.global_transform = Transform3D(Basis.looking_at(-forward, Vector3.UP), pos)
+	_simple_play = MeshInstance3D.new()
+	_simple_play.name = "PlayButton"
+	var q := QuadMesh.new()
+	q.size = Vector2(0.9, 0.28)
+	_simple_play.mesh = q
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(0.1, 0.6, 0.2)
+	_simple_play.material_override = mat
+	_simple_root.add_child(_simple_play)
+	var lbl := Label3D.new()
+	lbl.text = "JUGAR (gatillo)"
+	lbl.font_size = 64
+	lbl.pixel_size = 0.0025
+	lbl.shaded = false
+	lbl.position = Vector3(0.0, 0.0, 0.01)
+	_simple_root.add_child(lbl)
+	_diag("menu simple listo: apunta al boton verde y aprieta el gatillo")
+
+
+func _simple_menu_input() -> void:
+	if _simple_root == null or _simple_play == null:
+		return
+	var best_hit := false
+	var pressed := false
+	for controller in controllers:
+		var o: Vector3 = controller.global_position
+		var d: Vector3 = -controller.global_transform.basis.z
+		var plane := Plane(_simple_root.global_transform.basis.z, _simple_root.global_position)
+		var hit = plane.intersects_ray(o, d)
+		if hit == null:
+			continue
+		var local: Vector3 = _simple_root.global_transform.affine_inverse() * (hit as Vector3)
+		if absf(local.x) <= 0.45 and absf(local.y) <= 0.14:
+			best_hit = true
+			if controller.get_float(&"trigger") > 0.6:
+				pressed = true
+	var m := _simple_play.material_override as StandardMaterial3D
+	m.albedo_color = Color(0.2, 0.9, 0.3) if best_hit else Color(0.1, 0.6, 0.2)
+	if pressed and not _simple_down:
+		_simple_down = true
+		_start_game_direct()
+	elif not pressed:
+		_simple_down = false
+
+
+func _start_game_direct() -> void:
+	var gm := load(GAME_MODE_PATH) as Script
+	var m = gm.call("default_map_meta", 4242) if gm != null else {}
+	var sess := load(SESSION_PATH) as Script
+	if sess == null or typeof(m) != TYPE_DICTIONARY or (m as Dictionary).is_empty():
+		_diag("ERROR: no se pudo preparar la partida")
+		return
+	_diag("arrancando la partida...")
+	sess.set("vr_menu_confirmed", true)
+	sess.call("start", (m as Dictionary).duplicate(true), get_tree())
 
 
 func _start_menu() -> void:
@@ -195,6 +267,7 @@ func _process(delta: float) -> void:
 	_waited += delta
 	if _menu_pending and (_waited > 2.5 or (BootstrapScript.active != null and BootstrapScript.active.focused and _waited > 0.8)):
 		_menu_pending = false
+		_build_simple_menu()
 		_start_menu()
 	if not _menu_ok and not _auto_started and _waited > 14.0 and flow == null:
 		_auto_started = true
@@ -205,6 +278,7 @@ func _process(delta: float) -> void:
 		if sess != null and typeof(m) == TYPE_DICTIONARY and not (m as Dictionary).is_empty():
 			sess.set("vr_menu_confirmed", true)
 			sess.call("start", (m as Dictionary).duplicate(true), get_tree())
+	_simple_menu_input()
 	if _menu_ok:
 		_status_t += delta
 		if _status_t >= 1.0:
