@@ -67,3 +67,9 @@ jobs:
         run: |
           gh release delete vr-latest --yes --cleanup-tag || true
           gh release create vr-latest out/untitled_vr_debug.apk out/SHA256.txt --target "$GITHUB_SHA" --prerelease --title "APK VR (ultima compilacion)" --notes "Compilado por GitHub Actions desde $GITHUB_SHA. Build de depuracion para Meta Quest. No probado en casco por el autor del CI."
+      - name: Publicar version numerada (apk-N)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          N=$(( $(gh release list --limit 200 --json tagName -q '[.[] | select(.tagName | startswith("apk-"))] | length') + 1 ))
+          gh release create "apk-$N" out/untitled_vr_debug.apk out/SHA256.txt --target "$GITHUB_SHA" --prerelease --title "APK $N (${GITHUB_SHA:0:7})" --notes "Commit $GITHUB_SHA. Firma fija; se actualiza encima de versiones con la misma clave."
