@@ -1,6 +1,8 @@
 class_name GameWorld
 extends Node3D
 
+const BISECT_SAFE := true  # PRUEBA DE AISLAMIENTO: apagar NPC, vehiculos y panel; poner en false al terminar.
+
 const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
 const SESSION_SCRIPT: String = "res://core/game/game_session.gd"
 const HOTBAR_SCENE: String = "res://scenes/ui/hotbar.tscn"
@@ -164,7 +166,10 @@ func setup(meta: Dictionary) -> void:
 		vr_state = vr_result.get("state", null) as Node
 
 	RemoteLog.crumb("world: vr listo, panel depuracion")
-	_setup_debug_panel()
+	if BISECT_SAFE:
+		RemoteLog.crumb("AISLAMIENTO: salto panel depuracion VR")
+	else:
+		_setup_debug_panel()
 	RemoteLog.crumb("world: panel listo")
 
 	_collect_physics_props()
@@ -173,12 +178,18 @@ func setup(meta: Dictionary) -> void:
 	RemoteLog.crumb("world: navegacion")
 	_build_navigation(meta)
 	RemoteLog.crumb("world: npcs")
-	_spawn_living_npcs(first_point, meta)
+	if BISECT_SAFE:
+		RemoteLog.crumb("AISLAMIENTO: salto NPC armados")
+	else:
+		_spawn_living_npcs(first_point, meta)
 	RemoteLog.crumb("world: dianas")
 	_spawn_dummies(first_point, meta)
 	RemoteLog.crumb("world: vehiculos")
-	_park_vehicles(first_point, meta)
-	_block_parked_vehicles()
+	if BISECT_SAFE:
+		RemoteLog.crumb("AISLAMIENTO: salto vehiculos aparcados")
+	else:
+		_park_vehicles(first_point, meta)
+		_block_parked_vehicles()
 	_connect_player_signals()
 	
 	var mode_type: int = int(meta.get("game_mode", 0))
