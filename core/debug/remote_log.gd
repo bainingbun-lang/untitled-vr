@@ -2,7 +2,7 @@ extends RefCounted
 
 const HOST := "192.168.1.5"
 const PORT := 8765
-static var dead: bool = false
+static var retry_at_msec: int = 0
 
 
 static func crumb(msg: String) -> void:
@@ -10,18 +10,18 @@ static func crumb(msg: String) -> void:
 
 
 static func send(tag: String, body: String) -> void:
-	if dead or DisplayServer.get_name() == "headless":
+	if Time.get_ticks_msec() < retry_at_msec or DisplayServer.get_name() == "headless":
 		return
 	var tcp := StreamPeerTCP.new()
 	if tcp.connect_to_host(HOST, PORT) != OK:
-		dead = true
+		retry_at_msec = Time.get_ticks_msec() + 3000
 		return
 	var t := Time.get_ticks_msec()
-	while tcp.get_status() == StreamPeerTCP.STATUS_CONNECTING and Time.get_ticks_msec() - t < 600:
+	while tcp.get_status() == StreamPeerTCP.STATUS_CONNECTING and Time.get_ticks_msec() - t < 150:
 		tcp.poll()
 		OS.delay_msec(5)
 	if tcp.get_status() != StreamPeerTCP.STATUS_CONNECTED:
-		dead = true
+		retry_at_msec = Time.get_ticks_msec() + 3000
 		return
 	var data := body.to_utf8_buffer()
 	tcp.put_data(("POST /%s HTTP/1.0\r\nHost: x\r\nContent-Length: %d\r\n\r\n" % [tag, data.size()]).to_utf8_buffer())
