@@ -74,6 +74,7 @@ var _geometry_root: Node3D = null
 var _hud_layer: CanvasLayer = null
 var _dummies_root: Node3D = null
 var _syncing_hotbar := false
+var _frames_seen: int = 0
 var voice: Node = null
 var performance: Node = null
 var vr_state: Node = null
@@ -99,6 +100,7 @@ func _ready() -> void:
 
 
 func setup(meta: Dictionary) -> void:
+	var _t0 := Time.get_ticks_msec()
 	_test_setup_count += 1
 	print("world.setup inicio #" + str(_test_setup_count))
 	RemoteLog.crumb("world.setup inicio")
@@ -195,9 +197,17 @@ func setup(meta: Dictionary) -> void:
 	RemoteLog.crumb("world: conectando objetivos")
 	_wire_targets()
 	RemoteLog.crumb("world.setup FIN")
+	RemoteLog.crumb("setup tardo %d ms" % (Time.get_ticks_msec() - _t0))
 
 
 func _process(delta: float) -> void:
+	_frames_seen += 1
+	if _frames_seen == 1:
+		RemoteLog.crumb("juego: primer fotograma")
+	elif _frames_seen == 60:
+		RemoteLog.crumb("juego: 60 fotogramas ok")
+	elif _frames_seen == 600:
+		RemoteLog.crumb("juego: 600 fotogramas ok")
 	ArmedNpcScript.advance_fx(maxf(delta, 0.0))
 	_locomotion_timer -= maxf(delta, 0.0)
 	if _locomotion_timer <= 0.0:
