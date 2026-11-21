@@ -31,6 +31,10 @@ extends BTNode
 
 @export var action_name: String = ""
 
+func enter(tick: Variant) -> void:
+	if action_name != "":
+		tick.blackboard.set_value("current_action", action_name, tick.tree)
+
 func tick(tick: Variant) -> int:
 	return execute_action(tick)
 

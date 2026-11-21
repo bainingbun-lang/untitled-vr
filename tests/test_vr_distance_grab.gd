@@ -36,7 +36,7 @@ class FakeHolsters extends RefCounted:
 			"bag": Vector3(0.26, -0.38, 0.32),
 		}
 		var eye_height: float = 1.65
-		var local := offsets.get(slot, Vector3.ZERO) * eye_height
+		var local: Vector3 = offsets.get(slot, Vector3.ZERO) * eye_height
 		return _head_transform.origin + _head_transform.basis * local
 	func slot_radius(slot: String) -> float:
 		return 0.2
@@ -273,8 +273,9 @@ func _test_fly_to_hand() -> void:
 	hand.bag = bag
 	hand.input_provider = provider
 	hand.auto_process = false
-	hand.distance_grab_enabled = true
+	hand.use_physical_grab = false
 	root.add_child(hand)
+	grab.set_enabled(true)
 	
 	grab.step(0.016, provider.pose, false, holsters, bag, hand)
 	_expect(grab.get_target() == weapon, "objetivo detectado antes del grip")
@@ -283,7 +284,7 @@ func _test_fly_to_hand() -> void:
 	grab.step(0.016, provider.pose, true, holsters, bag, hand)
 	_expect(grab.is_flying(), "inicia vuelo al presionar grip")
 	
-	var start_pos := weapon.global_position
+	var start_pos: Vector3 = weapon.global_position
 	var flew: bool = false
 	for i in range(30):
 		grab.step(0.016, provider.pose, true, holsters, bag, hand)
@@ -319,9 +320,9 @@ func _test_weapon_equip() -> void:
 	hand.bag = bag
 	hand.input_provider = provider
 	hand.auto_process = false
-	hand.distance_grab_enabled = true
 	hand.use_physical_grab = false
 	root.add_child(hand)
+	grab.set_enabled(true)
 	
 	grab.step(0.016, provider.pose, false, holsters, bag, hand)
 	provider.grip_pressed = true
@@ -352,8 +353,8 @@ func _test_prop_grab() -> void:
 	hand.bag = bag
 	hand.input_provider = provider
 	hand.auto_process = false
-	hand.distance_grab_enabled = true
 	root.add_child(hand)
+	grab.set_enabled(true)
 	
 	grab.step(0.016, provider.pose, false, holsters, bag, hand)
 	_expect(grab.get_target() == prop, "prop fisico detectado")

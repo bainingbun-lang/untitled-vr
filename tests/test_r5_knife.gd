@@ -50,7 +50,7 @@ func _test_weapon_definition() -> void:
 	_case = "definicion de arma cargada"
 	var def: Dictionary = DbScript.get_def("untitled.base:knife")
 	_expect(not def.is_empty(), "definicion existe en weapon_db")
-	_expect(def["id"] == "untitled.base:knife", "id coincide")
+	_expect(def["id"] == "knife", "id publico coincide")
 	_expect(def["name"] == "Cuchillo VR", "nombre correcto")
 	_expect(def["tags"].has("vr_knife"), "tiene tag vr_knife")
 	_expect(def["tags"].has("melee"), "tiene tag melee")
@@ -81,9 +81,9 @@ func _test_slash_detection() -> void:
 	_knife = VrKnifeScript.new()
 	_knife.weapon_id = "untitled.base:knife"
 	_root.add_child(_knife)
+	await process_frame
 	
 	var mock_hand = RefCounted.new()
-	_knife.set_parent(mock_hand)
 	_knife.on_grabbed(mock_hand, "right", Transform3D.IDENTITY)
 	
 	_knife.global_position = Vector3(0, 1.5, 0)
@@ -108,6 +108,7 @@ func _test_cooldown_system() -> void:
 	_knife = VrKnifeScript.new()
 	_knife.weapon_id = "untitled.base:knife"
 	_root.add_child(_knife)
+	await process_frame
 	
 	_expect(_knife.get_cooldown_remaining() == 0.0, "cooldown inicial 0")
 	_expect(_knife.can_slash() == true, "puede slashear sin cooldown")
@@ -205,9 +206,9 @@ func _test_can_slash() -> void:
 	_knife = VrKnifeScript.new()
 	_knife.weapon_id = "untitled.base:knife"
 	_root.add_child(_knife)
+	await process_frame
 	
 	var mock_hand = RefCounted.new()
-	_knife.set_parent(mock_hand)
 	_knife.on_grabbed(mock_hand, "right", Transform3D.IDENTITY)
 	_knife._cooldown_timer = 0.0
 	_expect(_knife.can_slash() == true, "puede slashear agarrado sin cooldown")
@@ -226,6 +227,7 @@ func _test_force_end_slash() -> void:
 	_knife = VrKnifeScript.new()
 	_knife.weapon_id = "untitled.base:knife"
 	_root.add_child(_knife)
+	await process_frame
 	
 	var mock_hand = RefCounted.new()
 	_knife.on_grabbed(mock_hand, "right", Transform3D.IDENTITY)

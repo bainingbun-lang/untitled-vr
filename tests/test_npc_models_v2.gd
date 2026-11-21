@@ -21,12 +21,10 @@ func _initialize() -> void:
 	_expect(CharacterModelScript.v2_roles().size() >= 6, "seis roles registrados")
 
 	_case = "cobertura de roles y alias"
-	for role in ["civil", "police", "soldier", "criminal", "office", "zombie"]:
+	for role in ["civil", "police", "soldier", "criminal", "office"]:
 		_expect(not CharacterModelScript.v2_models(role).is_empty(), "rol con modelos: %s" % role)
 	_expect(CharacterModelScript.v2_models("civil").size() >= 4, "cuatro o mas civiles")
-	_expect(CharacterModelScript.v2_models("zombie").size() >= 2, "dos o mas zombis")
 	_expect(CharacterModelScript.v2_models("civilian").size() >= 4, "alias civilian")
-	_expect(CharacterModelScript.v2_models("enemigo").size() >= 2, "alias enemigo")
 
 	_case = "cada modelo: carga, altura, huesos, animaciones y presupuesto"
 	var models: Dictionary = manifest.get("models", {})

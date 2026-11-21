@@ -89,28 +89,88 @@ static func apply_damage_to_mask(npc_id: int, uv: Vector2, depth: float, radius_
 	var r_sq := radius_px * radius_px
 	var r: float = sqrt(r_sq)
 	
-	var min_x: int = max(0, cx - radius_px)
-	var max_x: int = min(DAMAGE_MASK_SIZE - 1, cx + radius_px)
-	var min_y: int = max(0, cy - radius_px)
-	var max_y: int = min(DAMAGE_MASK_SIZE - 1, cy + radius_px)
+	var dilate_radius := radius_px + 2
+	var dilate_r_sq := dilate_radius * dilate_radius
+	var dilate_r: float = sqrt(dilate_r_sq)
+	
+	var min_x: int = max(0, cx - dilate_radius)
+	var max_x: int = min(DAMAGE_MASK_SIZE - 1, cx + dilate_radius)
+	var min_y: int = max(0, cy - dilate_radius)
+	var max_y: int = min(DAMAGE_MASK_SIZE - 1, cy + dilate_radius)
+	
+	var temp_pixels: Array = []
 	
 	for y in range(min_y, max_y + 1):
 		var dy: int = y - cy
 		var dy_sq: int = dy * dy
-		if dy_sq > r_sq:
+		if dy_sq > dilate_r_sq:
 			continue
-		var dx_max: int = int(sqrt(r_sq - dy_sq))
+		var dx_max: int = int(sqrt(dilate_r_sq - dy_sq))
 		var x_start: int = max(min_x, cx - dx_max)
 		var x_end: int = min(max_x, cx + dx_max)
 		for x in range(x_start, x_end + 1):
 			var dx: int = x - cx
 			var dist_sq: int = dx * dx + dy_sq
-			if dist_sq <= r_sq:
-				var falloff: float = 1.0 - sqrt(dist_sq) / r
+			if dist_sq <= dilate_r_sq:
+				var dist: float = sqrt(dist_sq)
+				var falloff: float = 1.0 - dist / dilate_r
+				falloff = falloff * falloff
+				if dist_sq <= r_sq:
+					falloff = 1.0
 				var alpha: float = color.a * falloff
 				var existing: Color = mask.get_pixel(x, y)
-				var new_alpha: float = max(existing.a, alpha)
-				mask.set_pixel(x, y, Color(color.r, color.g, color.b, new_alpha))
+				
+				var new_color: Color
+				if existing.a <= 0.01:
+					new_color = Color(color.r, color.g, color.b, alpha)
+				else:
+					var blended_alpha: float = _overlay_blend(existing.a, alpha)
+					var blended_r: float = _overlay_blend(existing.r, color.r)
+					var blended_g: float = _overlay_blend(existing.g, color.g)
+					var blended_b: float = _overlay_blend(existing.b, color.b)
+					new_color = Color(blended_r, blended_g, blended_b, blended_alpha)
+				
+				temp_pixels.append({
+					"x": x, "y": y,
+					"color": new_color
+				})
+	
+	for p in temp_pixels:
+		mask.set_pixel(p["x"], p["y"], p["color"])
+	
+	_edge_feather(mask, cx, cy, dilate_radius)
+
+static func _overlay_blend(base: float, blend: float) -> float:
+	if base < 0.5:
+		return 2.0 * base * blend
+	else:
+		return 1.0 - 2.0 * (1.0 - base) * (1.0 - blend)
+
+static func _edge_feather(mask: Image, cx: int, cy: int, radius: int) -> void:
+	var feather_radius := radius + 4
+	var feather_r_sq := feather_radius * feather_radius
+	var min_x: int = max(0, cx - feather_radius)
+	var max_x: int = min(DAMAGE_MASK_SIZE - 1, cx + feather_radius)
+	var min_y: int = max(0, cy - feather_radius)
+	var max_y: int = min(DAMAGE_MASK_SIZE - 1, cy + feather_radius)
+	
+	for y in range(min_y, max_y + 1):
+		var dy: int = y - cy
+		var dy_sq: int = dy * dy
+		if dy_sq > feather_r_sq:
+			continue
+		var dx_max: int = int(sqrt(feather_r_sq - dy_sq))
+		var x_start: int = max(min_x, cx - dx_max)
+		var x_end: int = min(max_x, cx + dx_max)
+		for x in range(x_start, x_end + 1):
+			var dx: int = x - cx
+			var dist_sq: int = dx * dx + dy_sq
+			if dist_sq > radius * radius and dist_sq <= feather_r_sq:
+				var dist: float = sqrt(dist_sq)
+				var feather_factor: float = 1.0 - (dist - radius) / 4.0
+				feather_factor = clampf(feather_factor, 0.0, 1.0)
+				var existing: Color = mask.get_pixel(x, y)
+				mask.set_pixel(x, y, Color(existing.r, existing.g, existing.b, existing.a * feather_factor))
 
 static func _get_layer_color(layer: int) -> Color:
 	match layer:
@@ -132,6 +192,15 @@ static func create_wound(parent: Node, pos: Vector3, normal: Vector3, size: floa
 	var wound := Node3D.new()
 	wound.name = "Wound_%s" % (zone if not zone.is_empty() else "generic")
 	
+	var surface := _raycast_ground(parent, pos + Vector3.UP * 0.3)
+	var impact_pos: Vector3 = surface.get("position", pos)
+	var impact_normal: Vector3 = surface.get("normal", normal)
+	if surface.is_empty() or impact_normal.y < 0.3:
+		impact_pos = pos
+		impact_normal = normal.normalized() if normal.length_squared() > 0.0001 else Vector3.UP
+	
+	var wound_rot := Quaternion(Vector3.UP, impact_normal)
+	
 	var created_layers := []
 	for i in range(layers):
 		var layer_decal := MeshInstance3D.new()
@@ -143,15 +212,9 @@ static func create_wound(parent: Node, pos: Vector3, normal: Vector3, size: floa
 		layer_decal.mesh = plane
 		layer_decal.material_override = _get_decal_material_for_layer(i, layers, depth)
 		
-		var surface := _raycast_ground(parent, pos + Vector3.UP * 0.3)
-		var impact_pos: Vector3 = surface.get("position", pos)
-		var impact_normal: Vector3 = surface.get("normal", normal)
-		if surface.is_empty() or impact_normal.y < 0.3:
-			impact_pos = pos
-			impact_normal = normal.normalized() if normal.length_squared() > 0.0001 else Vector3.UP
-		
-		layer_decal.global_position = impact_pos + impact_normal * (0.004 + float(i) * 0.0015)
-		layer_decal.global_rotation = Quaternion(Vector3.UP, impact_normal).get_euler()
+		var offset := impact_normal * (0.004 + float(i) * 0.0015)
+		layer_decal.position = offset
+		layer_decal.rotation = wound_rot.get_euler()
 		wound.add_child(layer_decal)
 		created_layers.append({
 			"node": layer_decal,
@@ -160,6 +223,8 @@ static func create_wound(parent: Node, pos: Vector3, normal: Vector3, size: floa
 			"age": 0.0,
 		})
 	
+	wound.position = impact_pos
+	wound.rotation = wound_rot.get_euler()
 	parent.add_child(wound)
 	
 	var wound_data := {

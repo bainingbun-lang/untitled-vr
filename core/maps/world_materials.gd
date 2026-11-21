@@ -106,7 +106,7 @@ const PROPS := {
 		"shape": "box", "collision": [0.65, 0.5, 0.55],
 	},
 	"street_light": {
-		"path": "res://assets/models/props/street_light/model.gltf",
+		"path": "res://assets/models/props/security_light/model.gltf",
 		"surface": "metal", "mass": 0.0, "height": 6.0,
 		"shape": "box", "collision": [0.3, 6.0, 0.3],
 		"emissive": Color(1.0, 0.9, 0.7, 1.0),
@@ -114,17 +114,17 @@ const PROPS := {
 		"light_energy": 2.5,
 	},
 	"bench": {
-		"path": "res://assets/models/props/bench/model.gltf",
+		"path": "res://assets/models/props/painted_wooden_bench/model.gltf",
 		"surface": "wood", "mass": 0.0, "height": 0.9,
 		"shape": "box", "collision": [1.5, 0.9, 0.5],
 	},
 	"trash_can": {
-		"path": "res://assets/models/props/trash_can/model.gltf",
+		"path": "res://assets/models/props/trashbag/model.gltf",
 		"surface": "metal", "mass": 12.0, "height": 1.0,
 		"shape": "cylinder", "collision": [0.4, 1.0, 0.4],
 	},
 	"fence_section": {
-		"path": "res://assets/models/props/fence_section/model.gltf",
+		"path": "res://assets/models/maps/nature/fence_simple.glb",
 		"surface": "metal", "mass": 0.0, "height": 1.2,
 		"shape": "box", "collision": [2.0, 1.2, 0.1],
 	},

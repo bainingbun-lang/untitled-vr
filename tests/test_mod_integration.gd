@@ -179,6 +179,7 @@ func _test_content_registration() -> void:
 			"range": 100.0,
 			"mag": 30,
 			"auto": true,
+			"fire_mode": "auto",
 			"spread": 2.0,
 			"pellets": 1,
 			"tags": ["rifle", "test"],
@@ -265,6 +266,7 @@ func _test_content_replacement() -> void:
 			"range": 80.0,
 			"mag": 30,
 			"auto": true,
+			"fire_mode": "auto",
 			"spread": 3.0,
 			"pellets": 1,
 			"tags": ["rifle", "base"],
@@ -308,6 +310,7 @@ func _test_content_replacement() -> void:
 			"range": 100.0,
 			"mag": 40,
 			"auto": true,
+			"fire_mode": "auto",
 			"spread": 2.5,
 			"pellets": 1,
 			"tags": ["rifle", "custom"],
@@ -440,13 +443,14 @@ func _mod_shutdown():
 	var weapon_v1 := {
 		"content": [{
 			"type": "weapon",
-			"id": "test.reload:pistol",
+			"id": "test.reload:test_pistol",
 			"name": "Pistol V1",
 			"damage": 20.0,
 			"fire_rate": 5.0,
 			"range": 50.0,
 			"mag": 15,
 			"auto": false,
+			"fire_mode": "semi",
 			"spread": 1.0,
 			"pellets": 1,
 			"tags": ["pistol", "test"],
@@ -466,7 +470,7 @@ func _mod_shutdown():
 			"max_penetrations": 1,
 			"max_ricochets": 0,
 			"model": "res://assets/models/weapons/pistol.gltf",
-			"ammo_id": "test.reload:pistol_ammo",
+			"ammo_id": "test.reload:test_pistol_ammo",
 			"caliber": "9x19mm"
 		}]
 	}
@@ -479,8 +483,8 @@ func _mod_shutdown():
 	ContentRegistryScript.instance().sync_loaded(registry.loaded_ids())
 
 	var weapons_before := ContentRegistryScript.instance().entries("weapon")
-	_expect(weapons_before.has("test.reload:pistol"), "arma antes de recargar")
-	_expect(weapons_before["test.reload:pistol"]["damage"] == 20.0, "damage v1")
+	_expect(weapons_before.has("test.reload:test_pistol"), "arma antes de recargar")
+	_expect(weapons_before["test.reload:test_pistol"]["damage"] == 20.0, "damage v1")
 
 	var weapon_v2 := weapon_v1.duplicate(true)
 	weapon_v2["content"][0]["damage"] = 25.0
@@ -494,9 +498,9 @@ func _mod_shutdown():
 	ContentRegistryScript.instance().sync_loaded(registry.loaded_ids())
 
 	var weapons_after := ContentRegistryScript.instance().entries("weapon")
-	_expect(weapons_after.has("test.reload:pistol"), "arma despues de recargar")
-	_expect(weapons_after["test.reload:pistol"]["damage"] == 25.0, "damage actualizado a v2")
-	_expect(weapons_after["test.reload:pistol"]["name"] == "Pistol V2", "nombre actualizado a v2")
+	_expect(weapons_after.has("test.reload:test_pistol"), "arma despues de recargar")
+	_expect(weapons_after["test.reload:test_pistol"]["damage"] == 25.0, "damage actualizado a v2")
+	_expect(weapons_after["test.reload:test_pistol"]["name"] == "Pistol V2", "nombre actualizado a v2")
 
 func _test_multi_mod_dependencies() -> void:
 	var bus = EventBusScript.new()

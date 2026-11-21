@@ -56,7 +56,7 @@ func get_behavior_at(index: int) -> SteeringBehavior:
 	return null
 
 
-func _calculate_steering(accel: TargetAcceleration) -> void:
+func _calculate_steering(accel: TargetAcceleration, delta: float = 0.0) -> void:
 	var threshold_squared := zero_threshold * zero_threshold
 
 	last_selected_index = -1
@@ -67,7 +67,7 @@ func _calculate_steering(accel: TargetAcceleration) -> void:
 		for i in range(size):
 			last_selected_index = i
 			var behavior: SteeringBehavior = _behaviors[i]
-			behavior.calculate_steering(accel)
+			behavior._calculate_steering(accel)
 
 			if accel.get_magnitude_squared() > threshold_squared:
 				break

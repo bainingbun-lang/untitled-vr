@@ -32,6 +32,8 @@ func check(tick: Variant) -> bool:
 	
 	var blackboard = context.blackboard
 	var sim_hour = blackboard.get_value("sim_hour", context.tree) or 12.0
-	var routine_stop = blackboard.get_value("routine_stop", context.tree) or {}
+	var routine_stop = blackboard.get_value("routine_stop", context.tree)
+	if routine_stop == null or routine_stop is bool:
+		routine_stop = {}
 	
 	return not routine_stop.is_empty()

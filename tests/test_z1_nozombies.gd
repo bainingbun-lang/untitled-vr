@@ -13,7 +13,7 @@ func _initialize() -> void:
 	_case = "CharacterModel: SKINS dictionary tiene humano no enemy"
 	_expect(CharacterModelScript.SKINS.has("humano"), "SKINS tiene clave 'humano'")
 	_expect(not CharacterModelScript.SKINS.has("enemy"), "SKINS no tiene clave 'enemy'")
-	_expect(str(CharacterModelScript.SKINS["humano"]).contains("enemy_zombie_basic"), "humano usa modelo enemy_zombie_basic")
+	_expect(str(CharacterModelScript.SKINS["humano"]).contains("criminal_punk.gltf"), "humano usa modelo criminal_punk.gltf")
 
 	_case = "CharacterModel: ALIASES mapea enemigo y zombie a humano"
 	_expect_eq(str(CharacterModelScript.ALIASES.get("enemigo", "")), "humano", "alias 'enemigo' resuelve a 'humano'")

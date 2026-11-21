@@ -129,8 +129,9 @@ func select(p_context: Dictionary = {}) -> Dictionary:
 	_update_blackboard(ctx)
 	var candidates: Array = []
 	var aggressiveness: float = float(ctx.get("aggressiveness", 0.5))
-	var is_hostile_npc: bool = aggressiveness > 0.6
-	var is_civilian_npc: bool = aggressiveness <= 0.4
+	var role: String = str(ctx.get("role", ""))
+	var is_hostile_npc: bool = aggressiveness > 0.6 or role == "hostile"
+	var is_civilian_npc: bool = aggressiveness <= 0.4 or role == "civilian"
 	for key in _actions.keys():
 		var id: String = str(key)
 		var config: Dictionary = _actions[key]
@@ -142,8 +143,6 @@ func select(p_context: Dictionary = {}) -> Dictionary:
 		if id == "attack" and is_hostile_npc:
 			continue
 		if id == "civilian_flee" and not is_civilian_npc:
-			continue
-		if id == "flee" and is_civilian_npc:
 			continue
 		if (id == "hostile_attack" or id == "attack") and not bool(ctx.get("force_attack", false)) and not (_aggression_cooldown > 0.0 and is_hostile_npc):
 			continue
@@ -500,6 +499,9 @@ func _update_blackboard(ctx: Dictionary) -> void:
 		if combat != null:
 			_blackboard.call("set", "under_attack", float(combat.get("under_attack", 0.0)))
 			_blackboard.call("set", "alert_level", float(combat.get("alert_level", 0.0)))
+			var ltp: Variant = combat.get("last_threat_position", Vector3.ZERO)
+			if ltp is Vector3 and ltp.length_squared() > 0.0001:
+				_blackboard.call("set", "threat_position", ltp)
 
 
 func _apply_behavior_mode(ctx: Dictionary) -> void:
@@ -513,19 +515,23 @@ func _apply_behavior_mode(ctx: Dictionary) -> void:
 	var mem: NPCMemory = controller.memory if controller != null else null
 	var danger: float = _memory_danger(mem)
 	var aggressiveness: float = float(ctx.get("aggressiveness", 0.5))
+	var visible: bool = bool(ctx.get("visible", false))
+	var role: String = str(ctx.get("role", ""))
+	var is_hostile_role: bool = role == "hostile" or role == "zombie"
+	var is_civilian_role: bool = role == "civilian"
 	
-	if behavior_mode == "hostil" and aggressiveness <= 0.4:
+	if behavior_mode == "hostil" and not is_hostile_role:
 		behavior_mode = "pacifico"
 	
 	match behavior_mode:
 		"hostil":
-			if aggressiveness > 0.6:
+			if is_hostile_role or aggressiveness > 0.6:
 				ctx["force_attack"] = true
 				ctx["force_chase"] = _aggression_cooldown > 0.0
 		"pacifico":
-			if aggressiveness <= 0.4:
-				ctx["force_flee"] = danger > 0.3 or _aggression_cooldown > 0.0
-			elif float(ctx.get("sociability", 0.5)) > 0.5 and aggressiveness <= 0.6:
+			if is_civilian_role or aggressiveness <= 0.4:
+				ctx["force_flee"] = danger > 0.3 or _aggression_cooldown > 0.0 or visible
+			elif float(ctx.get("sociability", 0.5)) > 0.5 and (aggressiveness <= 0.6 or not is_hostile_role):
 				ctx["force_witness"] = danger > 0.2 and _aggression_cooldown > 0.0
 
 

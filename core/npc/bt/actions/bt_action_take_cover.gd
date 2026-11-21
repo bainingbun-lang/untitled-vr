@@ -38,7 +38,12 @@ func execute_action(tick: Variant) -> int:
 		return FAILED
 	
 	var blackboard = context.blackboard
-	var current_time = blackboard.get_value("current_time", context.tree) or 0.0
+	var current_time_val = blackboard.get_value("current_time", context.tree)
+	var current_time: float = 0.0
+	if current_time_val is float:
+		current_time = current_time_val
+	elif current_time_val is int:
+		current_time = float(current_time_val)
 	
 	var actor = context.actor
 	var actor_pos = actor.global_position if actor is Node3D else Vector3.ZERO

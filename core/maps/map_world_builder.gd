@@ -26,6 +26,7 @@ const MODEL_TREE_OAK: String = "res://assets/models/maps/nature/tree_oak.glb"
 const MODEL_TREE_PINE: String = "res://assets/models/maps/nature/tree_pineDefaultA.glb"
 const MODEL_BUSH: String = "res://assets/models/maps/nature/plant_bush.glb"
 const MODEL_FENCE: String = "res://assets/models/maps/nature/fence_simple.glb"
+const MODEL_CAR: String = "res://assets/models/maps/car/taxi.glb"
 const VEGETATION_MARGIN: float = 1.0
 const FENCE_MARGIN: float = 0.5
 const TREE_SPACING: float = 3.0
@@ -33,6 +34,8 @@ const BUSH_SPACING: float = 2.0
 const FENCE_SPACING: float = 1.0
 const MAX_TREES: int = 12
 const MAX_BUSHES: int = 12
+const MAX_PARKED_CARS: int = 8
+const CAR_SPACING: float = 3.5
 const GEOMETRY_CONVENTION: String = (
 	"1 celda = 1 unidad * scale; grid[y][x] -> (x+0.5, 0, y+0.5); "
 	+ "suelo caminable en y=0 (caja de 0.5 de grosor centrada en y=-0.25); "
@@ -112,9 +115,59 @@ static func _build_vegetation(root: Node3D, bounds: AABB, spawn_points: Array, t
 			bush_count += 1
 	
 	if not transforms_trees.is_empty():
-		BuildingScript.model_batch(root, "Trees", tree_path, transforms_trees, Vector3(1.0, 1.0, 1.0), cull_dist)
+		var trees_node := BuildingScript.model_batch(root, "Trees", tree_path, transforms_trees, Vector3(1.0, 1.0, 1.0), cull_dist)
+		if trees_node != null:
+			trees_node.add_to_group("vegetation")
 	if not transforms_bushes.is_empty():
-		BuildingScript.model_batch(root, "Bushes", bush_path, transforms_bushes, Vector3(0.7, 0.7, 0.7), cull_dist * 0.75)
+		var bushes_node := BuildingScript.model_batch(root, "Bushes", bush_path, transforms_bushes, Vector3(0.7, 0.7, 0.7), cull_dist * 0.75)
+		if bushes_node != null:
+			bushes_node.add_to_group("vegetation")
+
+
+static func _build_parked_cars(root: Node3D, bounds: AABB, spawn_points: Array, theme: String, perf: VrPerformance = null) -> void:
+	if theme != "urbano" and theme != "industrial":
+		return
+	var path := MODEL_CAR
+	if not ResourceLoader.exists(path):
+		return
+	var transforms: Array = []
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(str(bounds.position.x) + "," + str(bounds.position.z) + ",1993")
+	
+	var min_x: float = bounds.position.x + VEGETATION_MARGIN
+	var max_x: float = bounds.end.x - VEGETATION_MARGIN
+	var min_z: float = bounds.position.z + VEGETATION_MARGIN
+	var max_z: float = bounds.end.z - VEGETATION_MARGIN
+	
+	var count: int = 0
+	for x_pos in range(int(min_x), int(max_x), int(CAR_SPACING)):
+		if count >= MAX_PARKED_CARS:
+			break
+		for z_pos in range(int(min_z), int(max_z), int(CAR_SPACING)):
+			if count >= MAX_PARKED_CARS:
+				break
+			var point := Vector3(
+				float(x_pos) + rng.randf_range(-0.5, 0.5),
+				0.0,
+				float(z_pos) + rng.randf_range(-0.5, 0.5)
+			)
+			if _too_close_planar(point, spawn_points, 4.0):
+				continue
+			if _too_close_planar(point, [], 3.5):
+				continue
+			transforms.append(BuildingScript.model_transform(
+				path, point, rng.randf_range(0.0, TAU), Vector3(1.0, 1.0, 1.0)
+			))
+			count += 1
+	
+	var cull_dist: float = 80.0
+	if perf != null:
+		cull_dist = perf.get_culling_distance()
+	
+	if not transforms.is_empty():
+		var cars_node := BuildingScript.model_batch(root, "ParkedCars", path, transforms, Vector3(1.0, 1.0, 1.0), cull_dist)
+		if cars_node != null:
+			cars_node.add_to_group("parked_car")
 
 
 static func _build_fences(root: Node3D, bounds: AABB, theme: String, perf: VrPerformance = null) -> void:
@@ -174,7 +227,9 @@ static func _build_fences(root: Node3D, bounds: AABB, theme: String, perf: VrPer
 		cull_dist = perf.get_culling_distance()
 	
 	if not transforms.is_empty():
-		BuildingScript.model_batch(root, "Fences", path, transforms, Vector3(2.0, 1.0, 0.2), cull_dist)
+		var fences_node := BuildingScript.model_batch(root, "Fences", path, transforms, Vector3(2.0, 1.0, 0.2), cull_dist)
+		if fences_node != null:
+			fences_node.add_to_group("fence")
 
 
 static func build(meta: Dictionary, parent: Node3D, perf: VrPerformance = null) -> Dictionary:
@@ -225,6 +280,7 @@ static func build(meta: Dictionary, parent: Node3D, perf: VrPerformance = null) 
 	_build_obstacles(root, obstacle_points, obstacle_materials, obstacle_surfaces, theme_name, perf)
 	_build_vegetation(root, bounds, spawn_points, theme_name, perf)
 	_build_fences(root, bounds, theme_name, perf)
+	_build_parked_cars(root, bounds, spawn_points, theme_name, perf)
 	_build_environment(root, time_of_day, theme_name)
 	_build_spawn_markers(root, spawn_points, marker_count)
 	var props: Array = populate_physics_props(

@@ -36,7 +36,9 @@ func check(tick: Variant) -> bool:
 		return false
 	
 	var blackboard = context.blackboard
-	var sim_hour = blackboard.get_value("sim_hour", context.tree) or 12.0
+	var sim_hour = blackboard.get_value("sim_hour", context.tree)
+	if sim_hour == null or sim_hour is bool:
+		sim_hour = 12.0
 	
 	if sim_hour >= work_start_hour and sim_hour < lunch_start_hour:
 		return true

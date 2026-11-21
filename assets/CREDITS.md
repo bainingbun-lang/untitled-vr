@@ -210,7 +210,7 @@ Ningún archivo descargado fue ejecutado. Copia local de esta sección:
 |---|---|---|---|---|---|---|
 | `civil` | `civil_casual_hoodie.gltf` | Ultimate Modular Men - Casual Hoodie | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels (pack `Ultimate Modular Men- Feb 2022`), original: https://quaternius.com/packs/ultimatemodularcharacters.html | CC0 1.0 | `civil_casual_hoodie.gltf`, `licenses/QUATERNIUS_CC0.txt` |
 | `soldier` | `soldier_swat.gltf` | Ultimate Modular Men - SWAT | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels (pack `Ultimate Modular Men- Feb 2022`), original: https://quaternius.com/packs/ultimatemodularcharacters.html | CC0 1.0 | `soldier_swat.gltf`, `licenses/QUATERNIUS_CC0.txt` |
-| `enemy` | `enemy_zombie_basic.gltf` | Zombie Apocalypse Kit - Zombie Basic | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels (pack `Zombie Apocalypse Kit - March 2024`), original: https://quaternius.com/ | CC0 1.0 | `enemy_zombie_basic.gltf`, `licenses/QUATERNIUS_CC0.txt` |
+
 | `robot` | `robot_blocky.glb` | Free Low-Poly Characters - Robot | Vuena / Popyca | https://github.com/Vuena/free-low-poly-characters-cc0 | CC0 1.0 | `robot_blocky.glb`, `licenses/VUENA_CC0.txt` |
 
 URLs directas de descarga (raw):
@@ -226,7 +226,6 @@ URLs directas de descarga (raw):
 |---|---:|---|---|
 | civil_casual_hoodie | 6.206 | sin imágenes externas (materiales de color) | 24 |
 | soldier_swat | 8.794 | sin imágenes externas (materiales de color) | 24 |
-| enemy_zombie_basic | 7.822 | 1 atlas PNG embebido | 16 |
 | robot_blocky | 2.504 | paleta 256×256 embebida | 10 |
 
 Todos quedan por debajo del límite de 15k tris por personaje y 1024px por textura.
@@ -243,9 +242,7 @@ Quaternius (62 huesos, esqueleto compartido civil/SWAT): `Root`, `Body`, `Hips`,
 `Wrist.R`, ídem dedos `.R`, `UpperLeg.L`, `LowerLeg.L`, `UpperLeg.R`, `LowerLeg.R`, `Foot.L`,
 `PT.L`, `Foot.R`, `PT.R`.
 
-Zombi (50 huesos): `Root`, `Foot.L`, `Body`, `Hips`, `Abdomen`, `Torso`, `Neck`, `Head`,
-`Tongue1..5`, `Eyelid.L/R`, brazos y dedos `.L/.R`, `UpperLeg.L/R`, `LowerLeg.L/R`,
-`PoleTarget.L/R`, `Foot.R`.
+
 
 Robot Vuena (22 huesos, esquema Mixamo): `mixamorig_Hips`, `mixamorig_Spine`,
 `mixamorig_Spine1`, `mixamorig_Spine2`, `mixamorig_Neck`, `mixamorig_Head`,
@@ -341,6 +338,13 @@ de 1024x1024 o menos y están por debajo del límite de 5.000 tris por prop.
 | Furniture Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/furniture-kit | CC0 1.0 | `bookcaseOpen.glb`, `chairDesk.glb`, `computerScreen.glb`, `desk.glb`, `floorFull.glb`, `kitchenBar.glb`, `lampSquareCeiling.glb`, `loungeSofa.glb`, `pottedPlant.glb`, `wall.glb`, `wallDoorwayWide.glb`, `wallWindow.glb` (+25 GLB del kit) |
 | Nature Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/nature-kit | CC0 1.0 | `fence_simple.glb`, `grass_large.glb`, `ground_grass.glb`, `ground_pathStraight.glb`, `plant_bush.glb`, `rock_largeA.glb`, `tree_default.glb`, `tree_oak.glb`, `tree_pineDefaultA.glb` |
 | Car Kit (vehiculos jugables G5) | Kenney (Kenney.NL), espejo https://github.com/Arslan12216775/kenney_car-kit | https://kenney.nl/assets/car-kit | CC0 1.0 | `assets/models/vehicles/`: `sedan.glb`, `truck.glb`, `sedan-sports.glb`, `delivery.glb`, `kart-oobi.glb`, `suv.glb`, `race.glb` (ruedas separadas, texturas embebidas; manifest.json) |
+| City Suburban Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/city-kit-suburban | CC0 1.0 | `building-type-a.glb` ... `building-type-u.glb`, `driveway-long.glb`, `driveway-short.glb`, `fence*.glb`, `path*.glb`, `planter.glb`, `tree-large.glb`, `tree-small.glb`, `Textures/colormap.png` |
+| Modular Buildings Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/modular-buildings-kit | CC0 1.0 | `building-block.glb`, `building-corner*.glb`, `building-door*.glb`, `building-sample-*.glb`, `building-steps*.glb`, `building-window*.glb`, `building-windows*.glb`, `detail-ac*.glb`, `door-*.glb`, `roof-*.glb`, `window-*.glb`, `Textures/colormap.png` |
+| Retro Urban Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/retro-urban-kit | CC0 1.0 | `balcony-*.glb`, `cliff-*.glb`, `detail-*.glb`, `door-*.glb`, `grass*.glb`, `pallet*.glb`, `planks.glb`, `road-*.glb`, `roof-metal*.glb`, `scaffolding-*.glb`, `tree-*.glb`, `truck-*.glb`, `wall-*.glb`, `window-*.glb`, `Textures/*.png` (64-128px) |
+| Survival Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/survival-kit | CC0 1.0 | `barrel*.glb`, `bedroll*.glb`, `bottle*.glb`, `box*.glb`, `bucket.glb`, `campfire*.glb`, `chest.glb`, `fence*.glb`, `fish*.glb`, `floor*.glb`, `grass*.glb`, `metal-panel*.glb`, `patch-grass*.glb`, `resource-*.glb`, `rock-*.glb`, `signpost*.glb`, `structure*.glb`, `tent*.glb`, `tool-*.glb`, `tree*.glb`, `workbench*.glb`, `Textures/colormap.png` (512px) |
+| Food Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/food-kit | CC0 1.0 | 200 food/prop models (`apple.glb`, `burger*.glb`, `can*.glb`, `bottle*.glb`, `cake*.glb`, `cheese*.glb`, `fruit*.glb`, `vegetable*.glb`, `bread.glb`, `candy*.glb`, etc.), `Textures/colormap.png` (512px), all < 1.4k tris |
+| Mini Market Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/mini-market-kit | CC0 1.0 | `bottle-return.glb`, `cash-register.glb`, `character-employee.glb`, `column.glb`, `display-bread.glb`, `display-fruit.glb`, `fence*.glb`, `floor.glb`, `freezer*.glb`, `shelf-*.glb`, `shopping-basket.glb`, `shopping-cart.glb`, `wall*.glb`, `Textures/colormap.png` (512px), all < 900 tris |
+| Mini Forest Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/mini-forest-kit | CC0 1.0 | `bridge.glb`, `building-*.glb`, `character-archer.glb`, `fence.glb`, `flag.glb`, `ladder.glb`, `patch-*.glb`, `plant.glb`, `platform.glb`, `rocks-*.glb`, `stones.glb`, `target.glb`, `tent.glb`, `tree*.glb`, `weapon-*.glb`, `Textures/colormap.png` (512px), all < 850 tris |
 
 ---
 
@@ -385,9 +389,6 @@ ejecutó. Copia de la licencia: `assets/models/characters/v2/licenses/QUATERNIUS
 | `soldier_female` | soldier | Soldier (Ultimate Modular Women, April 2022) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/packs/ultimatemodularcharacters.html | CC0 1.0 | `assets/models/characters/v2/soldier_female.gltf` | 7.900 |
 | `criminal_punk` | criminal | Punk (Ultimate Modular Men, Feb 2022) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/packs/ultimatemodularcharacters.html | CC0 1.0 | `assets/models/characters/v2/criminal_punk.gltf` | 5.500 |
 | `office_suit` | office | Suit (Ultimate Modular Men, Feb 2022) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/packs/ultimatemodularcharacters.html | CC0 1.0 | `assets/models/characters/v2/office_suit.gltf` | 7.674 |
-| `zombie_basic` | zombie | Zombie Basic (Zombie Apocalypse Kit, Mar 2024) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/ | CC0 1.0 | `assets/models/characters/v2/zombie_basic.gltf` | 7.822 |
-| `zombie_chubby` | zombie | Zombie Chubby (Zombie Apocalypse Kit, Mar 2024) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/ | CC0 1.0 | `assets/models/characters/v2/zombie_chubby.gltf` | 6.174 |
-| `zombie_ribcage` | zombie | Zombie Ribcage (Zombie Apocalypse Kit, Mar 2024) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels , original https://quaternius.com/ | CC0 1.0 | `assets/models/characters/v2/zombie_ribcage.gltf` | 4.774 |
 
 URLs directas de descarga (raw, `https://raw.githubusercontent.com/agentkaerf/FreeModels/main/`):
 
@@ -399,9 +400,6 @@ URLs directas de descarga (raw, `https://raw.githubusercontent.com/agentkaerf/Fr
 - `soldier_female.gltf`: `Ultimate%20Modular%20Women%20-%20April%202022/Individual%20Characters/glTF/Soldier.gltf`
 - `criminal_punk.gltf`: `Ultimate%20Modular%20Men-%20Feb%202022/Individual%20Characters/glTF/Punk.gltf`
 - `office_suit.gltf`: `Ultimate%20Modular%20Men-%20Feb%202022/Individual%20Characters/glTF/Suit.gltf`
-- `zombie_basic.gltf`: `Zombie%20Apocalypse%20Kit%20-%20March%202024/Characters/glTF/Zombie_Basic.gltf`
-- `zombie_chubby.gltf`: `Zombie%20Apocalypse%20Kit%20-%20March%202024/Characters/glTF/Zombie_Chubby.gltf`
-- `zombie_ribcage.gltf`: `Zombie%20Apocalypse%20Kit%20-%20March%202024/Characters/glTF/Zombie_Ribcage.gltf`
 
 El manifest `assets/models/characters/v2/manifest.json` documenta id, rol, archivo, altura
 (1,75 m normalizados en juego; `source_height` es la altura original del glTF), huesos
@@ -414,9 +412,8 @@ como fallback documentado en el manifest).
 ## Presupuesto móvil verificado (C6 P1)
 
 Máximo 8.794 tris por personaje (límite 15k). Los ocho humanoides usan materiales de
-color (sin imágenes externas; 5-10 materiales); los tres zombis comparten un atlas PNG
-embebido de 512×512 (límite 1024). Tamaño total añadido: 29.126.579 bytes (~27,8 MiB)
-en 11 `.gltf` + `manifest.json` + licencia. No se usaron assets de Mixamo ni Sketchfab.
+color (sin imágenes externas; 5-10 materiales). Tamaño total añadido: ~17,5 MiB
+en 8 `.gltf` + `manifest.json` + licencia. No se usaron assets de Mixamo ni Sketchfab.
 
 **Honestidad sobre el realismo:** estos modelos son de estilo *low-poly estilizado* de
 Quaternius (con ropa, siluetas y animaciones diferenciadas), no personajes

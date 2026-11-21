@@ -174,6 +174,15 @@ var _flee_goal_age: float = 0.0
 # AI2 Steering and Behavior Tree integration
 var steering_agent = null
 var steering_behavior = null
+
+var npc_controller = null
+var npc_routine = null
+var npc_personality = null
+var npc_needs = null
+var npc_memory = null
+var npc_state_machine = null
+
+var controller = null
 var behavior_tree = null
 var bt_blackboard = null
 var _steering_arrive_target = null
@@ -760,17 +769,61 @@ func _initialize_steering() -> void:
 func _initialize_behavior_tree() -> void:
 	if _behavior_tree_initialized or not _use_behavior_tree:
 		return
+	_ensure_npc_components()
 	if not ResourceLoader.exists(BEHAVIOR_TREE_PATH) or not ResourceLoader.exists(BT_BLACKBOARD_PATH) or not ResourceLoader.exists(BT_TREE_BUILDER_PATH) or not ResourceLoader.exists(NPC_TYPES_PATH):
+		print("[BT] NPC %s: resources missing: BT=%s BB=%s Builder=%s Types=%s" % [npc_id, str(ResourceLoader.exists(BEHAVIOR_TREE_PATH)), str(ResourceLoader.exists(BT_BLACKBOARD_PATH)), str(ResourceLoader.exists(BT_TREE_BUILDER_PATH)), str(ResourceLoader.exists(NPC_TYPES_PATH))])
 		return
 	var BehaviorTree = load(BEHAVIOR_TREE_PATH) as Script
 	var BTBlackboard = load(BT_BLACKBOARD_PATH) as Script
 	var BTTreeBuilder = load(BT_TREE_BUILDER_PATH) as Script
 	if BehaviorTree == null or BTBlackboard == null or BTTreeBuilder == null:
+		print("[BT] NPC %s: failed to load scripts" % [npc_id])
 		return
 	bt_blackboard = BTBlackboard.new()
 	behavior_tree = BehaviorTree.new(bt_blackboard, false)
 	_setup_behavior_tree_for_role(BTTreeBuilder)
 	_behavior_tree_initialized = true
+	print("[BT] NPC %s: behavior tree initialized, role=%s" % [npc_id, role])
+
+
+func _ensure_npc_components() -> void:
+	if npc_controller != null:
+		return
+	var NPCControllerScript = preload("res://core/npc/npc_controller.gd")
+	var NPCRoutineScript = preload("res://core/npc/npc_routine.gd")
+	var NPCPersonalityScript = preload("res://core/npc/npc_personality.gd")
+	var NPCNeedsScript = preload("res://core/npc/npc_needs.gd")
+	var NPCMemoryScript = preload("res://core/npc/npc_memory.gd")
+	var NPCStateMachineScript = preload("res://core/npc/npc_state_machine.gd")
+
+	npc_state_machine = NPCStateMachineScript.new()
+	npc_state_machine.transition_to("idle")
+
+	npc_personality = NPCPersonalityScript.new({
+		"temperament": 0.5,
+		"confidence": 0.5,
+		"bravery": 0.5,
+		"fear": 0.3,
+		"curiosity": 0.7,
+		"sociability": 0.5,
+		"aggressiveness": 0.3,
+	})
+
+	npc_needs = NPCNeedsScript.new({
+		"fatigue": 0.0,
+		"stress": 0.0,
+		"fear": 0.0,
+		"confusion": 0.0,
+		"stun": 0.0,
+		"health": 1.0,
+	})
+
+	npc_memory = NPCMemoryScript.new()
+
+	npc_routine = NPCRoutineScript.new([])
+
+	npc_controller = NPCControllerScript.new(npc_state_machine, npc_personality, npc_needs, npc_memory, npc_routine)
+	controller = npc_controller
 
 
 func _setup_behavior_tree_for_role(BTTreeBuilder: Script) -> void:
@@ -787,11 +840,11 @@ func _setup_behavior_tree_for_role(BTTreeBuilder: Script) -> void:
 	}
 	var role_key: String = role_map.get(role.to_lower(), "civil")
 	var mode: String = "pacifico"
-	if combat != null:
-		var combat_mode: Variant = combat.get("behavior_mode")
-		if combat_mode != null:
-			mode = str(combat_mode).to_lower()
-		else:
+	if combat != null and combat.behavior != null and combat.behavior.has_method("get_behavior_mode"):
+		mode = str(combat.behavior.get_behavior_mode()).to_lower()
+	elif combat != null:
+		var role_str: String = str(combat.get("role", "civilian"))
+		if role_str == "hostile" or role_str == "zombie":
 			mode = "hostil"
 	var tree = BTTreeBuilder.build_tree_for_role(role_key, mode)
 	if tree != null:
@@ -1453,12 +1506,12 @@ func _physics_process(delta: float) -> void:
 		var decision_delta: float = _tick_accumulator
 		_tick_accumulator = 0.0
 		tick(decision_delta)
+	if _use_behavior_tree and _behavior_tree_initialized and behavior_tree != null:
+		_update_behavior_tree(step)
 	if _use_steering and _steering_initialized and steering_agent != null:
 		_update_steering(step)
 	else:
 		_move_toward_goal(step)
-	if _use_behavior_tree and _behavior_tree_initialized and behavior_tree != null:
-		_update_behavior_tree(step)
 
 
 func _move_toward_goal(delta: float) -> void:
@@ -1538,13 +1591,15 @@ func _update_steering(delta: float) -> void:
 	steering_agent.orientation = rotation.y
 	steering_agent.linear_velocity = velocity
 	if _steering_arrive_target != null:
-		var destination: Vector3 = _goal
-		if _path_index < _path.size():
-			destination = _path[_path_index]
-		elif destination == Vector3.ZERO and bt_blackboard != null:
-			var bt_target = bt_blackboard.get_value("move_target", null)
+		var destination: Vector3 = Vector3.ZERO
+		if bt_blackboard != null:
+			var bt_target = bt_blackboard.get_value("move_target", behavior_tree)
 			if bt_target is Vector3 and bt_target.length_squared() > 0.001:
 				destination = bt_target
+		if destination == Vector3.ZERO and _path_index < _path.size():
+			destination = _path[_path_index]
+		if destination == Vector3.ZERO:
+			destination = _goal
 		if destination == Vector3.ZERO:
 			var home_pos: Vector3 = _home if _home != Vector3.ZERO else global_position
 			var angle: float = _rng.randf_range(0.0, TAU)
@@ -1573,6 +1628,7 @@ func _update_steering(delta: float) -> void:
 				break
 		var accel = TargetAcceleration.new()
 		steering_behavior.calculate_steering(accel)
+		print("[STEER] NPC %s accel=%s vel=%s" % [npc_id, str(accel.linear), str(velocity)])
 		if accel.linear.length_squared() > 0.0001:
 			var max_accel: float = steering_agent.linear_acceleration_max
 			var max_speed: float = steering_agent.linear_speed_max
@@ -1585,6 +1641,7 @@ func _update_steering(delta: float) -> void:
 			rotation.y = lerp_angle(rotation.y, steering_agent.orientation + steering_agent.angular_velocity * delta, 0.5)
 		var previous: Vector3 = global_position
 		move_and_slide()
+		print("[STEER] NPC %s moved from %s to %s" % [npc_id, str(previous), str(global_position)])
 		if _has_navigation_grid() and not bool(navigation.call("is_walkable_world", global_position, nav_cell_size)):
 			global_position = previous
 			velocity.x = 0.0
@@ -1599,23 +1656,69 @@ func _update_steering(delta: float) -> void:
 
 func _update_behavior_tree(delta: float) -> void:
 	if behavior_tree == null or bt_blackboard == null:
+		print("[BT] NPC %s: behavior_tree=%s, bt_blackboard=%s" % [npc_id, str(behavior_tree), str(bt_blackboard)])
 		return
+	print("[BT] NPC %s: starting tick" % [npc_id])
+	_sim_time += delta
 	var ctx: Dictionary = _context()
 	var role_lower: String = role.to_lower()
 	var mode: String = "pacifico"
-	if combat != null:
-		var combat_mode: Variant = combat.get("behavior_mode")
-		if combat_mode != null:
-			mode = str(combat_mode).to_lower()
+	var sim_hour: float = 12.0
+	var controller = null
+	var routine = null
+	if combat != null and combat.behavior != null and combat.behavior.has_method("get_behavior_mode"):
+		mode = str(combat.behavior.get_behavior_mode()).to_lower()
+	elif combat != null:
+		var role_str: String = str(combat.get("role", "civilian"))
+		if role_str == "hostile" or role_str == "zombie":
+			mode = "hostil"
+		controller = combat.get("controller")
+		if controller != null:
+			routine = controller.routine
+	if controller == null:
+		controller = npc_controller
+	if routine == null:
+		routine = npc_routine
+	if routine != null and routine.has_method("get_current_stop"):
+		var stop: Dictionary = routine.get_current_stop(sim_hour)
+		if not stop.is_empty():
+			bt_blackboard.set_value("routine_stop", stop, behavior_tree)
 	bt_blackboard.set_value("role", role_lower, behavior_tree)
 	bt_blackboard.set_value("behavior_mode", mode, behavior_tree)
 	bt_blackboard.set_value("ctx", ctx, behavior_tree)
 	bt_blackboard.set_value("delta", delta, behavior_tree)
+	bt_blackboard.set_value("current_time", _sim_time, behavior_tree)
+	bt_blackboard.set_value("sim_hour", sim_hour, behavior_tree)
 	bt_blackboard.set_value("npc", self, behavior_tree)
+	if target != null and is_instance_valid(target):
+		bt_blackboard.set_value("target", target, behavior_tree)
+	print("[BT] NPC %s: about to tick_with" % [npc_id])
+	var bt_target = bt_blackboard.get_value("target", behavior_tree)
 	behavior_tree.tick_with(self, bt_blackboard, false)
+	print("[BT] NPC %s: tick_with returned" % [npc_id])
+	var fire_weapon_val = bt_blackboard.get_value("fire_weapon", behavior_tree)
+	print("[BT] NPC %s: fire_weapon=%s" % [npc_id, str(fire_weapon_val)])
+	if fire_weapon_val == true:
+		var shot_result = fire()
+		if shot_result and bool(shot_result.get("fired", false)):
+			print("[BT] NPC %s: fired weapon" % [npc_id])
+		else:
+			print("[BT] NPC %s: fire() failed: %s" % [npc_id, str(shot_result)])
+		bt_blackboard.set_value("fire_weapon", false, behavior_tree)
 	var action_id: String = str(bt_blackboard.get_value("current_action", behavior_tree))
+	print("[BT] NPC %s: got action_id=%s" % [npc_id, action_id])
+	var move_target: Variant = bt_blackboard.get_value("move_target", behavior_tree)
+	if move_target is Vector3 and move_target.length_squared() > 0.001:
+		if not (_use_steering and _steering_initialized and steering_agent != null):
+			_goal = move_target
+			_path.clear()
+			_path_index = 0
+	else:
+		move_target = Vector3.ZERO
+	print("[BT] NPC %s tick: action=%s, move_target=%s, time=%.1f" % [npc_id, action_id, str(move_target), _sim_time])
 	if not action_id.is_empty() and action_id != _last_action:
 		_last_action = action_id
+		print("[BT] NPC %s action changed: %s" % [npc_id, action_id])
 
 
 func _context() -> Dictionary:

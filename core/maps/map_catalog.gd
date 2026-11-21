@@ -52,6 +52,12 @@ func get_log() -> Array:
 func clear_log() -> void:
 	_log.clear()
 
+func get_available_maps() -> Array:
+	if _registry == null or not _registry.has_method("list"):
+		_record_error("MapCatalog: MapRegistry no disponible")
+		return []
+	return _registry.list()
+
 func filter(criteria: Dictionary) -> Array:
 	if _registry == null or not _registry.has_method("list"):
 		_record_error("MapCatalog: MapRegistry no disponible")

@@ -17,7 +17,7 @@ const V2_SCALE_MAX: float = 1.05
 const SKINS: Dictionary = {
 	"civil": "res://assets/models/characters/civil_casual_hoodie.gltf",
 	"soldier": "res://assets/models/characters/soldier_swat.gltf",
-	"enemy": "res://assets/models/characters/enemy_zombie_basic.gltf",
+	"humano": "res://assets/models/characters/v2/criminal_punk.gltf",
 	"robot": "res://assets/models/characters/robot_blocky.glb",
 }
 
@@ -25,8 +25,8 @@ const ALIASES: Dictionary = {
 	"civilian": "civil",
 	"soldado": "soldier",
 	"swat": "soldier",
-	"enemigo": "enemy",
-	"zombie": "enemy",
+	"enemigo": "humano",
+	"zombie": "humano",
 }
 
 const LOGICAL_ANIMS: Array = ["idle", "walk", "run", "aim", "shoot", "hit", "die"]
@@ -45,10 +45,10 @@ const ANIM_CANDIDATES: Dictionary = {
 	"melee": ["Punch_Right", "Punch", "punch", "Kick_Right", "Gun_Shoot"],
 	"hit_head": ["HitRecieve_2", "HitReact", "HitRecieve", "Hit", "hit", "Punch_Left", "Punch", "punch"],
 	"hit_limb": ["HitRecieve_2", "HitReact", "HitRecieve", "Hit", "hit", "Punch_Left", "Punch", "punch"],
-	"zombie_idle": ["Idle", "Idle_Attack", "idle", "Walk", "walk"],
-	"zombie_walk": ["Walk", "Run_Arms", "walk", "Run", "run"],
-	"zombie_run": ["Run_Arms", "Run", "Run_Attack", "run", "Walk"],
-	"zombie_attack": ["Punch", "Idle_Attack", "Run_Attack", "punch", "Gun_Shoot"],
+	"humano_idle": ["Idle", "Idle_Neutral", "Idle_Gun", "idle", "Walk", "walk"],
+	"humano_walk": ["Walk", "Walking", "Walk_Forward", "walk"],
+	"humano_run": ["Run", "Run_Shoot", "Run_Forward", "run", "Sprint"],
+	"humano_attack": ["Punch_Right", "Punch", "punch", "Gun_Shoot", "Idle_Gun_Shoot"],
 }
 
 const ANIM_BLEND: float = 0.16
@@ -146,7 +146,7 @@ var _step_side: int = 0
 var _recoil: float = 0.0
 var _stagger: float = 0.0
 var _crouch: float = 0.0
-var _zombie: bool = false
+var _humano: bool = false
 var _hit_lock: float = 0.0
 var _shoot_lock: float = 0.0
 var _death_pending: float = -1.0
@@ -285,7 +285,7 @@ func _ready() -> void:
 		return
 	if model_root == null:
 		load_model(skin_id)
-	_zombie = str(skin_id).to_lower().contains("zombie") or str(skin_id) == "enemy"
+	_humano = str(skin_id).to_lower().contains("humano") or str(skin_id) == "enemy"
 	_connect_host_signals()
 
 
@@ -378,6 +378,7 @@ func load_model(id: String, seed: int = -1) -> bool:
 	add_child(_visual)
 	model_root = instance as Node3D
 	_visual.add_child(model_root)
+	model_root.rotation.y = PI
 	skin_id = key
 	skeleton = _find_skeleton(_visual)
 	animation_player = _find_animation_player(_visual)
@@ -408,6 +409,7 @@ func load_v2(role: String, seed: int = 0) -> bool:
 	add_child(_visual)
 	model_root = instance as Node3D
 	_visual.add_child(model_root)
+	model_root.rotation.y = PI
 	skin_id = str(entry.get("id", role))
 	v2_entry = entry.duplicate()
 	skeleton = _find_skeleton(_visual)
@@ -488,12 +490,12 @@ func blend_value() -> float:
 	return clampf(_speed_scale, 0.0, 2.0)
 
 
-func set_zombie(enabled: bool) -> void:
-	_zombie = enabled
+func set_humano(enabled: bool) -> void:
+	_humano = enabled
 
 
-func is_zombie() -> bool:
-	return _zombie
+func is_humano() -> bool:
+	return _humano
 
 
 func set_look_target(point: Vector3) -> void:
@@ -534,12 +536,12 @@ func update_animation(delta: float, speed: float, p_aiming: bool = false, p_crou
 	var desired := "idle"
 	if moving:
 		desired = "run" if speed01 > 0.62 else "walk"
-	if _zombie:
+	if _humano:
 		if moving:
-			desired = "zombie_run" if speed01 > 0.55 else "zombie_walk"
+			desired = "humano_run" if speed01 > 0.55 else "humano_walk"
 		else:
-			desired = "zombie_idle"
-	if p_aiming and not _zombie:
+			desired = "humano_idle"
+	if p_aiming and not _humano:
 		desired = "aim"
 	if p_crouching and not moving:
 		desired = "crouch"
@@ -562,7 +564,7 @@ func update_animation(delta: float, speed: float, p_aiming: bool = false, p_crou
 	_crouch = lerpf(_crouch, 1.0 if (p_crouching or p_covering) else 0.0, clampf(delta * 9.0, 0.0, 1.0))
 	if moving:
 		var cadence := 1.0 if desired == "walk" else 1.65
-		if _zombie:
+		if _humano:
 			cadence = 0.8
 		_step_phase += delta * cadence * maxf(speed01, 0.25) / maxf(FOOTSTEP_STRIDE, 0.1)
 		if _step_phase >= 1.0:
@@ -812,29 +814,44 @@ func detach_limb(bone_name: String) -> Node3D:
 	if not _gore_enabled():
 		return null
 	var idx := _find_bone(bone_name)
-	if idx < 0 or skeleton == null:
+	if idx < 0 or skeleton == null or _visual == null:
 		return null
 	stop()
 	var root_name := String(skeleton.get_bone_name(idx))
 	for i in range(skeleton.get_bone_count()):
 		if i == idx or _is_bone_descendant(i, idx):
 			skeleton.set_bone_pose_scale(i, Vector3(0.001, 0.001, 0.001))
+
+	var slice_result = MeshSlicer.slice_skeletal_mesh_at_bone(skeleton, idx, _visual, _get_wound_material())
+
 	var center := skeleton.to_global(skeleton.get_bone_global_pose(idx).origin)
-	var length := _bone_length(idx)
 	var body := RigidBody3D.new()
 	body.name = "DetachedLimb_%s" % root_name.replace(".", "_")
 	body.mass = 1.25
+
 	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = Vector3(0.14, maxf(length, 0.18), 0.14)
-	shape.shape = box
+	var capsule := CapsuleShape3D.new()
+	var bone_len := _bone_length(idx)
+	capsule.radius = 0.08
+	capsule.height = maxf(bone_len, 0.18)
+	shape.shape = capsule
 	body.add_child(shape)
-	var visual := MeshInstance3D.new()
-	var fragment := BoxMesh.new()
-	fragment.size = box.size
-	visual.mesh = fragment
-	visual.material_override = _get_wound_material()
-	body.add_child(visual)
+
+	var detached_meshes = slice_result["detached_meshes"]
+	if detached_meshes.size() > 0:
+		for i in range(detached_meshes.size()):
+			var mesh_inst = detached_meshes[i]
+			mesh_inst.name = "DetachedMesh_%d" % i
+			body.add_child(mesh_inst)
+	else:
+		var visual := MeshInstance3D.new()
+		var fragment := CapsuleMesh.new()
+		fragment.radius = 0.08
+		fragment.height = maxf(bone_len, 0.18)
+		visual.mesh = fragment
+		visual.material_override = _get_wound_material()
+		body.add_child(visual)
+
 	var host := get_parent()
 	if host == null:
 		host = self
@@ -879,39 +896,29 @@ func get_stump_for_bone(bone_name: String) -> Node3D:
 
 
 func _dismember_limb(bone_name: String, bone_idx: int) -> void:
+	var slice_result = MeshSlicer.slice_skeletal_mesh_at_bone(skeleton, bone_idx, _visual, _get_wound_material())
+	
 	var limb := detach_limb(bone_name)
 	if limb == null:
 		return
-	_create_stump_with_cut_surface(bone_name, bone_idx)
+	
+	_create_stump_from_slice_result(slice_result["stump_meshes"], bone_name)
 	_limb_timers[bone_name] = Time.get_ticks_msec() + int(LIMB_LIFETIME * 1000)
 	_limb_damage.erase(bone_name)
 
 
-func _create_stump_with_cut_surface(bone_name: String, bone_idx: int) -> void:
-	if skeleton == null:
+func _create_stump_from_slice_result(stump_meshes: Array, bone_name: String) -> void:
+	if stump_meshes.is_empty():
 		return
-	var stump := MeshInstance3D.new()
-	stump.name = "Stump_%s" % bone_name.replace(".", "_")
-	
-	var bone_global_pos := skeleton.global_transform * skeleton.get_bone_global_pose(bone_idx).origin
-	var bone_global_rot := skeleton.global_transform.basis * skeleton.get_bone_global_pose(bone_idx).basis
-	
-	var length: float = _bone_length(bone_idx)
-	var radius: float = clampf(length * 0.15, 0.05, 0.12)
-	
-	var cylinder := CylinderMesh.new()
-	cylinder.top_radius = radius
-	cylinder.bottom_radius = radius
-	cylinder.height = 0.04
-	cylinder.radial_segments = 12
-	stump.mesh = cylinder
-	stump.material_override = _get_wound_material()
-	
-	add_child(stump)
-	stump.global_position = bone_global_pos + bone_global_rot.z * 0.02
-	stump.global_transform.basis = bone_global_rot
-	stump.set_meta("cut_surface", true)
-	_stumps[bone_name] = stump
+
+	for i in range(stump_meshes.size()):
+		var mesh_inst = stump_meshes[i]
+		mesh_inst.name = "StumpMesh_%s_%d" % [bone_name.replace(".", "_"), i]
+		mesh_inst.set_meta("cut_surface", true)
+		mesh_inst.set_meta("stump_bone", bone_name)
+		add_child(mesh_inst)
+
+	_stumps[bone_name] = stump_meshes[0] if stump_meshes.size() > 0 else null
 
 
 func _combine_meshes_for_slicing(meshes: Array, bone_idx: int) -> Mesh:

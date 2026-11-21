@@ -195,8 +195,8 @@ func _update_wrist_display() -> void:
 	if hs_label:
 		hs_label.text = "MEJOR: %d" % _save_high_score
 
-func add_kill(is_zombie: bool = false, is_boss: bool = false) -> void:
-	var base_points = is_zombie ? 150 : 100
+func add_kill(is_humano: bool = false, is_boss: bool = false) -> void:
+	var base_points = is_humano ? 150 : 100
 	if is_boss:
 		base_points = 500
 	

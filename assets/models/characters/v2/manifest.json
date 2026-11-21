@@ -21,11 +21,6 @@
     ],
     "office": [
       "office_suit"
-    ],
-    "zombie": [
-      "zombie_basic",
-      "zombie_chubby",
-      "zombie_ribcage"
     ]
   },
   "aliases": {
@@ -38,11 +33,7 @@
     "gangster": "criminal",
     "punk": "criminal",
     "office_worker": "office",
-    "worker": "office",
-    "zombie": "zombie",
-    "enemy": "zombie",
-    "enemigo": "zombie",
-    "undead": "zombie"
+    "worker": "office"
   },
   "models": {
     "civil_man_casual": {
@@ -628,183 +619,6 @@
         "license": "CC0-1.0",
         "license_file": "licenses/QUATERNIUS_CC0.txt"
       }
-    },
-    "zombie_basic": {
-      "id": "zombie_basic",
-      "role": "zombie",
-      "file": "res://assets/models/characters/v2/zombie_basic.gltf",
-      "description": "zombi basico",
-      "height": 1.75,
-      "source_height": 1.362,
-      "triangles": 7822,
-      "materials": 1,
-      "key_bones": {
-        "head": "Head",
-        "neck": "Neck",
-        "chest": "Torso",
-        "abdomen": "Abdomen",
-        "hips": "Hips",
-        "arm_l": "UpperArm.L",
-        "lowerarm_l": "LowerArm.L",
-        "arm_r": "UpperArm.R",
-        "lowerarm_r": "LowerArm.R",
-        "leg_l": "UpperLeg.L",
-        "lowerleg_l": "LowerLeg.L",
-        "foot_l": "Foot.L",
-        "leg_r": "UpperLeg.R",
-        "lowerleg_r": "LowerLeg.R",
-        "foot_r": "Foot.R"
-      },
-      "animations": [
-        "Crawl",
-        "Death",
-        "HitReact",
-        "Idle",
-        "Idle_Attack",
-        "Jump",
-        "Jump_Idle",
-        "Jump_Land",
-        "No",
-        "Punch",
-        "Run",
-        "Run_Arms",
-        "Run_Attack",
-        "Walk",
-        "Wave",
-        "Yes"
-      ],
-      "anim_map": {
-        "idle": "Idle",
-        "walk": "Walk",
-        "run": "Run",
-        "aim": "Idle_Attack",
-        "shoot": "Punch",
-        "hit": "HitReact",
-        "die": "Death"
-      },
-      "source": {
-        "pack": "Zombie Apocalypse Kit - March 2024",
-        "model": "Zombie_Basic.gltf",
-        "author": "Quaternius (Laulhet)",
-        "url": "https://github.com/agentkaerf/FreeModels",
-        "original_url": "https://quaternius.com/",
-        "license": "CC0-1.0",
-        "license_file": "licenses/QUATERNIUS_CC0.txt"
-      }
-    },
-    "zombie_chubby": {
-      "id": "zombie_chubby",
-      "role": "zombie",
-      "file": "res://assets/models/characters/v2/zombie_chubby.gltf",
-      "description": "zombi corpulento",
-      "height": 1.75,
-      "source_height": 1.64,
-      "triangles": 6174,
-      "materials": 1,
-      "key_bones": {
-        "head": "Head",
-        "neck": "Neck",
-        "chest": "Torso",
-        "abdomen": "Abdomen",
-        "hips": "Hips",
-        "arm_l": "UpperArm.L",
-        "lowerarm_l": "LowerArm.L",
-        "arm_r": "UpperArm.R",
-        "lowerarm_r": "LowerArm.R",
-        "leg_l": "UpperLeg.L",
-        "lowerleg_l": "LowerLeg.L",
-        "foot_l": "Foot.L",
-        "leg_r": "UpperLeg.R",
-        "lowerleg_r": "LowerLeg.R",
-        "foot_r": "Foot.R"
-      },
-      "animations": [
-        "Crawl",
-        "Death",
-        "HitReact",
-        "Idle",
-        "Idle_Attack",
-        "Jump",
-        "Jump_Idle",
-        "Jump_Land",
-        "No",
-        "Punch",
-        "Run",
-        "Run_Arms",
-        "Run_Attack",
-        "Walk",
-        "Wave",
-        "Yes"
-      ],
-      "anim_map": {
-        "idle": "Idle",
-        "walk": "Walk",
-        "run": "Run",
-        "aim": "Idle_Attack",
-        "shoot": "Punch",
-        "hit": "HitReact",
-        "die": "Death"
-      },
-      "source": {
-        "pack": "Zombie Apocalypse Kit - March 2024",
-        "model": "Zombie_Chubby.gltf",
-        "author": "Quaternius (Laulhet)",
-        "url": "https://github.com/agentkaerf/FreeModels",
-        "original_url": "https://quaternius.com/",
-        "license": "CC0-1.0",
-        "license_file": "licenses/QUATERNIUS_CC0.txt"
-      }
-    },
-    "zombie_ribcage": {
-      "id": "zombie_ribcage",
-      "role": "zombie",
-      "file": "res://assets/models/characters/v2/zombie_ribcage.gltf",
-      "description": "zombi sin brazos/costillas expuestas",
-      "height": 1.75,
-      "source_height": 1.063,
-      "triangles": 4774,
-      "materials": 1,
-      "key_bones": {
-        "chest": "Body",
-        "abdomen": "Abdomen",
-        "hips": "Hips",
-        "leg_l": "UpperLeg.L",
-        "lowerleg_l": "LowerLeg.L",
-        "foot_l": "Foot.L",
-        "leg_r": "UpperLeg.R",
-        "lowerleg_r": "LowerLeg.R",
-        "foot_r": "Foot.R"
-      },
-      "animations": [
-        "Crawl",
-        "Death",
-        "HitReact",
-        "Idle",
-        "Jump",
-        "Jump_Idle",
-        "Jump_Land",
-        "Run",
-        "Walk"
-      ],
-      "anim_map": {
-        "idle": "Idle",
-        "walk": "Walk",
-        "run": "Run",
-        "aim": "Idle",
-        "shoot": "Jump",
-        "hit": "HitReact",
-        "die": "Death"
-      },
-      "source": {
-        "pack": "Zombie Apocalypse Kit - March 2024",
-        "model": "Zombie_Ribcage.gltf",
-        "author": "Quaternius (Laulhet)",
-        "url": "https://github.com/agentkaerf/FreeModels",
-        "original_url": "https://quaternius.com/",
-        "license": "CC0-1.0",
-        "license_file": "licenses/QUATERNIUS_CC0.txt"
-      },
-      "notes": "Sin huesos de cabeza/brazos ni animacion de ataque; aim=Idle, shoot=Jump (embestida) como fallback documentado."
     }
   }
 }

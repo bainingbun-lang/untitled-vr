@@ -38,7 +38,7 @@ func check(tick: Variant) -> bool:
 	if controller == null:
 		return false
 	
-	var needs = controller.needs if controller.has_method("get") or controller.has("needs") else null
+	var needs = controller.needs
 	if needs == null:
 		return false
 	
@@ -46,7 +46,13 @@ func check(tick: Variant) -> bool:
 	if target == null or not is_instance_valid(target):
 		return false
 	
-	var target_health = float(target.get("health", 1.0))
+	var target_health: float = 1.0
+	if target is Dictionary:
+		target_health = float(target.get("health", 1.0))
+	elif target.has_method("get_health"):
+		target_health = float(target.call("get_health"))
+	elif target.has("health"):
+		target_health = float(target.health)
 	var own_health = float(needs.health)
 	
 	if own_health > target_health + health_advantage:

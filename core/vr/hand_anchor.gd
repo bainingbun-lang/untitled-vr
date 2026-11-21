@@ -9,11 +9,7 @@ const COLLISION_SHAPE_RADIUS: float = 0.05
 const SNAP_DISTANCE: float = 0.02
 
 @export var hand_name: String = "right"
-@export var anchor_mass: float = 0.1:
-	set(value):
-		anchor_mass = value
-		if is_inside_tree():
-			mass = float(anchor_mass)
+@export var anchor_mass: float = 0.1
 @export var follow_stiffness: float = 5000.0
 @export var follow_damping: float = 150.0
 @export var collision_layer_phys: int = 1

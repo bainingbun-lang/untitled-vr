@@ -44,17 +44,17 @@ func set_enabled(value: bool) -> void:
 func is_enabled() -> bool:
 	return enabled
 
-func _get_space_state() -> PhysicsDirectSpaceState3D:
+func _get_space_state(weapon_hand: Node) -> PhysicsDirectSpaceState3D:
 	if _space_state == null or not is_instance_valid(_space_state):
-		var world := get_world_3d()
+		var world: World3D = weapon_hand.get_world_3d()
 		_space_state = world.direct_space_state if world != null else null
 	return _space_state
 
-func step(delta: float, hand_pose: Transform3D, grip_pressed: bool, holsters, bag, weapon_hand) -> void:
+func step(delta: float, hand_pose: Transform3D, grip_pressed: bool, holsters, bag, weapon_hand: Node) -> void:
 	if not enabled:
 		return
 	
-	var space = _get_space_state()
+	var space = _get_space_state(weapon_hand)
 	if space == null:
 		return
 	
@@ -76,7 +76,7 @@ func step(delta: float, hand_pose: Transform3D, grip_pressed: bool, holsters, ba
 	if _target != null and grip_pressed:
 		_start_fly(hand_pose, weapon_hand)
 
-func _find_target(space: PhysicsDirectSpaceState3D, hand_pose: Transform3D, holsters, bag, weapon_hand) -> Node3D:
+func _find_target(space: PhysicsDirectSpaceState3D, hand_pose: Transform3D, holsters, bag, weapon_hand: Node) -> Node3D:
 	var hand_pos: Vector3 = hand_pose.origin
 	var hand_forward: Vector3 = -hand_pose.basis.z
 	
@@ -89,7 +89,7 @@ func _find_target(space: PhysicsDirectSpaceState3D, hand_pose: Transform3D, hols
 	var best_score: float = 1.0e9
 	
 	for group in ["weapon_pickup", "grabbable", "physics_props"]:
-		for node in get_tree().get_nodes_in_group(group):
+		for node in weapon_hand.get_tree().get_nodes_in_group(group):
 			if not (node is Node3D) or not is_instance_valid(node):
 				continue
 			if node == weapon_hand or (weapon_hand.holder != null and node == weapon_hand.holder):
@@ -195,7 +195,7 @@ func _finish_grab(weapon_hand) -> void:
 			weapon_hand._build_visual(weapon_id)
 			if weapon_hand.use_physical_grab:
 				weapon_hand.configure_handling()
-				var pose := Transform3D(weapon_hand._aim_basis(weapon_hand._pose(_hand)), weapon_hand._pose(_hand).origin)
+				var pose: Transform3D = Transform3D(weapon_hand._aim_basis(weapon_hand._pose(_hand)), weapon_hand._pose(_hand).origin)
 				weapon_hand.grab_weapon_from_pose(pose, 1.0, "grip")
 			target.free()
 			weapon_hand.weapon_taken.emit(weapon_id, _hand)
@@ -204,7 +204,7 @@ func _finish_grab(weapon_hand) -> void:
 			return
 	
 	if target.is_in_group("physics_props") or target.is_in_group("grabbable"):
-		var pose := weapon_hand._pose(_hand)
+		var pose: Transform3D = weapon_hand._pose(_hand)
 		if weapon_hand.grab_world_prop(target, weapon_hand.PROP_GRAB_RADIUS):
 			weapon_hand.pulse(_hand, 0.05, 0.4, 0.5)
 			grabbed.emit(target, _hand)

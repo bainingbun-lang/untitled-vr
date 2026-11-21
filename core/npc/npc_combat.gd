@@ -73,6 +73,7 @@ var last_result: Dictionary = {}
 var cover_points: Array = []
 var attack_points: Array = []
 var patrol_points: Array = []
+var flee_points: Array = []
 var last_threat_position: Vector3 = Vector3.ZERO
 var melee_range: float = 1.6
 
@@ -542,6 +543,7 @@ func _install_actions() -> void:
 		"score": Callable(self, "_score_flee"),
 		"available": Callable(self, "_available_flee"),
 		"state": "flee",
+		"movement": true,
 	})
 	behavior.register_action(ACTION_RELOAD, {
 		"score": Callable(self, "_score_reload"),

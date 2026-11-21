@@ -21,6 +21,7 @@ const LOD_PATH: String = "res://core/npc/npc_lod.gd"
 const GAME_MODE_PATH: String = "res://core/game/game_mode.gd"
 const MODE_SURVIVAL_PATH: String = "res://core/game/mode_survival.gd"
 const SPAWN_MENU_SCENE: String = "res://scenes/ui/spawn_menu.tscn"
+
 const CharacterModelScript = preload("res://core/game/character_model.gd")
 const VoiceSystemScript = preload("res://core/game/voice_system.gd")
 const GoreFxScript = preload("res://core/game/gore_fx.gd")
@@ -1025,10 +1026,10 @@ func _skin_for_role(role: String) -> String:
 			return "civil"
 		"defender", "police", "guard":
 			return "soldier"
-		"zombie", "zombi", "infectado":
-			return "enemy"
+		"hostile", "criminal", "zombie", "zombi", "infectado":
+			return "humano"
 		_:
-			return "enemy"
+			return "humano"
 
 
 func _role_skin_manifest() -> Dictionary:

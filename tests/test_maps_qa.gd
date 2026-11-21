@@ -5,6 +5,7 @@ const BuilderScript = preload("res://core/maps/map_world_builder.gd")
 const ValidatorScript = preload("res://core/maps/map_validator.gd")
 const MapCatalogScript = preload("res://core/maps/map_catalog.gd")
 const MapLoaderScript = preload("res://core/maps/map_loader.gd")
+const MapRegistryScript = preload("res://core/maps/map_registry.gd")
 
 var _checks := 0
 var _failures: Array = []
@@ -57,7 +58,11 @@ func _run() -> void:
 	_run_regression_suite()
 
 func _validate_catalog() -> void:
-	var catalog: MapCatalogScript = MapCatalogScript.new()
+	var registry = MapRegistryScript.new()
+	for theme in MAP_THEMES:
+		var meta = _make_test_map_meta(theme)
+		registry.register(meta)
+	var catalog: MapCatalogScript = MapCatalogScript.new(registry)
 	var maps: Array = catalog.get_available_maps()
 	_expect(maps.size() >= 3, "catalogo tiene al menos 3 mapas")
 	for theme in MAP_THEMES:
@@ -67,6 +72,16 @@ func _validate_catalog() -> void:
 				found = true
 				break
 		_expect(found, "catalogo contiene mapa: %s" % theme)
+
+func _make_test_map_meta(theme: String) -> Dictionary:
+	return {
+		"id": "test_map_" + theme,
+		"theme": theme,
+		"license": "MIT",
+		"has_collisions": true,
+		"has_navigation": true,
+		"spawn_points": [Vector3(0, 0, 0)],
+	}
 
 func _test_theme(theme: String, seed: int) -> void:
 	var meta: Dictionary = ThemesScript.generate(seed, {

@@ -56,12 +56,12 @@ func get_behavior_at(index: int) -> Dictionary:
 	return {}
 
 
-func _calculate_steering(blended_accel: TargetAcceleration) -> void:
+func _calculate_steering(blended_accel: TargetAcceleration, delta: float = 0.0) -> void:
 	blended_accel.set_zero()
 
 	for i in range(_behaviors.size()):
 		var bw: Dictionary = _behaviors[i]
-		bw.behavior.calculate_steering(_accel)
+		bw.behavior._calculate_steering(_accel)
 
 		blended_accel.add_scaled_accel(_accel, bw.weight)
 

@@ -79,11 +79,11 @@ func _test_animation_states() -> void:
 	model.update_animation(0.016, 0.0, false, false, true)
 	_expect_eq(model.state(), "cover")
 
-	model.set_zombie(true)
+	model.set_humano(true)
 	model.update_animation(0.016, 3.0)
-	_expect(String(model.state()).begins_with("zombie"))
-	_expect_eq(str(model.animation_for("zombie_run")), "Run")
-	model.set_zombie(false)
+	_expect(String(model.state()).begins_with("humano"))
+	_expect_eq(str(model.animation_for("humano_run")), "Run")
+	model.set_humano(false)
 
 	model.set_look_target(Vector3(50.0, 0.0, 0.0))
 	for i in range(20):

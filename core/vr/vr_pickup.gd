@@ -105,7 +105,15 @@ func _use_item(hand: Variant) -> void:
 		"position": global_position,
 		"velocity": linear_velocity,
 	}
+	print("[DEBUG VrPickup] _use_item called, emitting pickup_used with data:", data)
+	var connections = pickup_used.get_connections()
+	print("[DEBUG VrPickup] signal connections:", connections)
+	for conn in connections:
+		print("[DEBUG VrPickup] calling callable manually:", conn.callable)
+		conn.callable.call(data)
+	print("[DEBUG VrPickup] after manual calls")
 	pickup_used.emit(data)
+	print("[DEBUG VrPickup] after emit")
 	
 	if consume_on_use:
 		current_stack -= 1
