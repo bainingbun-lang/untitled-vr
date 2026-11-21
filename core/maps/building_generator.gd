@@ -404,7 +404,7 @@ static func build(parent: Node3D, spec: Dictionary) -> Dictionary:
 			)
 			multimesh.set_instance_transform(i, transform)
 		visual.multimesh = multimesh
-		visual.material_override = WorldMaterialsScript.surface_material(str(surface))
+		visual.material_override = WorldMaterialsScript.surface_material(str(surface), WorldMaterialsScript.is_mobile())
 		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		root.add_child(visual)
 		visual_count += 1
@@ -434,7 +434,7 @@ static func build(parent: Node3D, spec: Dictionary) -> Dictionary:
 		if str(surface) == "glass":
 			visual.material_override = _glass_material()
 		else:
-			visual.material_override = WorldMaterialsScript.surface_material(str(surface))
+			visual.material_override = WorldMaterialsScript.surface_material(str(surface), WorldMaterialsScript.is_mobile())
 		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		root.add_child(visual)
 		visual_count += 1
@@ -761,8 +761,14 @@ static func _failure(errors: Array) -> Dictionary:
 	}
 
 
+static var _glass_cache: StandardMaterial3D = null
+
+
 static func _glass_material() -> StandardMaterial3D:
+	if _glass_cache != null:
+		return _glass_cache
 	var material := StandardMaterial3D.new()
+	_glass_cache = material
 	material.transparency = StandardMaterial3D.TRANSPARENCY_ALPHA
 	material.albedo_color = Color(0.2, 0.3, 0.5, 0.3)
 	material.roughness = 0.05

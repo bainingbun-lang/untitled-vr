@@ -812,7 +812,7 @@ static func _build_environment(root: Node3D, time_of_day: String, theme: String)
 	sun.light_color = sun_color
 	sun.light_energy = sun_energy
 	sun.rotation_degrees = sun_rotation
-	sun.shadow_enabled = true
+	sun.shadow_enabled = not mobile
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 	sun.directional_shadow_max_distance = 45.0
 	sun.shadow_bias = 0.035
