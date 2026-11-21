@@ -666,8 +666,8 @@ static func build(world: Node3D, available: bool) -> Node3D:
 		rig.name = "Player"
 		rig.auto_process = false
 		rig.xr_availability_override = func() -> bool: return true
-		world.add_child(rig)
-		if bool(rig.call("is_active")):
+		if rig.build():
+			world.add_child(rig)
 			return rig
 		rig.queue_free()
 	return _build_player(world)

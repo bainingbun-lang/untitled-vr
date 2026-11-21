@@ -128,19 +128,28 @@ func _test_hostile_mode_attacks() -> void:
 		await process_frame
 		return
 
-	var provocation_target = hostile_npcs[0].global_position
-	for i in range(60):
+	var player_target = harness.rig.xr_camera if harness.rig != null and harness.rig.xr_camera != null else null
+	if player_target == null:
+		harness.cleanup()
+		await process_frame
+		return
+
+	var provocation_target = player_target.global_position
+	for npc in hostile_npcs:
+		if npc == null or not is_instance_valid(npc):
+			continue
+		npc.set_target(player_target)
+
+	for i in range(120):
 		await physics_frame
 		if i == 10:
 			for npc in hostile_npcs:
 				if npc == null or not is_instance_valid(npc):
 					continue
-				if npc.has_method("get_combat"):
-					var combat = npc.get_combat()
-					if combat != null:
-						combat.note_gunshot_impact("player", provocation_target)
-				if npc.has_method("get_behavior"):
-					var behavior = npc.get_behavior()
+				var combat = npc.combat
+				if combat != null:
+					combat.note_gunshot_impact("player", provocation_target)
+					var behavior = combat.behavior
 					if behavior != null:
 						behavior.note_aggression("player")
 		harness.step(2)

@@ -2,11 +2,11 @@ class_name WeaponParts
 extends RefCounted
 
 const REQUIRED_ROLES := {
-	"pistol": ["slide", "magazine", "hammer", "trigger"],
-	"submachine_gun": ["bolt", "magazine", "charging_handle"],
-	"assault_rifle": ["bolt", "magazine", "charging_handle"],
-	"shotgun": ["pump", "bolt", "magazine"],
-	"sniper_rifle": ["bolt", "magazine", "charging_handle"],
+	"pistol": ["slide", "magazine", "hammer", "trigger", "ammo_counter"],
+	"submachine_gun": ["bolt", "magazine", "charging_handle", "ammo_counter"],
+	"assault_rifle": ["bolt", "magazine", "charging_handle", "ammo_counter"],
+	"shotgun": ["pump", "bolt", "magazine", "ammo_counter"],
+	"sniper_rifle": ["bolt", "magazine", "charging_handle", "ammo_counter"],
 	"bat": ["body"],
 }
 
@@ -32,6 +32,7 @@ const ROLE_NAMES := {
 	"charging_handle": "palanca de montaje",
 	"hammer": "martillo",
 	"trigger": "gatillo",
+	"ammo_counter": "contador_municion",
 }
 
 
@@ -367,8 +368,8 @@ static func _role_for(point: Vector3, bounds: AABB, id: String, clean_islands: b
 		if x > 0.30 and x < 0.66 and y > 0.62:
 			return "bolt"
 		return "body"
-	if y < 0.42 and x > 0.18 and x < 0.68:
-		return "magazine"
+if y < 0.42 and x > 0.18 and x < 0.68:
+			return "magazine"
 	if x > 0.40 and x < 0.58 and y > 0.72:
 		return "charging_handle"
 	if x > 0.26 and x < 0.74 and y > 0.55:
@@ -377,6 +378,8 @@ static func _role_for(point: Vector3, bounds: AABB, id: String, clean_islands: b
 		return "hammer"
 	if x > 0.30 and x < 0.58 and y > 0.18 and y < 0.46:
 		return "trigger"
+	if y > 0.55 and x > 0.10 and x < 0.35:
+		return "ammo_counter"
 	return "body"
 
 
@@ -420,6 +423,7 @@ static func _role_x(role: String) -> float:
 		"trigger": return 0.42
 		"bolt": return 0.52
 		"pump": return 0.70
+		"ammo_counter": return 0.22
 		_: return 0.50
 
 
@@ -431,6 +435,7 @@ static func _role_y(role: String) -> float:
 		"charging_handle": return 0.82
 		"hammer": return 0.66
 		"trigger": return 0.34
+		"ammo_counter": return 0.60
 		_: return 0.50
 
 
@@ -442,6 +447,7 @@ static func _role_sx(role: String) -> float:
 		"charging_handle": return 0.05
 		"hammer": return 0.05
 		"trigger": return 0.04
+		"ammo_counter": return 0.10
 		_: return 0.5
 
 
@@ -453,6 +459,7 @@ static func _role_sy(role: String) -> float:
 		"charging_handle": return 0.06
 		"hammer": return 0.10
 		"trigger": return 0.12
+		"ammo_counter": return 0.08
 		_: return 0.5
 
 
@@ -464,6 +471,7 @@ static func _role_sz(role: String) -> float:
 		"charging_handle": return 0.15
 		"hammer": return 0.15
 		"trigger": return 0.12
+		"ammo_counter": return 0.05
 		_: return 0.5
 
 

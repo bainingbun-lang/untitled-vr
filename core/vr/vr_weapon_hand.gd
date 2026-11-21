@@ -145,6 +145,8 @@ func bind_weapon_system(node: Node) -> void:
 		node.connect("impact", Callable(self, "on_impact"))
 	if node != null and node.has_signal("cycled") and not node.is_connected("cycled", Callable(self, "_on_cycled")):
 		node.connect("cycled", Callable(self, "_on_cycled"))
+	if node != null and node.has_signal("ammo_changed") and not node.is_connected("ammo_changed", Callable(self, "_on_ammo_changed")):
+		node.connect("ammo_changed", Callable(self, "_on_ammo_changed"))
 
 
 func configure_handling(head_pose: Transform3D = Transform3D.IDENTITY) -> void:
@@ -213,6 +215,11 @@ func bind_reload_system(system) -> void:
 func _on_cycled(id: String) -> void:
 	if id == weapon_id:
 		pulse(other_hand(), 0.06, 0.6, 0.6)
+
+
+func _on_ammo_changed(id: String, loaded: int, reserve: int) -> void:
+	if id == weapon_id and viewmodel != null and is_instance_valid(viewmodel) and viewmodel.has_method("update_ammo"):
+		viewmodel.call("update_ammo", loaded, reserve)
 
 
 func _ensure_reload_system() -> bool:

@@ -54,6 +54,11 @@ func configure(p_holsters, p_weapon_system: Node, weapon_ids: Array, p_dominant:
 	weapon_system = p_weapon_system
 	dominant = p_dominant
 	weapon_rows = weapon_ids.duplicate()
+	if holsters.has_method("set_eye_height"):
+		var cal := preload("res://core/vr/vr_calibration.gd").new()
+		cal.load_profile()
+		if cal.profile.has("eye_height"):
+			holsters.set_eye_height(float(cal.profile["eye_height"]))
 	_build_slots()
 	_build_wrist_menu()
 	_build_tutorial()
@@ -120,11 +125,12 @@ func _build_slots() -> void:
 				anchor.add_child(mag)
 		else:
 			var model = ViewmodelScript.new()
-			model.set_process(false)
 			anchor.add_child(model)
 			model.call("set_weapon", weapon)
 			model.call("attach_to", anchor)
-			model.transform = Transform3D(Basis(Vector3.RIGHT, deg_to_rad(float(spec["tilt"]))), Vector3.ZERO)
+			model.set_process(false)
+			if model.is_instance_valid(model.get_node_or_null("Motion/Rig")):
+				model.get_node("Motion/Rig").rotation_degrees = Vector3(float(spec["tilt"]), 0.0, 0.0)
 		slot_nodes[slot] = anchor
 		var halo := MeshInstance3D.new()
 		halo.name = "Glow_" + str(slot)

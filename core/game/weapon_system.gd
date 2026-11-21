@@ -7,6 +7,7 @@ signal reload_finished(weapon_id: String)
 signal reload_cancelled(weapon_id: String)
 signal impact(info: Dictionary)
 signal cycled(weapon_id: String)
+signal ammo_changed(weapon_id: String, loaded: int, reserve: int)
 
 const DbScript = preload("res://core/game/weapon_db.gd")
 const GoreFxScript = preload("res://core/game/gore_fx.gd")
@@ -96,6 +97,7 @@ func set_ammo(weapon_id: String, loaded: int, reserve: int = -1) -> bool:
 		_reserves[weapon_id] = reserve
 	_reload_ready.erase(weapon_id)
 	_reload_total.erase(weapon_id)
+	ammo_changed.emit(weapon_id, int(_magazines[weapon_id]), int(_reserves.get(weapon_id, 0)))
 	return true
 
 
@@ -146,6 +148,7 @@ func set_manual_lock(weapon_id: String, reason: String = "recargando") -> void:
 func set_loaded_raw(weapon_id: String, loaded: int, reserve: int) -> void:
 	_magazines[weapon_id] = maxi(loaded, 0)
 	_reserves[weapon_id] = maxi(reserve, 0)
+	ammo_changed.emit(weapon_id, int(_magazines[weapon_id]), int(_reserves[weapon_id]))
 
 
 func reload_progress(weapon_id: String) -> float:
@@ -309,6 +312,7 @@ func fire(weapon_id: String, origin: Vector3, direction: Vector3, space: Physics
 	_next_allowed[weapon_id] = _time + fire_interval(weapon_id)
 	if bool(def.get("uses_ammo", true)):
 		_magazines[weapon_id] = maxi(int(_magazines.get(weapon_id, 0)) - 1, 0)
+		ammo_changed.emit(weapon_id, int(_magazines[weapon_id]), int(_reserves.get(weapon_id, 0)))
 	result["fired"] = true
 	if manual_cycle and int(_magazines.get(weapon_id, 0)) > 0:
 		var tags: Array = def.get("tags", [])
@@ -370,6 +374,7 @@ func _resolve_reloads() -> void:
 			"reserve": int(_reserves[weapon_id]), "duration": duration,
 		})
 		reload_finished.emit(weapon_id)
+		ammo_changed.emit(weapon_id, int(_magazines[weapon_id]), int(_reserves[weapon_id]))
 
 
 func _record(message: String) -> void:

@@ -221,6 +221,9 @@ func update_frustum() -> void:
 		frustum_planes = culling_camera.get_frustum()
 	else:
 		frustum_planes = []
+	
+	# Pre-compute plane distances for faster culling checks
+	# We'll store plane normal and distance for quick dot product checks
 
 
 func is_visible(aabb: AABB) -> bool:
@@ -230,6 +233,36 @@ func is_visible(aabb: AABB) -> bool:
 		if plane.distance_to(aabb.position) + plane.normal.dot(aabb.size.abs()) < 0.0:
 			return false
 	return true
+
+
+func is_visible_fast(min_pos: Vector3, max_pos: Vector3) -> bool:
+	if frustum_planes.is_empty():
+		return true
+	var center: Vector3 = (min_pos + max_pos) * 0.5
+	var half_size: Vector3 = (max_pos - min_pos).abs() * 0.5
+	for plane in frustum_planes:
+		if plane.distance_to(center) + plane.normal.dot(half_size) < 0.0:
+			return false
+	return true
+
+
+func cull_multi_mesh_instances(node: MultiMeshInstance3D, camera_pos: Vector3) -> int:
+	var multimesh: MultiMesh = node.multimesh
+	if multimesh == null:
+		return 0
+	var cull_dist: float = node.get_meta("cull_distance", get_culling_distance())
+	var cull_aabb: AABB = node.get_meta("cull_aabb", AABB())
+	
+	if not is_visible_fast(cull_aabb.position, cull_aabb.end):
+		node.visible_instance_count = 0
+		return 0
+	
+	var dist_sq: float = camera_pos.distance_squared_to(cull_aabb.get_center())
+	if dist_sq > cull_dist * cull_dist:
+		node.visible_instance_count = 0
+		return 0
+	
+	return multimesh.instance_count
 
 
 func is_visible_sphere(position: Vector3, radius: float) -> bool:
@@ -312,3 +345,16 @@ func apply_profile_to_scene(root: Node3D) -> void:
 	var lod_bias := get_lod_bias()
 	
 	_apply_profile_recursive(root, cull_dist)
+
+func update_visibility_per_frame(root: Node3D, camera_pos: Vector3) -> int:
+	var visible_count: int = 0
+	var stack: Array = [root]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		if node is MultiMeshInstance3D:
+			var count: int = cull_multi_mesh_instances(node, camera_pos)
+			visible_count += count
+		for child in node.get_children():
+			if child is Node3D:
+				stack.append(child)
+	return visible_count

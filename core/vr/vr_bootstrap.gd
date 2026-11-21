@@ -9,6 +9,7 @@ signal lifecycle(event: String)
 
 const SELF_PATH := "res://core/vr/vr_bootstrap.gd"
 const PERFORMANCE_PATH := "res://core/vr/vr_performance.gd"
+const ACTION_MAP_PATH := "res://openxr_action_map.tres"
 const MAX_FOVEATION := 3
 
 static var active = null
@@ -22,6 +23,7 @@ var target_refresh_hz: float = 72.0
 var foveation: int = 1
 var paused_by_xr: bool = false
 var focused: bool = false
+var _ever_focused: bool = false
 
 
 static func boot(p_viewport: Viewport, p_tree: SceneTree = null) -> Dictionary:
@@ -62,6 +64,7 @@ func start(p_viewport: Viewport, p_iface: Object = null, p_tree: SceneTree = nul
 		XRServer.primary_interface = iface as XRInterface
 		# El runtime OpenXR marca el ritmo; vsync propio añade latencia.
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	_setup_action_map()
 	viewport.use_xr = true
 	_load_performance()
 	_apply_foveation()
@@ -116,6 +119,18 @@ func _apply_refresh() -> bool:
 	return true
 
 
+func _setup_action_map() -> void:
+	if not ResourceLoader.exists(ACTION_MAP_PATH):
+		return
+	var action_map = load(ACTION_MAP_PATH) as OpenXRActionMap
+	if action_map != null and iface.has_method("set_action_map"):
+		iface.call("set_action_map", action_map)
+		if iface.has_method("get_action_set"):
+			var action_set = iface.call("get_action_set", "godot")
+			if action_set != null and action_set.has_method("activate"):
+				action_set.call("activate")
+
+
 func _connect_lifecycle() -> void:
 	for name in ["session_begun", "session_visible", "session_focussed", "session_stopping",
 			"session_loss_pending", "pose_recentered", "user_presence_changed"]:
@@ -129,14 +144,17 @@ func _on_session_begun() -> void:
 
 
 # Visible sin foco = menu del sistema / Guardian: el juego no recibe input.
+# No pausar en el "visible" inicial (Guardian al arrancar), solo si ya tuvimos foco antes.
 func _on_session_visible() -> void:
 	focused = false
-	pause_game()
+	if _ever_focused:
+		pause_game()
 	lifecycle.emit("visible")
 
 
 func _on_session_focussed() -> void:
 	focused = true
+	_ever_focused = true
 	resume_game()
 	lifecycle.emit("focused")
 
@@ -207,3 +225,4 @@ func shutdown() -> void:
 	viewport = null
 	paused_by_xr = false
 	focused = false
+	_ever_focused = false

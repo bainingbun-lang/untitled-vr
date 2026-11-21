@@ -13,6 +13,7 @@ const MuzzleFxScript = preload("res://core/game/muzzle_fx.gd")
 const WeaponPartsScript = preload("res://core/game/weapon_parts.gd")
 const HandsViewmodelScript = preload("res://core/game/hands_viewmodel.gd")
 const RecordedSfx = preload("res://core/game/recorded_sfx.gd")
+const WeaponDbScript = preload("res://core/game/weapon_db.gd")
 
 const MODEL_DIR := "res://assets/models/weapons/"
 
@@ -169,6 +170,13 @@ var _reload_phase: String = ""
 var _reload_t: float = 0.0
 var _reload_phases: Array = []
 var _mag_dropped: bool = false
+
+var _ammo_counter: Node3D = null
+var _ammo_counter_material: Material = null
+var _ammo_counter_meshes: Array = []
+var _last_ammo: int = -1
+var _last_reserve: int = -1
+var _ammo_font_size: float = 0.025
 
 
 func _ready() -> void:
@@ -451,6 +459,9 @@ func _swap_model(id: String) -> void:
 	if _fx != null:
 		_fx.position = cfg.get("muzzle", Vector3.ZERO)
 	_parts = WeaponPartsScript.build(node, id)
+	_build_ammo_counter(node, id)
+	if is_instance_valid(_model_holder):
+		_model_holder.visible = true
 
 
 func _compute_aabb(root: Node3D) -> AABB:
@@ -480,6 +491,61 @@ func _estimate_node_scale(root: Node3D) -> float:
 			continue
 		max_scale = maxf(max_scale, mi.mesh.get_aabb().size.length() * mi.scale.length())
 	return max_scale
+
+
+func _build_ammo_counter(root: Node3D, id: String) -> void:
+	_ammo_counter_meshes.clear()
+	_last_ammo = -1
+	_last_reserve = -1
+	if _parts == null or not _parts.has_role("ammo_counter"):
+		return
+	var counter_node: Node3D = _parts.node("ammo_counter")
+	if counter_node == null or not is_instance_valid(counter_node):
+		return
+	_ammo_counter = counter_node
+	var visual: MeshInstance3D = counter_node.find_children("*", "MeshInstance3D", true, false)
+	if visual.size() == 0:
+		return
+	var mi: MeshInstance3D = visual[0]
+	if mi.mesh == null:
+		return
+	_ammo_counter_material = StandardMaterial3D.new()
+	_ammo_counter_material.albedo_color = Color(0.1, 0.1, 0.1)
+	_ammo_counter_material.emission_enabled = true
+	_ammo_counter_material.emission = Color(0.0, 1.0, 0.0)
+	_ammo_counter_material.emission_energy_multiplier = 2.0
+	_ammo_counter_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_ammo_counter_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_ammo_counter_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+	mi.material_override = _ammo_counter_material
+	for surface in range(mi.mesh.get_surface_count()):
+		_ammo_counter_meshes.append({"mesh": mi, "surface": surface})
+
+
+func update_ammo(loaded: int, reserve: int) -> void:
+	if _ammo_counter_meshes.is_empty() or _ammo_counter_material == null:
+		return
+	if loaded == _last_ammo and reserve == _last_reserve:
+		return
+	_last_ammo = loaded
+	_last_reserve = reserve
+	var def: Dictionary = WeaponDbScript.get_def(_current_id)
+	var mag_size: int = maxi(int(def.get("mag", 0)), 0)
+	var uses_ammo: bool = bool(def.get("uses_ammo", true))
+	if not uses_ammo or mag_size <= 0:
+		_ammo_counter_material.emission = Color(0.0, 1.0, 0.0)
+		_ammo_counter_material.emission_energy_multiplier = 1.0
+		return
+	var ratio: float = clampf(float(loaded) / float(mag_size), 0.0, 1.0)
+	if ratio > 0.5:
+		_ammo_counter_material.emission = Color(0.0, 1.0, 0.0)
+		_ammo_counter_material.emission_energy_multiplier = 1.0 + ratio
+	elif ratio > 0.25:
+		_ammo_counter_material.emission = Color(1.0, 0.8, 0.0)
+		_ammo_counter_material.emission_energy_multiplier = 1.5
+	else:
+		_ammo_counter_material.emission = Color(1.0, 0.2, 0.0)
+		_ammo_counter_material.emission_energy_multiplier = 2.0
 
 
 func _step_recoil(delta: float) -> void:

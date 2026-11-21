@@ -22,6 +22,7 @@ const BEHAVIOR_PATH: String = "res://core/npc/npc_behavior.gd"
 const STEERING_AGENT_PATH: String = "res://core/npc/steering/steering_agent.gd"
 const STEERING_BEHAVIOR_PATH: String = "res://core/npc/steering/steering_behavior.gd"
 const ARRIVE_PATH: String = "res://core/npc/steering/behaviors/arrive.gd"
+const FLEE_PATH: String = "res://core/npc/steering/behaviors/flee.gd"
 const FACE_PATH: String = "res://core/npc/steering/behaviors/face.gd"
 const SEPARATION_PATH: String = "res://core/npc/steering/behaviors/separation.gd"
 const AVOID_COLLISIONS_PATH: String = "res://core/npc/steering/behaviors/avoid_collisions.gd"
@@ -186,6 +187,7 @@ var controller = null
 var behavior_tree = null
 var bt_blackboard = null
 var _steering_arrive_target = null
+var _steering_flee_target = null
 var _steering_initialized: bool = false
 var _behavior_tree_initialized: bool = false
 var _use_steering: bool = true
@@ -717,10 +719,11 @@ func _apply_pending_options() -> void:
 func _initialize_steering() -> void:
 	if _steering_initialized or not _use_steering:
 		return
-	if not ResourceLoader.exists(STEERING_AGENT_PATH) or not ResourceLoader.exists(ARRIVE_PATH) or not ResourceLoader.exists(FACE_PATH) or not ResourceLoader.exists(SEPARATION_PATH) or not ResourceLoader.exists(AVOID_COLLISIONS_PATH) or not ResourceLoader.exists(RADIUS_PROXIMITY_PATH) or not ResourceLoader.exists(PRIORITY_PATH) or not ResourceLoader.exists(MATCH_ORIENTATION_PATH) or not ResourceLoader.exists(TARGET_ACCELERATION_PATH) or not ResourceLoader.exists("res://core/npc/steering/agent_location.gd"):
+	if not ResourceLoader.exists(STEERING_AGENT_PATH) or not ResourceLoader.exists(ARRIVE_PATH) or not ResourceLoader.exists(FLEE_PATH) or not ResourceLoader.exists(FACE_PATH) or not ResourceLoader.exists(SEPARATION_PATH) or not ResourceLoader.exists(AVOID_COLLISIONS_PATH) or not ResourceLoader.exists(RADIUS_PROXIMITY_PATH) or not ResourceLoader.exists(PRIORITY_PATH) or not ResourceLoader.exists(MATCH_ORIENTATION_PATH) or not ResourceLoader.exists(TARGET_ACCELERATION_PATH) or not ResourceLoader.exists("res://core/npc/steering/agent_location.gd"):
 		return
 	var SteeringAgent = load(STEERING_AGENT_PATH) as Script
 	var Arrive = load(ARRIVE_PATH) as Script
+	var Flee = load(FLEE_PATH) as Script
 	var Face = load(FACE_PATH) as Script
 	var Separation = load(SEPARATION_PATH) as Script
 	var AvoidCollisions = load(AVOID_COLLISIONS_PATH) as Script
@@ -729,7 +732,7 @@ func _initialize_steering() -> void:
 	var MatchOrientation = load(MATCH_ORIENTATION_PATH) as Script
 	var TargetAcceleration = load(TARGET_ACCELERATION_PATH) as Script
 	var SteeringAgentLocation = load("res://core/npc/steering/agent_location.gd") as Script
-	if SteeringAgent == null or Arrive == null or Face == null or Separation == null or AvoidCollisions == null or RadiusProximity == null or Priority == null or MatchOrientation == null or TargetAcceleration == null or SteeringAgentLocation == null:
+	if SteeringAgent == null or Arrive == null or Flee == null or Face == null or Separation == null or AvoidCollisions == null or RadiusProximity == null or Priority == null or MatchOrientation == null or TargetAcceleration == null or SteeringAgentLocation == null:
 		return
 	steering_agent = SteeringAgent.new()
 	steering_agent.linear_speed_max = run_speed
@@ -745,6 +748,10 @@ func _initialize_steering() -> void:
 	var arrive_behavior = Arrive.new(steering_agent, arrive_target)
 	arrive_behavior.arrival_tolerance = 0.5
 	arrive_behavior.deceleration_radius = 3.0
+	var flee_target = SteeringAgentLocation.new()
+	flee_target.position = global_position
+	flee_target.orientation = rotation.y
+	var flee_behavior = Flee.new(steering_agent, flee_target)
 	var face_behavior = Face.new(steering_agent, steering_agent, false)
 	var match_orientation_behavior = MatchOrientation.new(steering_agent, steering_agent)
 	match_orientation_behavior.alignment_tolerance = 0.05
@@ -759,10 +766,12 @@ func _initialize_steering() -> void:
 	priority_behavior.add(avoid_collisions_behavior)
 	priority_behavior.add(separation_behavior)
 	priority_behavior.add(arrive_behavior)
+	priority_behavior.add(flee_behavior)
 	priority_behavior.add(face_behavior)
 	priority_behavior.add(match_orientation_behavior)
 	steering_behavior = priority_behavior
 	_steering_arrive_target = arrive_target
+	_steering_flee_target = flee_target
 	_steering_initialized = true
 
 
@@ -1590,8 +1599,12 @@ func _update_steering(delta: float) -> void:
 	steering_agent.position = global_position
 	steering_agent.orientation = rotation.y
 	steering_agent.linear_velocity = velocity
-	if _steering_arrive_target != null:
+	var current_action: String = ""
+	if combat != null:
+		current_action = str(combat.call("action"))
+	if _steering_arrive_target != null and _steering_flee_target != null:
 		var destination: Vector3 = Vector3.ZERO
+		var is_fleeing: bool = (current_action == "flee")
 		if bt_blackboard != null:
 			var bt_target = bt_blackboard.get_value("move_target", behavior_tree)
 			if bt_target is Vector3 and bt_target.length_squared() > 0.001:
@@ -1605,7 +1618,21 @@ func _update_steering(delta: float) -> void:
 			var angle: float = _rng.randf_range(0.0, TAU)
 			var radius: float = _rng.randf_range(5.0, 15.0)
 			destination = home_pos + Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
-		_steering_arrive_target.position = destination
+		if is_fleeing:
+			var threat_pos: Vector3 = _threat_position
+			if bt_blackboard != null:
+				var bt_threat = bt_blackboard.get_value("threat_position", behavior_tree)
+				if bt_threat is Vector3 and bt_threat.length_squared() > 0.001:
+					threat_pos = bt_threat
+			if threat_pos.length_squared() > 0.001:
+				_steering_flee_target.position = threat_pos
+				_steering_arrive_target.position = global_position
+			else:
+				_steering_flee_target.position = global_position
+				_steering_arrive_target.position = destination
+		else:
+			_steering_arrive_target.position = destination
+			_steering_flee_target.position = global_position
 	if steering_behavior is Priority:
 		var priority: Priority = steering_behavior
 		for i in range(priority._behaviors.size()):
@@ -2172,6 +2199,9 @@ func notice_weapon(position: Vector3) -> void:
 		return
 	if global_position.distance_to(position) <= vision_range:
 		_remember_threat(position, "weapon", 3.5)
+		if bt_blackboard != null and behavior_tree != null:
+			bt_blackboard.set_value("threat_position", position, behavior_tree)
+			bt_blackboard.set_value("under_attack", true, behavior_tree)
 
 
 func _initial_affinity() -> float:

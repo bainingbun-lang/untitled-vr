@@ -15,6 +15,7 @@ const VrWeaponHandScript = preload("res://core/vr/vr_weapon_hand.gd")
 const VrClimbScript = preload("res://core/vr/vr_climb.gd")
 const DbScript = preload("res://core/game/weapon_db.gd")
 const VrComfortScript = preload("res://core/vr/vr_comfort.gd")
+const VrInputScript = load("res://core/vr/vr_input.gd")
 
 @export var move_speed: float = 2.2
 @export var turn_mode: String = "smooth"
@@ -55,6 +56,7 @@ var right_hand = null
 var bag = null
 var weapon_system: Node = null
 var input_provider = null
+var vr_input = null
 
 var health: float = 100.0
 var max_health: float = 100.0
@@ -120,6 +122,12 @@ func build() -> bool:
 	right_hand = _make_hand("right")
 	add_child(left_hand)
 	add_child(right_hand)
+
+	vr_input = VrInputScript.new(self)
+	var initialized = vr_input.initialize(xr_interface)
+	set_input_provider(vr_input)
+	if not initialized:
+		vr_input.set_simulated(true)
 
 	if climb_enabled:
 		_climb = VrClimbScript.new()
@@ -229,6 +237,9 @@ func _call_provider(method: String, args: Array, fallback):
 
 
 func get_pose(hand_name: String) -> Transform3D:
+	var provider = _provider()
+	if provider != null and provider.has_method("get_pose"):
+		return provider.get_pose(hand_name)
 	var controller = controller_for(hand_name)
 	if controller == null:
 		return Transform3D.IDENTITY
@@ -236,6 +247,9 @@ func get_pose(hand_name: String) -> Transform3D:
 
 
 func is_grip_pressed(hand_name: String) -> bool:
+	var provider = _provider()
+	if provider != null and provider.has_method("is_grip_pressed"):
+		return provider.is_grip_pressed(hand_name)
 	var controller = controller_for(hand_name)
 	if controller == null:
 		return false
@@ -245,6 +259,9 @@ func is_grip_pressed(hand_name: String) -> bool:
 
 
 func is_trigger_pressed(hand_name: String) -> bool:
+	var provider = _provider()
+	if provider != null and provider.has_method("is_trigger_pressed"):
+		return provider.is_trigger_pressed(hand_name)
 	var controller = controller_for(hand_name)
 	if controller == null:
 		return false
@@ -254,6 +271,9 @@ func is_trigger_pressed(hand_name: String) -> bool:
 
 
 func get_stick(hand_name: String) -> Vector2:
+	var provider = _provider()
+	if provider != null and provider.has_method("get_stick"):
+		return provider.get_stick(hand_name)
 	var controller = controller_for(hand_name)
 	if controller == null:
 		return Vector2.ZERO
@@ -387,6 +407,9 @@ func is_reload_pressed(hand_name: String = "right") -> bool:
 func _controller_button(hand_name: String, action: StringName) -> bool:
 	if not _active:
 		return false
+	var provider = _provider()
+	if provider != null and provider.has_method("is_button_pressed"):
+		return provider.is_button_pressed(hand_name, str(action))
 	var controller = controller_for(hand_name)
 	if controller == null or not controller.has_method("is_button_pressed"):
 		return false

@@ -23,38 +23,48 @@ var is_occluded: bool = false
 var occlusion_check_time: float = 0.0
 var occlusion_check_interval: float = 0.5
 
+# Dynamic LOD bias from VR performance profile
+var lod_bias: float = 1.0
+
+func set_lod_bias(bias: float) -> void:
+	lod_bias = clampf(bias, 0.5, 2.0)
+
 func get_update_interval(distance: float) -> float:
-	if distance < 10.0:
+	var biased_dist: float = distance * lod_bias
+	if biased_dist < 10.0:
 		return 0.0
-	elif distance < 25.0:
+	elif biased_dist < 25.0:
 		return 0.5
-	elif distance < 50.0:
+	elif biased_dist < 50.0:
 		return 1.0
 	else:
 		return 5.0
 
 func get_visual_lod(distance: float, is_occluded: bool = false) -> int:
-	if is_occluded or distance > 80.0:
+	var biased_dist: float = distance * lod_bias
+	if is_occluded or biased_dist > 80.0:
 		return LOD_VISUAL_CULLED
-	elif distance < 15.0:
+	elif biased_dist < 15.0:
 		return LOD_VISUAL_HIGH
-	elif distance < 40.0:
+	elif biased_dist < 40.0:
 		return LOD_VISUAL_MED
 	else:
 		return LOD_VISUAL_LOW
 
 func get_anim_lod(distance: float) -> int:
-	if distance < 20.0:
+	var biased_dist: float = distance * lod_bias
+	if biased_dist < 20.0:
 		return LOD_ANIM_HIGH
-	elif distance < 50.0:
+	elif biased_dist < 50.0:
 		return LOD_ANIM_LOW
 	else:
 		return LOD_ANIM_DISABLED
 
 func get_ai_lod(distance: float) -> int:
-	if distance < 25.0:
+	var biased_dist: float = distance * lod_bias
+	if biased_dist < 25.0:
 		return LOD_AI_HIGH
-	elif distance < 60.0:
+	elif biased_dist < 60.0:
 		return LOD_AI_LOW
 	else:
 		return LOD_AI_SLEEP

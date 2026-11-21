@@ -98,23 +98,44 @@ static func model_batch(
 	if transforms.is_empty():
 		return root
 	var parts: Array = model_parts(path)
+	
+	var meshes_by_material: Dictionary = {}
 	for index in range(parts.size()):
 		var entry: Dictionary = parts[index]
 		var mesh: Mesh = entry.get("mesh", null)
 		if mesh == null:
 			continue
-		var local: Transform3D = entry.get("xform", Transform3D.IDENTITY)
+		var material: Material = entry.get("material", null)
+		var mat_key: String = str(material.get_instance_id()) if material != null else "default"
+		if not meshes_by_material.has(mat_key):
+			meshes_by_material[mat_key] = {
+				"mesh": mesh,
+				"material": material,
+				"local_transforms": [],
+			}
+		meshes_by_material[mat_key]["local_transforms"].append(entry.get("xform", Transform3D.IDENTITY))
+	
+	for mat_key in meshes_by_material.keys():
+		var group: Dictionary = meshes_by_material[mat_key]
+		var mesh: Mesh = group["mesh"]
+		var material: Material = group["material"]
+		var local_transforms: Array = group["local_transforms"]
+		
 		var visual := MultiMeshInstance3D.new()
-		visual.name = "Mesh_%d" % index
+		visual.name = "Batch_%s" % mat_key
 		var multimesh := MultiMesh.new()
 		multimesh.transform_format = MultiMesh.TRANSFORM_3D
 		multimesh.mesh = mesh
-		multimesh.instance_count = transforms.size()
+		multimesh.instance_count = transforms.size() * local_transforms.size()
+		
+		var instance_idx: int = 0
 		for i in range(transforms.size()):
 			var transform: Transform3D = transforms[i]
-			multimesh.set_instance_transform(i, transform * local)
+			for local in local_transforms:
+				multimesh.set_instance_transform(instance_idx, transform * local)
+				instance_idx += 1
+		
 		visual.multimesh = multimesh
-		var material: Material = entry.get("material", null)
 		if material != null:
 			visual.material_override = material
 		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
@@ -483,6 +504,32 @@ static func collision_shape(boxes: Array) -> ConcavePolygonShape3D:
 	shape.set_faces(faces)
 	shape.set_backface_collision_enabled(true)
 	return shape
+
+
+static func simple_collision_shape(boxes: Array) -> Shape3D:
+	# Create a single bounding box collision for simpler static buildings
+	if boxes.is_empty():
+		return BoxShape3D.new()
+	
+	var min_pos: Vector3 = Vector3(INF, INF, INF)
+	var max_pos: Vector3 = Vector3(-INF, -INF, -INF)
+	for value in boxes:
+		var box: Dictionary = value
+		var center: Vector3 = box.get("center", Vector3.ZERO)
+		var size: Vector3 = box.get("size", Vector3.ONE)
+		var hx: float = maxf(0.001, size.x * 0.5)
+		var hy: float = maxf(0.001, size.y * 0.5)
+		var hz: float = maxf(0.001, size.z * 0.5)
+		min_pos.x = mini(min_pos.x, center.x - hx)
+		min_pos.y = mini(min_pos.y, center.y - hy)
+		min_pos.z = mini(min_pos.z, center.z - hz)
+		max_pos.x = maxi(max_pos.x, center.x + hx)
+		max_pos.y = maxi(max_pos.y, center.y + hy)
+		max_pos.z = maxi(max_pos.z, center.z + hz)
+	
+	var box_shape := BoxShape3D.new()
+	box_shape.size = max_pos - min_pos
+	return box_shape
 
 
 static func unit_box() -> BoxMesh:

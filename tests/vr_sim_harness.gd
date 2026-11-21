@@ -42,6 +42,9 @@ class FakeInput extends RefCounted:
 	func is_reload_pressed(hand: String = "right") -> bool:
 		return bool(buttons["a"]) if hand == "right" else bool(buttons["x"])
 
+	func is_button_pressed(hand: String, action: String) -> bool:
+		return bool(buttons.get(action, false))
+
 	func controller_for(hand: String):
 		return rig.controller_for(hand)
 
@@ -85,13 +88,16 @@ func start(p_tree: SceneTree, meta: Dictionary = {}) -> void:
 	ws = world.vr_result.get("weapon_system", null)
 	input = FakeInput.new()
 	input.rig = rig
-	rig.set_input_provider(input)
+	if rig.vr_input != null:
+		rig.vr_input.set_input_provider(input)
+		rig.vr_input.set_simulated(true)
 	apply_poses()
 
 
 func cleanup() -> void:
 	if world != null and is_instance_valid(world):
 		world.free()
+		await tree.process_frame
 	world = null
 	VrGameModeScript.xr_available_override = Callable()
 	SessionScript.platform_override = ""
@@ -111,11 +117,26 @@ func apply_poses() -> void:
 func step(count: int = 1, physics: bool = false) -> void:
 	for i in count:
 		apply_poses()
+		_sync_input_to_vr_input()
 		state.tick(DT)
 		frames += 1
 		if physics and frames % 6 == 0:
 			await tree.physics_frame
 	apply_poses()
+	_sync_input_to_vr_input()
+
+
+func _sync_input_to_vr_input() -> void:
+	if rig == null or rig.vr_input == null:
+		return
+	var vr_input = rig.vr_input
+	for hand in ["left", "right"]:
+		vr_input.set_grip_value(hand, input.grips.get(hand, 0.0))
+		vr_input.set_trigger_value(hand, input.triggers.get(hand, 0.0))
+		vr_input.set_stick(hand, input.sticks.get(hand, Vector2.ZERO))
+	for action in ["a", "b", "x", "y", "menu"]:
+		for hand in ["left", "right"]:
+			vr_input.set_button(hand, action, input.buttons.get(action, false))
 
 
 func head_world() -> Vector3:

@@ -14,11 +14,11 @@ const MAX_FLASHES := 8
 const MAX_FLASH_LIGHTS := 8
 const MAX_SMOKE := 6
 const MAX_DROPPED_MAGS := 4
-const CASING_LIFE := 2.5
-const FLASH_LIFE := 0.09
-const SMOKE_LIFE := 0.11
-const DROPPED_MAG_LIFE := 2.8
-const SPRITE_RES := 64
+const CASING_LIFE := 3.0
+const FLASH_LIFE := 0.12
+const SMOKE_LIFE := 0.15
+const DROPPED_MAG_LIFE := 3.0
+const SPRITE_RES := 128
 
 static var _casing_pool: Array = []
 static var _casing_active: Array = []
@@ -108,9 +108,9 @@ static func spawn_flash(parent: Node, pos: Vector3, direction: Vector3, scale: f
 	parent.add_child(anchor)
 	var light := OmniLight3D.new()
 	light.name = "FlashLight"
-	light.light_color = Color(1.0, 0.78, 0.36)
-	light.light_energy = 7.0 * power
-	light.omni_range = 2.4 * power
+	light.light_color = Color(1.0, 0.85, 0.4)
+	light.light_energy = 12.0 * power
+	light.omni_range = 3.5 * power
 	light.shadow_enabled = false
 	anchor.add_child(light)
 	_flash_lights.append(light)
@@ -122,7 +122,7 @@ static func spawn_flash(parent: Node, pos: Vector3, direction: Vector3, scale: f
 	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	sprite.texture = _get_flash_texture()
 	sprite.material_override = _get_flash_material()
-	sprite.pixel_size = clampf(0.16 * power, 0.08, 0.28) / float(SPRITE_RES)
+	sprite.pixel_size = clampf(0.22 * power, 0.12, 0.35) / float(SPRITE_RES)
 	anchor.add_child(sprite)
 	anchor.set_meta("life", flash_life)
 	_flashes.append(anchor)
@@ -142,15 +142,15 @@ static func spawn_smoke(parent: Node, pos: Vector3, direction: Vector3, scale: f
 	if direction.length_squared() > 0.0001:
 		drift += direction.normalized() * 0.3
 	drift = drift.normalized()
-	for i in range(3):
+	for i in range(4):
 		var sprite := Sprite3D.new()
 		sprite.name = "SmokePuff%d" % i
 		sprite.centered = true
 		sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		sprite.texture = _get_smoke_texture()
 		sprite.material_override = _get_smoke_material()
-		sprite.pixel_size = clampf((0.09 + 0.025 * float(i)) * power, 0.06, 0.20) / float(SPRITE_RES)
-		sprite.position = drift * (0.035 * float(i) * power)
+		sprite.pixel_size = clampf((0.12 + 0.03 * float(i)) * power, 0.08, 0.25) / float(SPRITE_RES)
+		sprite.position = drift * (0.04 * float(i) * power)
 		anchor.add_child(sprite)
 	anchor.set_meta("life", SMOKE_LIFE)
 	_smoke.append(anchor)
@@ -180,8 +180,8 @@ static func eject_casing(parent: Node, world_pos: Vector3, world_dir: Vector3) -
 	casing.global_position = world_pos
 	casing.global_rotation = Vector3(side.z * 0.4, randf() * TAU, side.x * 0.4)
 	casing.show()
-	casing.linear_velocity = side * randf_range(1.1, 2.1) + Vector3.UP * randf_range(1.0, 2.0) - world_dir * 0.25
-	casing.angular_velocity = Vector3(randf_range(-14.0, 14.0), randf_range(-10.0, 10.0), randf_range(-14.0, 14.0))
+	casing.linear_velocity = side * randf_range(1.5, 2.8) + Vector3.UP * randf_range(1.2, 2.5) - world_dir * 0.3
+	casing.angular_velocity = Vector3(randf_range(-18.0, 18.0), randf_range(-12.0, 12.0), randf_range(-18.0, 18.0))
 	casing.sleeping = false
 	casing.set_meta("life", CASING_LIFE)
 	if not _casing_active.has(casing):
