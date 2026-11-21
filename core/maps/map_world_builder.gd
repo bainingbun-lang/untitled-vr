@@ -4,6 +4,7 @@ extends RefCounted
 const WorldMaterialsScript = preload("res://core/maps/world_materials.gd")
 const BuildingScript = preload("res://core/maps/building_generator.gd")
 const VrPerformance = preload("res://core/vr/vr_performance.gd")
+const RemoteLog = preload("res://core/debug/remote_log.gd")
 
 const MAX_NODES: int = 200
 const MAX_OBSTACLES: int = 8
@@ -234,6 +235,8 @@ static func _build_fences(root: Node3D, bounds: AABB, theme: String, perf: VrPer
 
 
 static func build(meta: Dictionary, parent: Node3D, perf: VrPerformance = null) -> Dictionary:
+	var map_label := str(meta.get("name", meta.get("id", "?")))
+	RemoteLog.crumb("construyendo mapa " + map_label)
 	var errors: Array = []
 	if parent == null:
 		errors.append("parent: se requiere un Node3D")
@@ -303,6 +306,7 @@ static func build(meta: Dictionary, parent: Node3D, perf: VrPerformance = null) 
 		var theme_script: Script = load("res://core/maps/map_themes.gd") as Script
 		if theme_script != null and theme_script.has_method("decorate_builder_report"):
 			report = theme_script.call("decorate_builder_report", root, meta, report)
+	RemoteLog.crumb("construido mapa " + map_label)
 	return report
 
 

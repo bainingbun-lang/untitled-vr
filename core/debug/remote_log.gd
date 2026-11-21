@@ -10,7 +10,7 @@ static func crumb(msg: String) -> void:
 
 
 static func send(tag: String, body: String) -> void:
-	if dead:
+	if dead or DisplayServer.get_name() == "headless":
 		return
 	var tcp := StreamPeerTCP.new()
 	if tcp.connect_to_host(HOST, PORT) != OK:
