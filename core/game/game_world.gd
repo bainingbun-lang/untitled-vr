@@ -172,7 +172,9 @@ func setup(meta: Dictionary) -> void:
 	RemoteLog.crumb("world: jugador creado")
 	vr_active = actor != null and actor.has_method("is_active") and bool(actor.call("is_active"))
 	if vr_active:
+		RemoteLog.crumb("VR: llamando setup")
 		vr_result = VrGameModeScript.setup(self, actor, meta)
+		RemoteLog.crumb("VR: setup devolvio")
 		vr_state = vr_result.get("state", null) as Node
 
 	RemoteLog.crumb("world: vr listo, panel depuracion")

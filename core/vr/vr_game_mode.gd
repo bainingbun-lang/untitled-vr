@@ -1,6 +1,7 @@
 class_name VrGameMode
 extends RefCounted
 
+const RemoteLog = preload("res://core/debug/remote_log.gd")
 const OnboardingScript = preload("res://core/vr/vr_onboarding.gd")
 const CalibrationScript = preload("res://core/vr/vr_calibration.gd")
 const BOOTSTRAP_PATH: String = "res://core/vr/vr_bootstrap.gd"
@@ -779,44 +780,70 @@ static func apply_default_comfort_profile(rig: Node3D) -> Dictionary:
 
 static func setup(world: Node3D, rig: Node3D, meta: Dictionary) -> Dictionary:
 	var result: Dictionary = {"rig": rig, "state": null, "weapon_system": null, "hud": null, "menu": null}
+	RemoteLog.crumb("VR paso 1: entrada a setup")
 	if rig == null or not is_instance_valid(rig) or not bool(rig.call("is_active")):
 		return result
+	RemoteLog.crumb("VR paso 2: antes strip_flat_ui")
 	strip_flat_ui(world)
+	RemoteLog.crumb("VR paso 3: despues strip_flat_ui")
+	RemoteLog.crumb("VR paso 4: antes apply_calibration")
 	apply_calibration(rig)
+	RemoteLog.crumb("VR paso 5: despues apply_calibration")
+	RemoteLog.crumb("VR paso 6: antes apply_default_comfort_profile")
 	apply_default_comfort_profile(rig)
+	RemoteLog.crumb("VR paso 7: despues apply_default_comfort_profile")
+	RemoteLog.crumb("VR paso 8: antes crear WeaponSystem")
 	var ws := WeaponSystemScript.new()
 	ws.name = "VrWeaponSystem"
 	ws.set_process(false)
 	ws.spread_scale = 0.0
+	RemoteLog.crumb("VR paso 9: WeaponSystem creado")
+	RemoteLog.crumb("VR paso 10: antes add_child arma")
 	world.add_child(ws)
+	RemoteLog.crumb("VR paso 11: despues add_child arma")
+	RemoteLog.crumb("VR paso 12: antes set_weapon_system")
 	rig.call("set_weapon_system", ws)
+	RemoteLog.crumb("VR paso 13: despues set_weapon_system")
 
+	RemoteLog.crumb("VR paso 14: antes db/items")
 	var db = ItemDbScript.new()
 	DbScript.register_items(db)
 	var inventory = InventoryScript.new(db, 20)
+	RemoteLog.crumb("VR paso 15: db items registrados")
 	LoadoutScript.give_starting_kit(inventory, db)
+	RemoteLog.crumb("VR paso 16: inventario con kit")
+	RemoteLog.crumb("VR paso 17: antes bag")
 	var bag = rig.get("bag")
 	if bag != null:
 		bag.call("load_from_inventory", inventory, db)
 		if (bag.call("items") as Array).is_empty():
 			bag.call("set_items", DbScript.list_ids())
 
+	RemoteLog.crumb("VR paso 18: despues bag")
+	RemoteLog.crumb("VR paso 19: antes State.new")
 	var state := State.new()
 	state.name = "VrGameModeState"
 	state.flat_ui_guard = strip_flat_ui
+	RemoteLog.crumb("VR paso 20: antes add_child state")
 	world.add_child(state)
+	RemoteLog.crumb("VR paso 21: despues add_child state")
+	RemoteLog.crumb("VR paso 22: antes state.configure")
 	state.configure(world, rig, ws, meta)
+	RemoteLog.crumb("VR paso 23: despues state.configure")
 
 	# Solo la mano dominante nace armada (con ambas, la izquierda se llevaba la pistola).
+	RemoteLog.crumb("VR paso 24: antes mano dominante")
 	var calibration = rig.get_meta("calibration", null)
 	var dominant: String = calibration.dominant_hand() if calibration != null else "right"
 	var main_hand = (state.hands as Dictionary).get(dominant, null)
 	if main_hand != null:
 		main_hand.auto_equip = true
+	RemoteLog.crumb("VR paso 25: antes armar resultado")
 	result["state"] = state
 	result["weapon_system"] = ws
 	result["hud"] = state.hud
 	result["menu"] = state.menu
+	RemoteLog.crumb("VR paso 26: antes return")
 	return result
 
 
