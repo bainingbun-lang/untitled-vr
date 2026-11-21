@@ -129,7 +129,7 @@ func _build_slots() -> void:
 			model.call("set_weapon", weapon)
 			model.call("attach_to", anchor)
 			model.set_process(false)
-			if model.is_instance_valid(model.get_node_or_null("Motion/Rig")):
+			if is_instance_valid(model.get_node_or_null("Motion/Rig")):
 				model.get_node("Motion/Rig").rotation_degrees = Vector3(float(spec["tilt"]), 0.0, 0.0)
 		slot_nodes[slot] = anchor
 		var halo := MeshInstance3D.new()

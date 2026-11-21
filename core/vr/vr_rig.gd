@@ -231,14 +231,14 @@ func _provider():
 
 func _call_provider(method: String, args: Array, fallback):
 	var provider = _provider()
-	if provider != null and provider.has_method(method):
+	if provider != null and provider != self and provider.has_method(method):
 		return provider.callv(method, args)
 	return fallback
 
 
 func get_pose(hand_name: String) -> Transform3D:
 	var provider = _provider()
-	if provider != null and provider.has_method("get_pose"):
+	if provider != null and provider != self and provider.has_method("get_pose"):
 		return provider.get_pose(hand_name)
 	var controller = controller_for(hand_name)
 	if controller == null:
@@ -248,7 +248,7 @@ func get_pose(hand_name: String) -> Transform3D:
 
 func is_grip_pressed(hand_name: String) -> bool:
 	var provider = _provider()
-	if provider != null and provider.has_method("is_grip_pressed"):
+	if provider != null and provider != self and provider.has_method("is_grip_pressed"):
 		return provider.is_grip_pressed(hand_name)
 	var controller = controller_for(hand_name)
 	if controller == null:
@@ -260,7 +260,7 @@ func is_grip_pressed(hand_name: String) -> bool:
 
 func is_trigger_pressed(hand_name: String) -> bool:
 	var provider = _provider()
-	if provider != null and provider.has_method("is_trigger_pressed"):
+	if provider != null and provider != self and provider.has_method("is_trigger_pressed"):
 		return provider.is_trigger_pressed(hand_name)
 	var controller = controller_for(hand_name)
 	if controller == null:
@@ -272,7 +272,7 @@ func is_trigger_pressed(hand_name: String) -> bool:
 
 func get_stick(hand_name: String) -> Vector2:
 	var provider = _provider()
-	if provider != null and provider.has_method("get_stick"):
+	if provider != null and provider != self and provider.has_method("get_stick"):
 		return provider.get_stick(hand_name)
 	var controller = controller_for(hand_name)
 	if controller == null:
@@ -408,7 +408,7 @@ func _controller_button(hand_name: String, action: StringName) -> bool:
 	if not _active:
 		return false
 	var provider = _provider()
-	if provider != null and provider.has_method("is_button_pressed"):
+	if provider != null and provider != self and provider.has_method("is_button_pressed"):
 		return provider.is_button_pressed(hand_name, str(action))
 	var controller = controller_for(hand_name)
 	if controller == null or not controller.has_method("is_button_pressed"):
@@ -432,7 +432,7 @@ func _try_climb_grab(hand_name: String) -> void:
 	query.from = controller.global_position
 	query.to = controller.global_position + (-controller.global_transform.basis.z) * 1.5
 	query.collision_mask = 1  # Default physics layer for static bodies
-	query.exclude = [xr_origin.get_rid()] if xr_origin else []
+	query.exclude = []
 	
 	var result: Dictionary = space.intersect_ray(query)
 	if result.is_empty():

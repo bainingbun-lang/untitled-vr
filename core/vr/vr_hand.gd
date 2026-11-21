@@ -156,7 +156,7 @@ func try_grab_any(grip_value: float = 1.0, zone: String = "grip", max_dist: floa
 	query.shape = shape
 	query.transform = Transform3D(Basis.IDENTITY, _last_anchor_transform.origin)
 	query.collision_mask = collision_mask
-	query.exclude = [anchor.get_rid()] if anchor != null else []
+	query.exclude = [anchor.get_rid()] if anchor != null and anchor.has_method("get_rid") else []
 	
 	var results := space.intersect_shape(query, 10)
 	for result in results:

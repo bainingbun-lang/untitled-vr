@@ -56,8 +56,7 @@ func _get_controller(hand: String) -> Object:
 	return null
 
 func get_pose(hand: String) -> Transform3D:
-	if _input_provider != null and _input_provider.has_method("get_pose"):
-		return _input_provider.get_pose(hand)
+	# No delegar en get_pose del proveedor: el proveedor es VrRig, que delega de vuelta aqui (recursion infinita).
 	var controller = _get_controller(hand)
 	if controller != null:
 		return controller.global_transform
