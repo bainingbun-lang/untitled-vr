@@ -15,7 +15,7 @@ const VrWeaponHandScript = preload("res://core/vr/vr_weapon_hand.gd")
 const VrClimbScript = preload("res://core/vr/vr_climb.gd")
 const DbScript = preload("res://core/game/weapon_db.gd")
 const VrComfortScript = preload("res://core/vr/vr_comfort.gd")
-const VrInputScript = load("res://core/vr/vr_input.gd")
+const VrInputScript = preload("res://core/vr/vr_input.gd")
 
 @export var move_speed: float = 2.2
 @export var turn_mode: String = "smooth"

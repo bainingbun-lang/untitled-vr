@@ -503,7 +503,7 @@ func _build_ammo_counter(root: Node3D, id: String) -> void:
 	if counter_node == null or not is_instance_valid(counter_node):
 		return
 	_ammo_counter = counter_node
-	var visual: MeshInstance3D = counter_node.find_children("*", "MeshInstance3D", true, false)
+	var visual: Array = counter_node.find_children("*", "MeshInstance3D", true, false)
 	if visual.size() == 0:
 		return
 	var mi: MeshInstance3D = visual[0]

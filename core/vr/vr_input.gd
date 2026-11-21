@@ -36,7 +36,7 @@ func initialize(iface: Object = null) -> bool:
 		if _action_map != null and _interface.has_method("set_action_map"):
 			_interface.call("set_action_map", _action_map)
 			if _interface.has_method("get_action_set"):
-				var set_ := _interface.call("get_action_set", "godot")
+				var set_ = _interface.call("get_action_set", "godot")
 				if set_ != null and set_.has_method("activate"):
 					set_.call("activate")
 	
@@ -103,7 +103,7 @@ func is_button_pressed(hand: String, action: String) -> bool:
 		return bool(_button_states.get("%s/%s" % [hand, action], false))
 	var controller = _get_controller(hand)
 	if controller != null and controller.has_method("is_button_pressed"):
-		return bool(controller.call("is_button_pressed", &action))
+		return bool(controller.call("is_button_pressed", StringName(action)))
 	return false
 
 func set_grip_value(hand: String, value: float) -> void:

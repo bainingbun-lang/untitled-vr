@@ -368,8 +368,8 @@ static func _role_for(point: Vector3, bounds: AABB, id: String, clean_islands: b
 		if x > 0.30 and x < 0.66 and y > 0.62:
 			return "bolt"
 		return "body"
-if y < 0.42 and x > 0.18 and x < 0.68:
-			return "magazine"
+	if y < 0.42 and x > 0.18 and x < 0.68:
+		return "magazine"
 	if x > 0.40 and x < 0.58 and y > 0.72:
 		return "charging_handle"
 	if x > 0.26 and x < 0.74 and y > 0.55:
