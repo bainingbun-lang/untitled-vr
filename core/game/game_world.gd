@@ -1,6 +1,7 @@
 class_name GameWorld
 extends Node3D
 
+const DIAG_EMPTY_MAP := true
 const BISECT_SAFE := true  # PRUEBA DE AISLAMIENTO: apagar NPC, vehiculos y panel; poner en false al terminar.
 
 const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
@@ -88,6 +89,10 @@ var _skins: Dictionary = {}
 var _impacts: Dictionary = {}
 var _wired: Dictionary = {}
 var _npc_scan_timer := 0.0
+var _diag_t := 0.0
+var _diag_acc := 0.0
+var _diag_n := 0
+var _diag_secs := 0
 
 var active_game_mode = null
 var _game_mode_type: int = 0
@@ -106,6 +111,11 @@ func setup(meta: Dictionary) -> void:
 	_test_setup_count += 1
 	print("world.setup inicio #" + str(_test_setup_count))
 	RemoteLog.crumb("world.setup inicio")
+	RemoteLog.crumb("DIAG gpu=%s" % RenderingServer.get_video_adapter_name())
+	if DIAG_EMPTY_MAP:
+		RemoteLog.crumb("DIAG: mapa vacio")
+		meta = meta.duplicate()
+		meta["diag_empty"] = true
 	_discard(_geometry_root)
 	_discard(actor)
 	_discard(_hud_layer)
@@ -183,7 +193,8 @@ func setup(meta: Dictionary) -> void:
 	else:
 		_spawn_living_npcs(first_point, meta)
 	RemoteLog.crumb("world: dianas")
-	_spawn_dummies(first_point, meta)
+	if not DIAG_EMPTY_MAP:
+		_spawn_dummies(first_point, meta)
 	RemoteLog.crumb("world: vehiculos")
 	if BISECT_SAFE:
 		RemoteLog.crumb("AISLAMIENTO: salto vehiculos aparcados")
@@ -213,6 +224,16 @@ func setup(meta: Dictionary) -> void:
 
 func _process(delta: float) -> void:
 	_frames_seen += 1
+	if _diag_secs < 60:
+		_diag_t += delta
+		_diag_acc += delta
+		_diag_n += 1
+		if _diag_t >= 1.0:
+			_diag_t -= 1.0
+			_diag_secs += 1
+			RemoteLog.crumb("DIAG t=%ds fps=%d frame_ms=%.1f mem=%dMB" % [_diag_secs, Engine.get_frames_per_second(), _diag_acc / _diag_n * 1000.0, OS.get_static_memory_usage() / 1048576])
+			_diag_acc = 0.0
+			_diag_n = 0
 	if _frames_seen == 1:
 		RemoteLog.crumb("juego: primer fotograma")
 	elif _frames_seen == 60:

@@ -280,16 +280,18 @@ static func build(meta: Dictionary, parent: Node3D, perf: VrPerformance = null) 
 	var time_of_day := str(meta.get("time_of_day", "atardecer"))
 	_build_floor(root, bounds, ground_material, perf)
 	_build_real_ground(root, bounds, theme_name, perf)
-	_build_walls(root, bounds, wall_material, "brick", perf)
-	_build_obstacles(root, obstacle_points, obstacle_materials, obstacle_surfaces, theme_name, perf)
-	_build_vegetation(root, bounds, spawn_points, theme_name, perf)
-	_build_fences(root, bounds, theme_name, perf)
-	_build_parked_cars(root, bounds, spawn_points, theme_name, perf)
+	var diag_empty := bool(meta.get("diag_empty", false))
+	var props: Array = []
+	if not diag_empty:
+		_build_walls(root, bounds, wall_material, "brick", perf)
+		_build_obstacles(root, obstacle_points, obstacle_materials, obstacle_surfaces, theme_name, perf)
+		_build_vegetation(root, bounds, spawn_points, theme_name, perf)
+		_build_fences(root, bounds, theme_name, perf)
+		_build_parked_cars(root, bounds, spawn_points, theme_name, perf)
 	_build_environment(root, time_of_day, theme_name)
 	_build_spawn_markers(root, spawn_points, marker_count)
-	var props: Array = populate_physics_props(
-		root, meta, bounds, spawn_points, prop_limit, null, perf
-	)
+	if not diag_empty:
+		props = populate_physics_props(root, meta, bounds, spawn_points, prop_limit, null, perf)
 
 	var report: Dictionary = {
 		"ok": true,
