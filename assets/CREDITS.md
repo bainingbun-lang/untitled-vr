@@ -46,6 +46,105 @@ Todos los modelos proceden de `https://polyhaven.com/a/<id>`, con autor
 | trashbag | Saco de basura | 4.482 | CC0 1.0 | `assets/models/props/trashbag/*` |
 | security_light | Farola/proyector de seguridad | 4.668 | CC0 1.0 | `assets/models/props/security_light/*` |
 | plastic_crate_02 | Caja plástica industrial | 5.840 | CC0 1.0 | `assets/models/props/plastic_crate_02/*` |
+| all_purpose_cleaner | Limpiador multiusos | 4.624 | CC0 1.0 | `assets/models/props/all_purpose_cleaner/*` |
+| american_football | Balón fútbol americano | 4.480 | CC0 1.0 | `assets/models/props/american_football/*` |
+| ammo_box_ph | Caja de munición (Poly Haven) | 4.382 | CC0 1.0 | `assets/models/props/ammo_box_ph/*` |
+| anthurium_botany_01 | Anthurium (planta) | 4.134 | CC0 1.0 | `assets/models/props/anthurium_botany_01/*` |
+| barrel_02 | Barril metálico 02 | 2.688 | CC0 1.0 | `assets/models/props/barrel_02/*` |
+| barrel_03_ph | Barril metálico 03 (Poly Haven) | 1.473 | CC0 1.0 | `assets/models/props/barrel_03_ph/*` |
+| baseball_01 | Pelota de béisbol | 2.712 | CC0 1.0 | `assets/models/props/baseball_01/*` |
+| baseball_bat | Bate de béisbol | 2.672 | CC0 1.0 | `assets/models/props/baseball_bat/*` |
+| bench_vice_01 | Tornillo de banco | 2.864 | CC0 1.0 | `assets/models/props/bench_vice_01/*` |
+| bleach_bottle | Botella de lejía | 4.052 | CC0 1.0 | `assets/models/props/bleach_bottle/*` |
+| brass_pan_01 | Sartén de latón | 4.340 | CC0 1.0 | `assets/models/props/brass_pan_01/*` |
+| brass_pot_01 | Olla de latón 01 | 3.760 | CC0 1.0 | `assets/models/props/brass_pot_01/*` |
+| brass_pot_02 | Olla de latón 02 | 3.344 | CC0 1.0 | `assets/models/props/brass_pot_02/*` |
+| brass_vase_03 | Jarrón de latón 03 | 2.616 | CC0 1.0 | `assets/models/props/brass_vase_03/*` |
+| brass_vase_04 | Jarrón de latón 04 | 2.760 | CC0 1.0 | `assets/models/props/brass_vase_04/*` |
+| bronze_ray_statue | Estatua de raya bronce | 1.844 | CC0 1.0 | `assets/models/props/bronze_ray_statue/*` |
+| bronze_whale_statue | Estatua de ballena bronce | 3.816 | CC0 1.0 | `assets/models/props/bronze_whale_statue/*` |
+| can_rusted | Lata oxidada | 3.520 | CC0 1.0 | `assets/models/props/can_rusted/*` |
+| carved_wooden_elephant | Elefante madera tallada | 2.752 | CC0 1.0 | `assets/models/props/carved_wooden_elephant/*` |
+| carved_wooden_plate | Plato madera tallada | 2.112 | CC0 1.0 | `assets/models/props/carved_wooden_plate/*` |
+| cassette_player | Reproductor de casetes | 4.830 | CC0 1.0 | `assets/models/props/cassette_player/*` |
+| cement_bag_ph | Saco de cemento (Poly Haven) | 844 | CC0 1.0 | `assets/models/props/cement_bag_ph/*` |
+| ceramic_pot | Olla de cerámica | 3.592 | CC0 1.0 | `assets/models/props/ceramic_pot/*` |
+| ceramic_vase_01 | Jarrón cerámica 01 | 2.548 | CC0 1.0 | `assets/models/props/ceramic_vase_01/*` |
+| ceramic_vase_02 | Jarrón cerámica 02 | 2.756 | CC0 1.0 | `assets/models/props/ceramic_vase_02/*` |
+| ceramic_vase_03 | Jarrón cerámica 03 | 2.784 | CC0 1.0 | `assets/models/props/ceramic_vase_03/*` |
+| ceramic_vase_04 | Jarrón cerámica 04 | 2.224 | CC0 1.0 | `assets/models/props/ceramic_vase_04/*` |
+| cheese_box_01 | Caja de queso | 884 | CC0 1.0 | `assets/models/props/cheese_box_01/*` |
+| chinese_armchair | Sillón chino | 2.675 | CC0 1.0 | `assets/models/props/chinese_armchair/*` |
+| chinese_screen_panels | Paneles pantalla china | 784 | CC0 1.0 | `assets/models/props/chinese_screen_panels/*` |
+| chinese_sofa | Sofá chino | 704 | CC0 1.0 | `assets/models/props/chinese_sofa/*` |
+| chinese_stool | Taburete chino | 1.090 | CC0 1.0 | `assets/models/props/chinese_stool/*` |
+| chinese_tea_table | Mesa de té china | 2.508 | CC0 1.0 | `assets/models/props/chinese_tea_table/*` |
+| classic_nightstand_01 | Mesita de noche clásica | 2.002 | CC0 1.0 | `assets/models/props/classic_nightstand_01/*` |
+| cleaner_tin_01 | Lata limpiador 01 | 3.560 | CC0 1.0 | `assets/models/props/cleaner_tin_01/*` |
+| coffee_table_round_01 | Mesa centro redonda 01 | 4.044 | CC0 1.0 | `assets/models/props/coffee_table_round_01/*` |
+| combination_wrench | Llave combinada | 1.986 | CC0 1.0 | `assets/models/props/combination_wrench/*` |
+| croissant | Croissant | 1.990 | CC0 1.0 | `assets/models/props/croissant/*` |
+| cross_pein_hammer | Martillo bola cruz | 2.124 | CC0 1.0 | `assets/models/props/cross_pein_hammer/*` |
+| crowbar_01 | Palanca 01 | 2.300 | CC0 1.0 | `assets/models/props/crowbar_01/*` |
+| dining_table | Mesa comedor | 1.048 | CC0 1.0 | `assets/models/props/dining_table/*` |
+| drain_cleaner | Limpiador desagües | 4.338 | CC0 1.0 | `assets/models/props/drain_cleaner/*` |
+| drill_01 | Taladro 01 | 2.926 | CC0 1.0 | `assets/models/props/drill_01/*` |
+| dustpan | Recogedor | 4.332 | CC0 1.0 | `assets/models/props/dustpan/*` |
+| fancy_picture_frame_01 | Marco cuadro elegante 01 | 938 | CC0 1.0 | `assets/models/props/fancy_picture_frame_01/*` |
+| fire_alarm | Alarma de incendios | 2.705 | CC0 1.0 | `assets/models/props/fire_alarm/*` |
+| fish_knife | Cuchillo pescado | 2.736 | CC0 1.0 | `assets/models/props/fish_knife/*` |
+| flathead_screwdriver | Destornillador plano | 2.300 | CC0 1.0 | `assets/models/props/flathead_screwdriver/*` |
+| football | Balón fútbol | 4.296 | CC0 1.0 | `assets/models/props/football/*` |
+| gothic_commode_01 | Cómoda gótica 01 | 3.897 | CC0 1.0 | `assets/models/props/gothic_commode_01/*` |
+| green_chair_01 | Silla verde 01 | 4.213 | CC0 1.0 | `assets/models/props/green_chair_01/*` |
+| handsaw_wood | Sierra de mano madera | 2.548 | CC0 1.0 | `assets/models/props/handsaw_wood/*` |
+| hanging_picture_frame_01 | Marco cuadro colgante 01 | 2.586 | CC0 1.0 | `assets/models/props/hanging_picture_frame_01/*` |
+| hanging_picture_frame_02 | Marco cuadro colgante 02 | 3.678 | CC0 1.0 | `assets/models/props/hanging_picture_frame_02/*` |
+| industrial_wall_lamp | Lámpara pared industrial | 4.446 | CC0 1.0 | `assets/models/props/industrial_wall_lamp/*` |
+| katana_stand_01 | Soporte katana 01 | 3.780 | CC0 1.0 | `assets/models/props/katana_stand_01/*` |
+| leather_cleaner_can | Lata limpiador cuero | 2.296 | CC0 1.0 | `assets/models/props/leather_cleaner_can/*` |
+| lemon | Limón | 4.012 | CC0 1.0 | `assets/models/props/lemon/*` |
+| lightbulb_01 | Bombilla 01 | 4.372 | CC0 1.0 | `assets/models/props/lightbulb_01/*` |
+| long_life_food | Comida larga duración | 4.712 | CC0 1.0 | `assets/models/props/long_life_food/*` |
+| machete | Machete | 3.032 | CC0 1.0 | `assets/models/props/machete/*` |
+| measuring_tape_01 | Cinta métrica 01 | 2.868 | CC0 1.0 | `assets/models/props/measuring_tape_01/*` |
+| medical_box | Botiquín | 3.718 | CC0 1.0 | `assets/models/props/medical_box/*` |
+| medical_tape | Cinta médica | 1.408 | CC0 1.0 | `assets/models/props/medical_tape/*` |
+| modern_coffee_table_01 | Mesa centro moderna 01 | 4.504 | CC0 1.0 | `assets/models/props/modern_coffee_table_01/*` |
+| multi_cleaner_5_litre | Limpiador multi 5L | 4.332 | CC0 1.0 | `assets/models/props/multi_cleaner_5_litre/*` |
+| office_notepads | Blocs de notas oficina | 666 | CC0 1.0 | `assets/models/props/office_notepads/*` |
+| oil_tin | Lata aceite | 2.834 | CC0 1.0 | `assets/models/props/oil_tin/*` |
+| old_tyre_ph | Neumático viejo (Poly Haven) | 2.880 | CC0 1.0 | `assets/models/props/old_tyre_ph/*` |
+| ottoman_01 | Otomana 01 | 4.240 | CC0 1.0 | `assets/models/props/ottoman_01/*` |
+| painted_wooden_bench | Banco madera pintada | 630 | CC0 1.0 | `assets/models/props/painted_wooden_bench/*` |
+| painted_wooden_cabinet | Armario madera pintada | 2.227 | CC0 1.0 | `assets/models/props/painted_wooden_cabinet/*` |
+| painted_wooden_cabinet_02 | Armario madera pintada 02 | 966 | CC0 1.0 | `assets/models/props/painted_wooden_cabinet_02/*` |
+| painted_wooden_chair_01 | Silla madera pintada 01 | 724 | CC0 1.0 | `assets/models/props/painted_wooden_chair_01/*` |
+| painted_wooden_chair_02 | Silla madera pintada 02 | 1.246 | CC0 1.0 | `assets/models/props/painted_wooden_chair_02/*` |
+| painted_wooden_nightstand | Mesita noche madera pintada | 470 | CC0 1.0 | `assets/models/props/painted_wooden_nightstand/*` |
+| painted_wooden_shelves | Estantes madera pintada | 524 | CC0 1.0 | `assets/models/props/painted_wooden_shelves/*` |
+| painted_wooden_stool | Taburete madera pintada | 676 | CC0 1.0 | `assets/models/props/painted_wooden_stool/*` |
+| painted_wooden_table | Mesa madera pintada | 600 | CC0 1.0 | `assets/models/props/painted_wooden_table/*` |
+| pastic_torch_6v | Antorcha plástico 6V | 4.352 | CC0 1.0 | `assets/models/props/pastic_torch_6v/*` |
+| planter_pot_clay | Maceta arcilla | 3.080 | CC0 1.0 | `assets/models/props/planter_pot_clay/*` |
+| plastic_container | Contenedor plástico | 4.070 | CC0 1.0 | `assets/models/props/plastic_container/*` |
+| plastic_monobloc_chair_01 | Silla monobloc plástico 01 | 3.356 | CC0 1.0 | `assets/models/props/plastic_monobloc_chair_01/*` |
+| pliers | Alicates | 4.540 | CC0 1.0 | `assets/models/props/pliers/*` |
+| plunger | Desatascador | 3.278 | CC0 1.0 | `assets/models/props/plunger/*` |
+| postcard_set_01 | Set postales 01 | 2.720 | CC0 1.0 | `assets/models/props/postcard_set_01/*` |
+| propane_torch | Soplete propano | 4.848 | CC0 1.0 | `assets/models/props/propane_torch/*` |
+| propane_torch_02 | Soplete propano 02 | 2.960 | CC0 1.0 | `assets/models/props/propane_torch_02/*` |
+| rollershutter_door | Puerta persiana | 1.104 | CC0 1.0 | `assets/models/props/rollershutter_door/*` |
+| rollershutter_window_01 | Ventana persiana 01 | 1.104 | CC0 1.0 | `assets/models/props/rollershutter_window_01/*` |
+| rollershutter_window_02 | Ventana persiana 02 | 1.120 | CC0 1.0 | `assets/models/props/rollershutter_window_02/*` |
+| school_desk_01 | Pupitre escolar 01 | 4.162 | CC0 1.0 | `assets/models/props/school_desk_01/*` |
+| shelf_01 | Estante 01 | 182 | CC0 1.0 | `assets/models/props/shelf_01/*` |
+| sofa_01 | Sofá 01 | 4.101 | CC0 1.0 | `assets/models/props/sofa_01/*` |
+| television_01 | Televisor 01 | 1.918 | CC0 1.0 | `assets/models/props/television_01/*` |
+| wet_floor_sign_01 | Señal suelo mojado 01 | 228 | CC0 1.0 | `assets/models/props/wet_floor_sign_01/*` |
+| wooden_table_01 | Mesa madera 01 | 952 | CC0 1.0 | `assets/models/props/wooden_table_01/*` |
+| wooden_table_02 | Mesa madera 02 | 1.514 | CC0 1.0 | `assets/models/props/wooden_table_02/*` |
+| wooden_table_03 | Mesa madera 03 | 2.298 | CC0 1.0 | `assets/models/props/wooden_table_03/*` |
 
 Nota: `assets/models/props/barrel_01/` conserva los nombres internos de textura
 `Barrel_01_*` tal como los referencia su `model.gltf` (no se renombraron para no
@@ -365,4 +464,126 @@ de 512×512) y copiado después al proyecto. No se ejecutó ningún archivo desc
 | Pistola de ejemplo | Pistol (Zombie Apocalypse Kit - March 2024) | Quaternius (Laulhet) | https://github.com/agentkaerf/FreeModels (pack `Zombie Apocalypse Kit - March 2024`), original: https://quaternius.com/ | CC0 1.0 | `assets/models/weapons/v2/rust_pistol.gltf`, `assets/models/weapons/v2/rust_pistol_Zombie_Atlas.png` (atlas extraído por el importador) |
 
 URL directa de descarga: https://raw.githubusercontent.com/agentkaerf/FreeModels/main/Zombie%20Apocalypse%20Kit%20-%20March%202024/Weapons/glTF/Pistol.gltf
+
+---
+
+# Codigo adaptado de terceros (W4 — weapons attribution)
+
+## Referencias de código adaptado
+
+Los siguientes archivos del sistema de armas (W4) contienen código adaptado de proyectos de referencia open-source. Cada archivo incluye un encabezado de atribución con el proyecto original, archivo de origen y licencia.
+
+| Archivo del proyecto | Referencia principal | Archivo original | Licencia | Licencia en third_party/ |
+|---|---|---|---|---|
+| `core/game/ammo_system.gd` | GodotFPS-Template (bukkbeek) | `common/autoloads/bullets.gd` | MIT | `GODOTFPS_TEMPLATE_LICENSE.txt` |
+| `core/game/weapon_pickup.gd` | GodotFPS-Template (bukkbeek) | `common/utils/ammo_refil.gd`, `common/weapon/weapon.gd` | MIT | `GODOTFPS_TEMPLATE_LICENSE.txt` |
+| `core/game/weapon_pickup.gd` | Godot-FPS-Template (AxelReviron) | `objects/weapon_interaction_component.gd` | MIT | `GODOT_FPS_TEMPLATE_LICENSE.txt` |
+| `core/game/weapon_shop.gd` | GodotFPS-Template (bukkbeek) | `common/weapon/weapon.gd`, `common/autoloads/bullets.gd` | MIT | `GODOTFPS_TEMPLATE_LICENSE.txt` |
+| `core/game/weapon_shop.gd` | Godot-FPS-Template (AxelReviron) | `WeaponController.gd`, `objects/weapon_interaction_component.gd` | MIT | `GODOT_FPS_TEMPLATE_LICENSE.txt` |
+| `core/game/weapon_system.gd` | GodotWeapons (JarLowrey) | `core/weapon.gd`, `core/ammunition.gd`, `core/magazine.gd` | MIT | `GODOTWEAPONS_LICENSE.txt` |
+| `core/game/weapon_system.gd` | godot_weapon_manager (toledosq) | `WeaponManager.gd` | MIT | `GODOT_WEAPON_MANAGER_LICENSE.txt` |
+| `core/game/weapon_system.gd` | Godot-FPS-Template (AxelReviron) | `WeaponController.gd`, `ShootingWeaponState.gd`, `ReloadingWeaponState.gd` | MIT | `GODOT_FPS_TEMPLATE_LICENSE.txt` |
+| `core/game/weapon_system.gd` | GodotFPS-Template (bukkbeek) | `common/weapon/weapons_manager.gd`, `common/weapon/weapon.gd` | MIT | `GODOTFPS_TEMPLATE_LICENSE.txt` |
+| `core/game/weapon_viewmodel.gd` | Godot-FPS-Template (AxelReviron) | `WeaponViewmodel.gd` | MIT | `GODOT_FPS_TEMPLATE_LICENSE.txt` |
+| `core/game/weapon_viewmodel.gd` | GodotFPS-Template (bukkbeek) | `common/weapon/weapon.gd` | MIT | `GODOTFPS_TEMPLATE_LICENSE.txt` |
+| `core/game/weapon_viewmodel.gd` | godot_openvr_fps (GodotVR) | `VR_Controller.gd` | MIT | `GODOT_OPENVR_FPS_LICENSE.txt` |
+| `core/game/weapon_db.gd` | Godot-FPS-Template (AxelReviron) | `Weapons.gd` | MIT | `GODOT_FPS_TEMPLATE_LICENSE.txt` |
+| `core/game/weapon_db.gd` | GodotWeapons (JarLowrey) | `Weapons.gd` | MIT | `GODOTWEAPONS_LICENSE.txt` |
+| `core/game/weapon_db.gd` | GodotFPS-Template (bukkbeek) | `common/weapon/weapons.gd` | MIT | `GODOTFPS_TEMPLATE_LICENSE.txt` |
+| `core/game/muzzle_fx.gd` | Godot-FPS-Template (AxelReviron) | `WeaponController.gd`, `ShootingWeaponState.gd` | MIT | `GODOT_FPS_TEMPLATE_LICENSE.txt` |
+| `core/game/muzzle_fx.gd` | GodotFPS-Template (bukkbeek) | `common/weapon/weapon.gd` | MIT | `GODOTFPS_TEMPLATE_LICENSE.txt` |
+| `core/game/muzzle_fx.gd` | GodotWeapons (JarLowrey) | `weapon.gd` | MIT | `GODOTWEAPONS_LICENSE.txt` |
+| `core/game/content_registry.gd` | (Original - Godot patterns) | — | MIT | — |
+| `core/vr/vr_weapon_hand.gd` | godot_openvr_fps (GodotVR) | `VR_Controller.gd`, `Pistol.gd` | MIT | `GODOT_OPENVR_FPS_LICENSE.txt` |
+| `core/vr/vr_weapon_hand.gd` | Godot-FPS-Template (AxelReviron) | `WeaponViewmodel.gd` | MIT | `GODOT_FPS_TEMPLATE_LICENSE.txt` |
+| `data/base/ammo.json` | GodotFPS-Template (bukkbeek) | `common/autoloads/bullets.gd` | MIT | `GODOTFPS_TEMPLATE_LICENSE.txt` |
+| `data/base/ammo.json` | Godot-FPS-Template (AxelReviron) | Weapon/ammo data patterns | MIT | `GODOT_FPS_TEMPLATE_LICENSE.txt` |
+| `data/base/ammo.json` | GodotWeapons (JarLowrey) | `Ammunition.gd` | MIT | `GODOTWEAPONS_LICENSE.txt` |
+| `data/base/weapon_shop.json` | GodotFPS-Template (bukkbeek) | `common/weapon/weapon.gd` pricing | MIT | `GODOTFPS_TEMPLATE_LICENSE.txt` |
+| `data/base/weapon_shop.json` | Godot-FPS-Template (AxelReviron) | Weapon interaction/store UI | MIT | `GODOT_FPS_TEMPLATE_LICENSE.txt` |
+| `data/base/weapons.json` | GodotWeapons (JarLowrey) | `Weapons.gd` definitions | MIT | `GODOTWEAPONS_LICENSE.txt` |
+| `data/base/weapons.json` | Godot-FPS-Template (AxelReviron) | `Weapons.gd` resource format | MIT | `GODOT_FPS_TEMPLATE_LICENSE.txt` |
+| `data/base/weapons.json` | GodotFPS-Template (bukkbeek) | `common/weapon/weapons.gd` | MIT | `GODOTFPS_TEMPLATE_LICENSE.txt` |
+| `data/base/weapons.json` | godot_weapon_manager (toledosq) | `WeaponManager.gd` configs | MIT | `GODOT_WEAPON_MANAGER_LICENSE.txt` |
+
+## Licencias de terceros (copiadas a `third_party/`)
+
+- **GodotWeapons** (James Lowrey, 2017) — MIT License → `third_party/GODOTWEAPONS_LICENSE.txt`
+- **Godot-FPS-Template** (Axel Reviron, 2026) — MIT License → `third_party/GODOT_FPS_TEMPLATE_LICENSE.txt`
+- **godot_weapon_manager** (Colormatic, 2023) — MIT License → `third_party/GODOT_WEAPON_MANAGER_LICENSE.txt`
+- **GodotFPS-Template** (bukkbeek, 2026) — MIT License → `third_party/GODOTFPS_TEMPLATE_LICENSE.txt`
+- **godot-fps-template** (MilkAndBanana01) — CC0 1.0 Universal → `third_party/GODOT_FPS_TEMPLATE_CC0_LICENSE.txt`
+- **godot_openvr_fps** (Bastiaan Olij & Noah "TwistedTwigleg" Beard, 2019) — MIT License → `third_party/GODOT_OPENVR_FPS_LICENSE.txt`
+- **godot-behavior-tree-plugin** (Jeffery Olson, Brandon Lamb, Sebastian Ebert, 2016-2017) — MIT License → `third_party/godot-behavior-tree-plugin/LICENSE`
+- **godot-steering-ai-framework** (GDQuest, 2020) — MIT License → `third_party/godot-steering-ai-framework/LICENSE`
+
+## Nota
+
+Todos los archivos listados arriba han sido **adaptados** (no copiados literalmente) para integrarse con la arquitectura del proyecto UNTITLED (ContentRegistry, WeaponDb, AmmoSystem, VrWeaponHand, etc.). La lógica de juego original de cada referencia se ha modificado para trabajar con el sistema de datos JSON (`data/base/*.json`), el registro de contenido y las convenciones de naming del proyecto. No se ha alterado la lógica de juego funcional más allá de la integración.
+
+---
+
+# Codigo adaptado de terceros (AI2 — Steering & Behavior Tree)
+
+## Referencias de código adaptado (Steering)
+
+Los siguientes archivos del sistema de steering (AI2) contienen código adaptado de **godot-steering-ai-framework** (GDQuest, MIT License, Copyright 2020).
+
+| Archivo del proyecto | Archivo original | Licencia | Licencia en third_party/ |
+|---|---|---|---|
+| `core/npc/steering/agent_location.gd` | `GSAIAgentLocation.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/group_behavior.gd` | `GSAIGroupBehavior.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/steering_agent.gd` | `GSAISteeringAgent.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/steering_behavior.gd` | `GSAISteeringBehavior.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/target_acceleration.gd` | `GSAITargetAcceleration.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/utils.gd` | `GSAIUtils.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/proximities/proximity.gd` | `GSAIProximity.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/proximities/radius_proximity.gd` | `GSAIRadiusProximity.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/agents/steering_agent.gd` | `GSAICharacterBody3DAgent.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/behaviors/arrive.gd` | `GSAIArrive.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/behaviors/avoid_collisions.gd` | `GSAIAvoidCollisions.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/behaviors/blend.gd` | `GSAIBlend.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/behaviors/cohesion.gd` | `GSAICohesion.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/behaviors/evade.gd` | `GSAIEvade.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/behaviors/face.gd` | `GSAIFace.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/behaviors/flee.gd` | `GSAIFlee.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/behaviors/match_orientation.gd` | `GSAIMatchOrientation.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/behaviors/priority.gd` | `GSAIPriority.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/behaviors/pursue.gd` | `GSAIPursue.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/behaviors/seek.gd` | `GSAISeek.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+| `core/npc/steering/behaviors/separation.gd` | `GSAISeparation.gd` | MIT | `godot-steering-ai-framework/LICENSE` |
+
+## Referencias de código adaptado (Behavior Tree)
+
+Los siguientes archivos del sistema de behavior tree (AI2) contienen código adaptado de **godot-behavior-tree-plugin** (Jeffery Olson, Brandon Lamb, Sebastian Ebert, 2016-2017, MIT License).
+
+| Archivo del proyecto | Archivo original | Licencia | Licencia en third_party/ |
+|---|---|---|---|
+| `core/npc/bt/bt_node.gd` | `bt_base.gd` | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/bt_composite.gd` | `sequence.gd`, `selector.gd`, `parallel.gd` | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/bt_selector.gd` | `selector.gd` | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/bt_sequence.gd` | `sequence.gd` | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/bt_parallel.gd` | `parallel.gd` | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/bt_condition.gd` | `condition.gd` | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/bt_action.gd` | `action.gd` | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/bt_decorator.gd` | `decorator.gd` | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/bt_inverter.gd` | `inverter.gd` | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/bt_repeater.gd` | `repeater.gd` | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/bt_repeat_until.gd` | `repeat_until_succeed.gd`, `repeat_until_fail.gd` | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/bt_always_return.gd` | `succeeder.gd`, `failer.gd` | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/blackboard.gd` | `blackboard.gd` | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/bt_context.gd` | (adapted context) | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/behavior_tree.gd` | `behavior_tree.gd` | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/bt_cooldown.gd` | (original cooldown decorator) | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/conditions/*.gd` | (custom conditions for NPC) | MIT | `godot-behavior-tree-plugin/LICENSE` |
+| `core/npc/bt/actions/*.gd` | (custom actions for NPC) | MIT | `godot-behavior-tree-plugin/LICENSE` |
+
+## Licencias de terceros (AI2)
+
+- **godot-steering-ai-framework** (GDQuest, 2020) — MIT License → `third_party/godot-steering-ai-framework/LICENSE`
+- **godot-behavior-tree-plugin** (Jeffery Olson, Brandon Lamb, Sebastian Ebert, 2016-2017) — MIT License → `third_party/godot-behavior-tree-plugin/LICENSE`
+
+## Nota AI2
+
+Todos los archivos listados arriba han sido **adaptados** (no copiados literalmente) para integrarse con la arquitectura del proyecto UNTITLED (NPCNavigation, NPCBehavior, NPCLod, ArmedNpc, etc.). La lógica original de cada referencia se ha modificado para trabajar con el sistema de datos JSON (`data/base/npc_types.json`), el registro de contenido y las convenciones de naming del proyecto. No se ha alterado la lógica de juego funcional más allá de la integración.
 

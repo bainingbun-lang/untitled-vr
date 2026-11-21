@@ -14,11 +14,16 @@ const WINDOW_SILL: float = 0.95
 const WINDOW_HEIGHT: float = 1.1
 const MAX_FLOORS: int = 3
 const MAX_BUILDING_NODES: int = 16
+
+const WINDOW_FRAME_DEPTH: float = 0.08
+const WINDOW_GLASS_DEPTH: float = 0.02
+const DOOR_FRAME_DEPTH: float = 0.12
+
 const STYLE_SURFACES: Dictionary = {
-	"brick": {"wall": "brick", "floor": "concrete", "roof": "concrete", "inner": "wood"},
-	"wood": {"wall": "wood", "floor": "wood", "roof": "wood", "inner": "wood"},
-	"metal": {"wall": "metal", "floor": "concrete", "roof": "metal", "inner": "metal"},
-	"concrete": {"wall": "concrete", "floor": "concrete", "roof": "concrete", "inner": "concrete"},
+	"brick": {"wall": "brick", "floor": "concrete", "roof": "concrete", "inner": "wood", "window_frame": "metal"},
+	"wood": {"wall": "wood", "floor": "wood", "roof": "wood", "inner": "wood", "window_frame": "wood"},
+	"metal": {"wall": "metal", "floor": "concrete", "roof": "metal", "inner": "metal", "window_frame": "metal"},
+	"concrete": {"wall": "concrete", "floor": "concrete", "roof": "concrete", "inner": "concrete", "window_frame": "metal"},
 }
 
 static var _unit_box: BoxMesh = null
@@ -140,10 +145,12 @@ static func generate(seed: int, params: Dictionary) -> Dictionary:
 	rng.seed = seed
 	var origin := Vector3(float(cell.x) + float(width) * 0.5, 0.0, float(cell.y) + float(depth) * 0.5)
 	var boxes: Array = []
+	var visuals: Array = []
 	var doors: Array = []
 	var rooms: Array = []
 	var stairs: Array = []
 	var wall_surface: String = surfaces["wall"]
+	var window_frame_surface: String = surfaces["window_frame"]
 
 	for floor in range(floors):
 		var base_y: float = float(floor) * FLOOR_HEIGHT
@@ -209,32 +216,33 @@ static func generate(seed: int, params: Dictionary) -> Dictionary:
 				"width": DOOR_WIDTH,
 				"height": DOOR_HEIGHT,
 			})
+			_add_door_visuals(visuals, door_side, world_center, base_y, window_frame_surface)
 
 		_add_wall_axis(
-			boxes, "x", origin.z - float(depth) * 0.5,
+			boxes, visuals, "x", origin.z - float(depth) * 0.5,
 			origin.x - float(width) * 0.5, origin.x + float(width) * 0.5,
-			base_y, openings_south, wall_surface
+			base_y, openings_south, wall_surface, window_frame_surface, true
 		)
 		_add_wall_axis(
-			boxes, "x", origin.z + float(depth) * 0.5,
+			boxes, visuals, "x", origin.z + float(depth) * 0.5,
 			origin.x - float(width) * 0.5, origin.x + float(width) * 0.5,
-			base_y, openings_north, wall_surface
+			base_y, openings_north, wall_surface, window_frame_surface, true
 		)
 		_add_wall_axis(
-			boxes, "z", origin.x - float(width) * 0.5,
+			boxes, visuals, "z", origin.x - float(width) * 0.5,
 			origin.z - float(depth) * 0.5 + WALL_THICKNESS,
 			origin.z + float(depth) * 0.5 - WALL_THICKNESS,
-			base_y, openings_west, wall_surface
+			base_y, openings_west, wall_surface, window_frame_surface, true
 		)
 		_add_wall_axis(
-			boxes, "z", origin.x + float(width) * 0.5,
+			boxes, visuals, "z", origin.x + float(width) * 0.5,
 			origin.z - float(depth) * 0.5 + WALL_THICKNESS,
 			origin.z + float(depth) * 0.5 - WALL_THICKNESS,
-			base_y, openings_east, wall_surface
+			base_y, openings_east, wall_surface, window_frame_surface, true
 		)
 
 		_add_wall_axis(
-			boxes, "z", origin.x,
+			boxes, visuals, "z", origin.x,
 			origin.z - float(depth) * 0.5 + WALL_THICKNESS,
 			origin.z + float(depth) * 0.5 - WALL_THICKNESS,
 			base_y,
@@ -244,7 +252,7 @@ static func generate(seed: int, params: Dictionary) -> Dictionary:
 				"bottom": 0.0,
 				"top": DOOR_HEIGHT,
 			}],
-			str(surfaces["inner"])
+			str(surfaces["inner"]), window_frame_surface, false
 		)
 		_add_box(
 			boxes,
@@ -331,6 +339,7 @@ static func generate(seed: int, params: Dictionary) -> Dictionary:
 		"bounds": bounds,
 		"footprint": footprint,
 		"boxes": boxes,
+		"visuals": visuals,
 		"collision_boxes": collision_boxes,
 		"doors": doors,
 		"rooms": rooms,
@@ -375,6 +384,36 @@ static func build(parent: Node3D, spec: Dictionary) -> Dictionary:
 			multimesh.set_instance_transform(i, transform)
 		visual.multimesh = multimesh
 		visual.material_override = WorldMaterialsScript.surface_material(str(surface))
+		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		root.add_child(visual)
+		visual_count += 1
+
+	var visuals_grouped: Dictionary = {}
+	for visual in spec.get("visuals", []):
+		var surface: String = str(visual.get("surface", "concrete"))
+		if not visuals_grouped.has(surface):
+			visuals_grouped[surface] = []
+		(visuals_grouped[surface] as Array).append(visual)
+
+	for surface in visuals_grouped.keys():
+		var instances: Array = visuals_grouped[surface]
+		if instances.is_empty():
+			continue
+		var visual := MultiMeshInstance3D.new()
+		visual.name = "Visual_%s_Details" % str(surface)
+		var multimesh := MultiMesh.new()
+		multimesh.transform_format = MultiMesh.TRANSFORM_3D
+		multimesh.mesh = unit_box()
+		multimesh.instance_count = instances.size()
+		for i in range(instances.size()):
+			var v: Dictionary = instances[i]
+			var transform := Transform3D(Basis().scaled(Vector3(v["size"])), Vector3(v["center"]))
+			multimesh.set_instance_transform(i, transform)
+		visual.multimesh = multimesh
+		if str(surface) == "glass":
+			visual.material_override = _glass_material()
+		else:
+			visual.material_override = WorldMaterialsScript.surface_material(str(surface))
 		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		root.add_child(visual)
 		visual_count += 1
@@ -494,8 +533,9 @@ static func _window_opening(center: float, rng: RandomNumberGenerator) -> Dictio
 
 
 static func _add_wall_axis(
-	boxes: Array, axis: String, fixed: float, start: float, end: float,
-	base_y: float, openings: Array, surface: String
+	boxes: Array, visuals: Array, axis: String, fixed: float, start: float, end: float,
+	base_y: float, openings: Array, surface: String, window_frame_surface: String,
+	is_exterior: bool = true
 ) -> void:
 	for segment in _wall_segments(start, end, openings):
 		var along_start: float = segment[0]
@@ -514,6 +554,78 @@ static func _add_wall_axis(
 			center = Vector3(fixed, base_y + (bottom + top) * 0.5, along_center)
 			size = Vector3(WALL_THICKNESS, top - bottom, along_end - along_start)
 		_add_box(boxes, center, size, surface, true, "wall")
+		
+		if is_exterior and (bottom > 0.0 or top < WALL_HEIGHT):
+			_add_window_visuals(visuals, axis, fixed, along_start, along_end, bottom, top, base_y, window_frame_surface)
+
+
+static func _add_window_visuals(
+	visuals: Array, axis: String, fixed: float, along_start: float, along_end: float,
+	bottom: float, top: float, base_y: float, frame_surface: String
+) -> void:
+	var width: float = along_end - along_start
+	var height: float = top - bottom
+	if width <= 0.001 or height <= 0.001:
+		return
+	var center: Vector3
+	var frame_size: Vector3
+	var glass_size: Vector3
+	if axis == "x":
+		center = Vector3((along_start + along_end) * 0.5, base_y + bottom + height * 0.5, fixed)
+		frame_size = Vector3(width, height, WINDOW_FRAME_DEPTH)
+		glass_size = Vector3(width - 0.04, height - 0.04, WINDOW_GLASS_DEPTH)
+	else:
+		center = Vector3(fixed, base_y + bottom + height * 0.5, (along_start + along_end) * 0.5)
+		frame_size = Vector3(WINDOW_FRAME_DEPTH, height, width)
+		glass_size = Vector3(WINDOW_GLASS_DEPTH, height - 0.04, width - 0.04)
+	
+	visuals.append({
+		"type": "window_frame",
+		"center": center,
+		"size": frame_size,
+		"surface": frame_surface,
+		"kind": "window_frame"
+	})
+	visuals.append({
+		"type": "window_glass",
+		"center": center,
+		"size": glass_size,
+		"surface": "glass",
+		"kind": "window_glass"
+	})
+
+
+static func _add_door_visuals(
+	visuals: Array, side: String, world_center: Vector3, base_y: float, frame_surface: String
+) -> void:
+	var door_center: Vector3 = Vector3(world_center.x, base_y + DOOR_HEIGHT * 0.5, world_center.z)
+	var frame_size: Vector3
+	var door_size: Vector3
+	match side:
+		"north", "south":
+			frame_size = Vector3(DOOR_WIDTH + 0.1, DOOR_HEIGHT + 0.05, DOOR_FRAME_DEPTH)
+			door_size = Vector3(DOOR_WIDTH, DOOR_HEIGHT, 0.04)
+		"east", "west":
+			frame_size = Vector3(DOOR_FRAME_DEPTH, DOOR_HEIGHT + 0.05, DOOR_WIDTH + 0.1)
+			door_size = Vector3(0.04, DOOR_HEIGHT, DOOR_WIDTH)
+		_:
+			frame_size = Vector3(DOOR_WIDTH + 0.1, DOOR_HEIGHT + 0.05, DOOR_FRAME_DEPTH)
+			door_size = Vector3(DOOR_WIDTH, DOOR_HEIGHT, 0.04)
+	
+	visuals.append({
+		"type": "door_frame",
+		"center": door_center,
+		"size": frame_size,
+		"surface": frame_surface,
+		"kind": "door_frame"
+	})
+	visuals.append({
+		"type": "door",
+		"center": door_center,
+		"size": door_size,
+		"surface": "wood",
+		"kind": "door"
+	})
 
 
 static func _wall_segments(start: float, end: float, openings: Array) -> Array:
@@ -595,7 +707,20 @@ static func _failure(errors: Array) -> Dictionary:
 		"boxes": [],
 		"collision_boxes": [],
 		"doors": [],
+		"visuals": [],
 		"footprint": [],
 		"node_estimate": 0,
 		"errors": errors.duplicate(),
 	}
+
+
+static func _glass_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.transparency = StandardMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = Color(0.2, 0.3, 0.5, 0.3)
+	material.roughness = 0.05
+	material.metallic = 0.9
+	material.clearcoat = 1.0
+	material.clearcoat_roughness = 0.05
+	material.cull_mode = StandardMaterial3D.CULL_BACK
+	return material

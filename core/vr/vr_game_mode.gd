@@ -6,6 +6,7 @@ const CalibrationScript = preload("res://core/vr/vr_calibration.gd")
 const BOOTSTRAP_PATH: String = "res://core/vr/vr_bootstrap.gd"
 const PLAYER_SCENE: String = "res://scenes/player/player.tscn"
 const SESSION_PATH: String = "res://core/game/game_session.gd"
+const GameSessionScript = preload("res://core/game/game_session.gd")
 const VrRigScript = preload("res://core/vr/vr_rig.gd")
 const VrHudScript = preload("res://core/vr/vr_hud.gd")
 const VrMenuScript = preload("res://core/vr/vr_menu.gd")
@@ -455,7 +456,7 @@ class State extends Node:
 				if menu != null:
 					menu.call("close_menu")
 			"gore":
-				GameSession.gore_enabled = not GameSession.gore_enabled
+				GameSessionScript.gore_enabled = not GameSessionScript.gore_enabled
 			"map":
 				_start_next_map()
 			"quit":
@@ -463,11 +464,35 @@ class State extends Node:
 
 
 	func _start_next_map() -> void:
-		var next_meta: Dictionary = VrGameMode.map_choice_meta(int(selected_meta.get("choice_index", 0)) + 1)
-		if next_meta.is_empty():
+		var next_index: int = int(selected_meta.get("choice_index", 0)) + 1
+		var choice: Dictionary = MAP_CHOICES[posmod(next_index, MAP_CHOICES.size())]
+		var params: Dictionary = {
+			"width": 24, "height": 18, "obstacle_density": 0.12, "spawn_count": 4,
+		}
+		var meta: Dictionary
+		var theme: String = str(choice["theme"])
+		if theme.is_empty():
+			meta = GeneratorScript.generate(int(choice["seed"]), params)
+		else:
+			params["theme"] = theme
+			params["theme_density"] = 0.55
+			params["time_of_day"] = "dia"
+			meta = ThemesScript.generate(int(choice["seed"]), params)
+		if not bool(meta.get("ok", false)):
 			return
-		GameSession.vr_menu_confirmed = true
-		GameSession.start(next_meta, get_tree())
+		meta["choice_index"] = posmod(next_index, MAP_CHOICES.size())
+		meta["choice_label"] = str(choice["label"])
+		if bool(choice["office"]):
+			var office: Dictionary = (meta.get("theme_data", {}) as Dictionary).get("office", {})
+			var inside: Array = office.get("spawns", [])
+			if not inside.is_empty():
+				var points: Array = (meta.get("spawn_points", []) as Array).duplicate()
+				var spot: Vector3 = inside[0]
+				points.push_front(Vector3(spot.x, 0.0, spot.z))
+				meta["spawn_points"] = points
+				meta["office_spawn"] = true
+		GameSessionScript.vr_menu_confirmed = true
+		GameSessionScript.start(meta, get_tree())
 
 
 	func on_health_changed(current: float, maximum: float) -> void:
@@ -545,16 +570,42 @@ class StartMenuHost extends Node3D:
 		if button_id == "recalibrate":
 			return
 		if button_id == "map_next":
-			var next_meta: Dictionary = VrGameMode.map_choice_meta(int(chosen_meta.get("choice_index", 0)) + 1)
-			if not next_meta.is_empty():
-				chosen_meta = next_meta
-				if menu != null and menu.has_method("set_buttons"):
-					var labeled: Array = START_BUTTONS.duplicate(true)
-					(labeled[0] as Dictionary)["label"] = "JUGAR: " + str(chosen_meta.get("choice_label", "MAPA"))
-					menu.call("set_buttons", labeled)
+			var next_index: int = int(chosen_meta.get("choice_index", 0)) + 1
+			var choice: Dictionary = MAP_CHOICES[posmod(next_index, MAP_CHOICES.size())]
+			var params: Dictionary = {
+				"width": 24, "height": 18, "obstacle_density": 0.12, "spawn_count": 4,
+			}
+			var meta: Dictionary
+			var theme: String = str(choice["theme"])
+			if theme.is_empty():
+				meta = GeneratorScript.generate(int(choice["seed"]), params)
+			else:
+				params["theme"] = theme
+				params["theme_density"] = 0.55
+				params["time_of_day"] = "dia"
+				meta = ThemesScript.generate(int(choice["seed"]), params)
+			if not bool(meta.get("ok", false)):
+				return
+			meta["choice_index"] = posmod(next_index, MAP_CHOICES.size())
+			meta["choice_label"] = str(choice["label"])
+			if bool(choice["office"]):
+				var office: Dictionary = (meta.get("theme_data", {}) as Dictionary).get("office", {})
+				var inside: Array = office.get("spawns", [])
+				if not inside.is_empty():
+					var points: Array = (meta.get("spawn_points", []) as Array).duplicate()
+					var spot: Vector3 = inside[0]
+					points.push_front(Vector3(spot.x, 0.0, spot.z))
+					meta["spawn_points"] = points
+					meta["office_spawn"] = true
+			chosen_meta = meta
+			if menu != null and menu.has_method("set_buttons"):
+				var labeled: Array = START_BUTTONS.duplicate(true)
+				(labeled[0] as Dictionary)["label"] = "JUGAR: " + str(chosen_meta.get("choice_label", "MAPA"))
+				menu.call("set_buttons", labeled)
 			return
-		GameSession.vr_menu_confirmed = true
-		GameSession.start(chosen_meta.duplicate(true), get_tree())
+		if button_id == "play":
+			GameSessionScript.vr_menu_confirmed = true
+			GameSessionScript.start(chosen_meta.duplicate(true), get_tree())
 
 
 	func _unhandled_input(event: InputEvent) -> void:

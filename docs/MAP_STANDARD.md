@@ -23,6 +23,31 @@
 - **Tags (`tags`)**: Free-form labels used to discover maps.
 - **Player count (`players_min` / `players_max`)**: Supported player-count range.
 
+## Optional Environmental Content (OPCIONAL)
+
+### Vegetación (`_build_vegetation`)
+Mapas generados pueden incluir vegetación procedimental (árboles y arbustos)
+distribuida sobre el terreno mediante `MultiMesh` para bajo costo de renderizado.
+- **Árboles**: `MODEL_TREE_DEFAULT`, `MODEL_TREE_OAK`, `MODEL_TREE_PINE` colocados
+  en grid con separación `TREE_SPACING`, máximo `MAX_TREES` por mapa.
+- **Arbustos**: `MODEL_BUSH` colocados en grid con separación `BUSH_SPACING`,
+  máximo `MAX_BUSHES` por mapa.
+- **Margen de seguridad**: `VEGETATION_MARGIN` evita colisión con bordes del mapa.
+- **Puntos de aparición**: la vegetación no se superpone con los puntos de
+  aparición del jugador (`spawn_points`).
+- Aplicable a todos los temas de mapa.
+
+### Vallas (`_build_fences`)
+Los temas `rural` e `industrial` incluyen una valla perimetral (`fence_simple.glb`)
+colocada en los bordes del mapa con separación `FENCE_SPACING` y margen
+`FENCE_MARGIN`. Otros temas no generan vallas.
+
+### Coches aparcados (`_park_vehicles`)
+El mundo genera vehículos aparcados (`PARKED_VEHICLE_COUNT`) distribuidos sobre
+puntos libres de navegación, respetando distancia mínima a puntos de aparición,
+edificios, NPCs y otros coches. Los coches aparcados se exponen mediante
+`world.parked_vehicle_list()` y se cuentan en `world_report.parked_vehicles`.
+
 ## Optional Metadata Fields (OPCIONAL, retrocompatible)
 
 All four fields are optional. A map that omits them keeps exactly the same

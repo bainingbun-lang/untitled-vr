@@ -69,6 +69,23 @@ static func pose(grip_value: float = 1.0, trigger_value: float = 0.0, zone: Stri
 	}
 
 
+static func two_hand_pose(
+	primary_zone: String, secondary_zone: String,
+	primary_grip: float = 1.0, secondary_grip: float = 1.0,
+	primary_trigger: float = 0.0, secondary_trigger: float = 0.0,
+	primary_hand: String = "right", secondary_hand: String = "left"
+) -> Dictionary:
+	var primary: Dictionary = pose(primary_grip, primary_trigger, primary_zone, primary_hand)
+	var secondary: Dictionary = pose(secondary_grip, secondary_trigger, secondary_zone, secondary_hand)
+	return {
+		"primary": primary,
+		"secondary": secondary,
+		"primary_zone": primary_zone,
+		"secondary_zone": secondary_zone,
+		"mixed": primary_zone != secondary_zone,
+	}
+
+
 static func angle_for(node_name: String, values: Dictionary) -> float:
 	var parts: PackedStringArray = node_name.split("_")
 	if parts.size() < 3 or not values.has("fingers"):

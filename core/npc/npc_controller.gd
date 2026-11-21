@@ -1,13 +1,13 @@
 class_name NPCController
 extends RefCounted
 
-var state_machine: NPCStateMachine
-var personality: NPCPersonality
-var needs: NPCNeeds
-var memory: NPCMemory
-var routine: NPCRoutine
+var state_machine
+var personality
+var needs
+var memory
+var routine
 
-func _init(sm: NPCStateMachine, pers: NPCPersonality, nds: NPCNeeds, mem: NPCMemory, rt: NPCRoutine):
+func _init(sm, pers, nds, mem, rt):
 	state_machine = sm
 	personality = pers
 	needs = nds

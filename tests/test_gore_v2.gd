@@ -236,18 +236,18 @@ func _test_budgets_and_limits() -> void:
 	_case = "limites NORMAL"
 	GoreSystemScript.apply_gore_level(GoreSystemScript.GoreLevel.NORMAL)
 	var limits: Dictionary = GoreSystemScript.get_limits()
-	_expect(limits["decals"] == 96, "decals NORMAL: %d" % limits["decals"])
-	_expect(limits["puddles"] == 32, "puddles NORMAL: %d" % limits["puddles"])
-	_expect(limits["parts"] == 16, "parts NORMAL: %d" % limits["parts"])
-	_expect(limits["active_particles"] == 48, "active_particles NORMAL: %d" % limits["active_particles"])
+	_expect(limits["decals"] == 24, "decals NORMAL: %d" % limits["decals"])
+	_expect(limits["puddles"] == 16, "puddles NORMAL: %d" % limits["puddles"])
+	_expect(limits["parts"] == 12, "parts NORMAL: %d" % limits["parts"])
+	_expect(limits["active_particles"] == 24, "active_particles NORMAL: %d" % limits["active_particles"])
 	
 	_case = "limites EXTREME"
 	GoreSystemScript.apply_gore_level(GoreSystemScript.GoreLevel.EXTREME)
 	limits = GoreSystemScript.get_limits()
-	_expect(limits["decals"] == 160, "decals EXTREME: %d" % limits["decals"])
-	_expect(limits["puddles"] == 64, "puddles EXTREME: %d" % limits["puddles"])
-	_expect(limits["parts"] == 32, "parts EXTREME: %d" % limits["parts"])
-	_expect(limits["active_particles"] == 96, "active_particles EXTREME: %d" % limits["active_particles"])
+	_expect(limits["decals"] == 48, "decals EXTREME: %d" % limits["decals"])
+	_expect(limits["puddles"] == 32, "puddles EXTREME: %d" % limits["puddles"])
+	_expect(limits["parts"] == 24, "parts EXTREME: %d" % limits["parts"])
+	_expect(limits["active_particles"] == 48, "active_particles EXTREME: %d" % limits["active_particles"])
 	
 	_case = "reciclado de decals (el mas antiguo)"
 	GoreSystemScript.apply_gore_level(GoreSystemScript.GoreLevel.NORMAL)

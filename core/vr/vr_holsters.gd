@@ -13,10 +13,26 @@ const SLOTS: Dictionary = {
 }
 const LONG_GUN_TAGS: Array = ["rifle", "sniper", "shotgun", "smg"]
 
+# Proporciones para escalado por eye_height (usadas cuando set_eye_height > 0)
+const HIP_Y_RATIO: float = -0.40
+const HIP_X_RATIO: float = 0.20
+const HIP_RADIUS_RATIO: float = 0.20
+const BACK_Y_RATIO: float = 0.08
+const BACK_Z_RATIO: float = 0.15
+const BACK_RADIUS_RATIO: float = 0.11
+const CHEST_Y_RATIO: float = -0.15
+const CHEST_Z_RATIO: float = -0.10
+const CHEST_RADIUS_RATIO: float = 0.08
+const BAG_Y_RATIO: float = -0.38
+const BAG_X_RATIO: float = 0.16
+const BAG_Z_RATIO: float = 0.19
+const BAG_RADIUS_RATIO: float = 0.12
+
 var head_transform: Transform3D = Transform3D.IDENTITY
 var _slots: Dictionary = {}
 var _location: Dictionary = {}
 var _events: Array = []
+var _eye_height: float = 0.0
 
 
 func _init() -> void:
@@ -34,6 +50,10 @@ func set_head_pose(xform: Transform3D) -> void:
 	head_transform = xform
 
 
+func set_eye_height(eye_height: float) -> void:
+	_eye_height = maxf(float(eye_height), 0.0)
+
+
 static func normalized_safe(value: Vector3, fallback: Vector3) -> Vector3:
 	var result := value
 	if is_nan(result.x) or is_nan(result.y) or is_nan(result.z) or result.length_squared() <= 0.000001:
@@ -44,7 +64,11 @@ static func normalized_safe(value: Vector3, fallback: Vector3) -> Vector3:
 func slot_position(slot: String) -> Vector3:
 	if not SLOTS.has(slot):
 		return head_transform.origin
-	var local: Vector3 = (SLOTS[slot] as Dictionary)["offset"]
+	var local: Vector3
+	if _eye_height > 0.0:
+		local = _get_proportional_offset(slot)
+	else:
+		local = (SLOTS[slot] as Dictionary)["offset"]
 	var basis: Basis = head_transform.basis
 	return head_transform.origin + basis.x * local.x + basis.y * local.y + basis.z * local.z
 
@@ -52,7 +76,34 @@ func slot_position(slot: String) -> Vector3:
 func slot_radius(slot: String) -> float:
 	if not SLOTS.has(slot):
 		return 0.01
+	if _eye_height > 0.0:
+		return maxf(_get_proportional_radius(slot), 0.01)
 	return maxf(float((SLOTS[slot] as Dictionary)["radius"]), 0.01)
+
+
+func _get_proportional_offset(slot: String) -> Vector3:
+	match slot:
+		"hip":
+			var hand_side: float = 1.0
+			return Vector3(HIP_X_RATIO * hand_side * _eye_height, HIP_Y_RATIO * _eye_height, 0.0)
+		"back":
+			return Vector3(0.0, BACK_Y_RATIO * _eye_height, BACK_Z_RATIO * _eye_height)
+		"chest":
+			return Vector3(0.0, CHEST_Y_RATIO * _eye_height, CHEST_Z_RATIO * _eye_height)
+		"bag":
+			var hand_side: float = 1.0
+			return Vector3(BAG_X_RATIO * hand_side * _eye_height, BAG_Y_RATIO * _eye_height, BAG_Z_RATIO * _eye_height)
+		_:
+			return (SLOTS[slot] as Dictionary)["offset"]
+
+
+func _get_proportional_radius(slot: String) -> float:
+	match slot:
+		"hip": return HIP_RADIUS_RATIO * _eye_height
+		"back": return BACK_RADIUS_RATIO * _eye_height
+		"chest": return CHEST_RADIUS_RATIO * _eye_height
+		"bag": return BAG_RADIUS_RATIO * _eye_height
+		_: return float((SLOTS[slot] as Dictionary)["radius"])
 
 
 func nearest_slot(hand_pose: Transform3D, radius_scale: float = 1.0) -> Dictionary:
@@ -69,6 +120,22 @@ func nearest_slot(hand_pose: Transform3D, radius_scale: float = 1.0) -> Dictiona
 		"distance": best_distance,
 		"ok": best_distance <= limit,
 	}
+
+
+func get_glow_info(hand_position: Transform3D, radius_scale: float = 1.0) -> Dictionary:
+	var hand_pos: Vector3 = hand_position.origin
+	var result: Dictionary = {}
+	for slot in SLOTS.keys():
+		var slot_pos: Vector3 = slot_position(slot)
+		var distance: float = hand_pos.distance_to(slot_pos)
+		var radius: float = slot_radius(slot) * maxf(radius_scale, 0.0)
+		result[slot] = {
+			"visible": distance <= radius,
+			"distance": distance,
+			"position": slot_pos,
+			"radius": radius,
+		}
+	return result
 
 
 static func item_kind(item_id: String, tags: Array = []) -> String:

@@ -150,6 +150,7 @@ func _start_game_direct() -> void:
 		_diag("ERROR: no se pudo preparar la partida")
 		return
 	_diag("arrancando la partida...")
+	menu = null
 	sess.set("vr_menu_confirmed", true)
 	sess.call("start", (m as Dictionary).duplicate(true), get_tree())
 
@@ -328,6 +329,8 @@ func _place_menu() -> void:
 
 
 func _point(controller: XRController3D) -> void:
+	if menu == null or not is_instance_valid(menu):
+		return
 	var hand := str(controller.tracker)
 	var beam: MeshInstance3D = _beams[hand]
 	beam.visible = controller.get_is_active()

@@ -56,6 +56,11 @@ const MODEL_SOFA: String = "res://assets/models/maps/furniture/loungeSofa.glb"
 const MODEL_PLANT: String = "res://assets/models/maps/furniture/pottedPlant.glb"
 const MODEL_COUNTER: String = "res://assets/models/maps/furniture/kitchenBar.glb"
 const MODEL_CEILING_LAMP: String = "res://assets/models/maps/furniture/lampSquareCeiling.glb"
+const MODEL_KEYBOARD: String = "res://assets/models/maps/furniture/keyboard.glb"
+const MODEL_MEETING_TABLE: String = "res://assets/models/maps/furniture/meetingTable.glb"
+const MODEL_WATER_COOLER: String = "res://assets/models/maps/furniture/waterCooler.glb"
+const MODEL_PRINTER: String = "res://assets/models/maps/furniture/printer.glb"
+const MODEL_FILING_CABINET: String = "res://assets/models/maps/furniture/filingCabinet.glb"
 const NAVIGATION_DECISION: String = (
 	"Se reutiliza NPCNavigation en vez de NavigationRegion3D: el juego ya consume su A* "
 	+ "desde NpcCombat/ArmedNpc, no requiere horneado en headless/Android y permite marcar "
@@ -220,7 +225,7 @@ static func apply_theme(meta: Dictionary, seed: int = -1, params: Dictionary = {
 	return result
 
 
-static func navigation_for(meta: Dictionary, theme_data: Dictionary = {}) -> NPCNavigation:
+static func navigation_for(meta: Dictionary, theme_data: Dictionary = {}):
 	var width: int = int(meta.get("width", 0))
 	var height: int = int(meta.get("height", 0))
 	var data: Dictionary = theme_data
@@ -357,6 +362,7 @@ static func _build_streets(root: Node3D, theme_data: Dictionary) -> void:
 	for value in roads:
 		road_set[value] = true
 	var placements: Array = []
+	var light_placements: Array = []
 	for value in roads:
 		var cell: Vector2i = value
 		var horizontal: bool = (
@@ -377,9 +383,33 @@ static func _build_streets(root: Node3D, theme_data: Dictionary) -> void:
 				horizontal = true
 		var yaw: float = PI * 0.5 if vertical and not horizontal else 0.0
 		placements.append([path, BuildingScript.cell_center(cell), yaw])
+		
+		if theme in ["urbano", "industrial"] and neighbors <= 2:
+			var cell_center := BuildingScript.cell_center(cell)
+			var offset_x: float = 0.0
+			var offset_z: float = 0.0
+			if horizontal and not vertical:
+				offset_z = 3.5
+			elif vertical and not horizontal:
+				offset_x = 3.5
+			else:
+				offset_x = 3.5
+				offset_z = 3.5
+			light_placements.append([
+				MODEL_LAMP,
+				Vector3(cell_center.x + offset_x, 0.0, cell_center.z + offset_z),
+				0.0
+			])
+	
 	_add_model_group(
 		root, "StreetModels", placements, Vector3(1.0, 0.04, 1.0), 90.0, true
 	)
+	
+	if not light_placements.is_empty():
+		_add_model_group(
+			root, "StreetLights", light_placements, Vector3(0.35, 3.2, 0.35), 80.0, true
+		)
+	
 	if theme == "urbano":
 		var walk_placements: Array = []
 		for value in sidewalks:
@@ -389,6 +419,16 @@ static func _build_streets(root: Node3D, theme_data: Dictionary) -> void:
 		_add_model_group(
 			root, "SidewalkModels", walk_placements, Vector3(1.0, 0.08, 1.0), 80.0, true
 		)
+		var curb_placements: Array = []
+		for value in sidewalks:
+			curb_placements.append([
+				"res://assets/models/maps/city-roads/tile-low.glb",
+				BuildingScript.cell_center(value), 0.0
+			])
+		if not curb_placements.is_empty():
+			_add_model_group(
+				root, "CurbModels", curb_placements, Vector3(1.0, 0.15, 1.0), 70.0, true
+			)
 
 
 static func _generate_props(
@@ -545,53 +585,9 @@ static func _build_facade(root: Node3D, spec: Dictionary, theme: String) -> Dict
 	group.set_meta("model_kind", theme)
 	root.add_child(group)
 
-	var placements: Array = []
-	if theme == "rural":
-		var x0: float = float(cell.x)
-		var z0: float = float(cell.y)
-		placements.append([
-			MODEL_OFFICE_WALL, Vector3(x0 + float(width) * 0.5, 1.2, z0 + 0.06),
-			0.0, Vector3(float(width), 2.4, 0.12),
-		])
-		placements.append([
-			MODEL_OFFICE_WALL, Vector3(x0 + float(width) * 0.5, 1.2, z0 + float(depth) - 0.06),
-			0.0, Vector3(float(width), 2.4, 0.12),
-		])
-		placements.append([
-			MODEL_OFFICE_WALL, Vector3(x0 + 0.06, 1.2, z0 + float(depth) * 0.5),
-			PI * 0.5, Vector3(float(depth), 2.4, 0.12),
-		])
-		placements.append([
-			MODEL_OFFICE_WALL, Vector3(x0 + float(width) - 0.06, 1.2, z0 + float(depth) * 0.5),
-			PI * 0.5, Vector3(float(depth), 2.4, 0.12),
-		])
-		placements.append([
-			MODEL_OFFICE_ROOF, Vector3(center.x, 2.5, center.z),
-			0.0, Vector3(float(width), 0.12, float(depth)),
-		])
-	else:
-		var path: String = MODEL_COMMERCIAL
-		if theme == "industrial":
-			path = MODEL_INDUSTRIAL
-			if rng_boolean(cell.x + cell.y + floors):
-				path = MODEL_INDUSTRIAL_ALT
-		elif rng_boolean(cell.x * 3 + cell.y + floors):
-			path = MODEL_COMMERCIAL_ALT
-		placements.append([
-			path, center, yaw,
-			Vector3(float(width) * 0.98, float(floors) * 2.6, float(depth) * 0.98),
-		])
-	_add_model_group(group, "BuildingModels", placements, Vector3.ZERO, 110.0, false)
-
-	var body := StaticBody3D.new()
-	body.name = "BuildingCollision"
-	body.collision_layer = 1
-	body.collision_mask = 0
-	body.set_meta("surface", "concrete")
-	var shape := CollisionShape3D.new()
-	shape.shape = BuildingScript.collision_shape(spec.get("boxes", []))
-	body.add_child(shape)
-	group.add_child(body)
+	var build_report: Dictionary = BuildingScript.build(group, spec)
+	if not bool(build_report.get("ok", false)):
+		_add_fallback_model(group, center, yaw, width, depth, floors, theme)
 
 	var doors: Array = []
 	var door_index: int = 0
@@ -613,6 +609,19 @@ static func _build_facade(root: Node3D, spec: Dictionary, theme: String) -> Dict
 		"doors": doors,
 		"node_count": BuildingScript.count_nodes(group),
 	}
+
+
+static func _add_fallback_model(
+	group: Node3D, center: Vector3, yaw: float,
+	width: int, depth: int, floors: int, theme: String
+) -> void:
+	var path: String = MODEL_COMMERCIAL
+	if theme == "industrial":
+		path = MODEL_INDUSTRIAL
+	elif theme == "rural":
+		path = MODEL_RURAL_HOUSE
+	var placements: Array = [[path, center, yaw, Vector3(float(width) * 0.98, float(floors) * 2.6, float(depth) * 0.98)]]
+	_add_model_group(group, "BuildingModels", placements, Vector3.ZERO, 110.0, false)
 
 
 static func _build_office(
@@ -790,27 +799,86 @@ static func _office_furniture(
 	var sofa_center := Vector3(x0 + float(width) - 1.2, 0.45, z0 + 0.9)
 	placements.append([MODEL_SOFA, sofa_center, PI, Vector3(1.5, 0.9, 0.8)])
 	boxes.append({"center": sofa_center, "size": Vector3(1.5, 0.9, 0.8)})
-	var desk_points: Array = [
-		Vector3(x0 + 1.4, 0.4, z0 + minf(3.1, float(depth) - 0.9)),
-		Vector3(x0 + minf(2.5, float(width) - 0.6), 0.4, z0 + maxf(1.2, float(depth) - 1.0)),
-		Vector3(x0 + float(width) - 1.2, 0.4, z0 + 1.3),
-	]
+	
+	var desk_points: Array = []
+	for gx in range(1, width - 1):
+		for gz in range(2, depth - 1):
+			if (gx + gz) % 2 == 0:
+				desk_points.append(Vector3(
+					x0 + float(gx) + 0.5,
+					0.4,
+					z0 + float(gz) + 0.5
+				))
+	
+	if desk_points.is_empty():
+		desk_points = [
+			Vector3(x0 + 1.4, 0.4, z0 + minf(3.1, float(depth) - 0.9)),
+			Vector3(x0 + minf(2.5, float(width) - 0.6), 0.4, z0 + maxf(1.2, float(depth) - 1.0)),
+			Vector3(x0 + float(width) - 1.2, 0.4, z0 + 1.3),
+		]
+	
 	for point in desk_points:
 		placements.append([MODEL_DESK, point, 0.0, Vector3(1.3, 0.8, 0.75)])
 		boxes.append({"center": point, "size": Vector3(1.3, 0.8, 0.75)})
-		placements.append([MODEL_CHAIR, point + Vector3(0.0, 0.25, 0.85), PI, Vector3(0.55, 0.9, 0.55)])
-		placements.append([MODEL_COMPUTER, point + Vector3(0.0, 0.82, -0.2), 0.0, Vector3(0.55, 0.4, 0.12)])
-	var shelf_a := Vector3(x0 + 0.35, 0.95, z0 + minf(3.2, float(depth) - 0.4))
-	var shelf_b := Vector3(x0 + float(width) - 0.35, 0.95, z0 + maxf(1.5, float(depth) - 0.4))
-	for shelf in [shelf_a, shelf_b]:
+		
+		var chair_pos: Vector3 = point + Vector3(0.0, 0.25, 0.85)
+		placements.append([MODEL_CHAIR, chair_pos, PI, Vector3(0.55, 0.9, 0.55)])
+		boxes.append({"center": chair_pos, "size": Vector3(0.55, 0.9, 0.55)})
+		
+		var monitor_pos: Vector3 = point + Vector3(0.0, 0.82, -0.2)
+		placements.append([MODEL_COMPUTER, monitor_pos, 0.0, Vector3(0.55, 0.4, 0.12)])
+		boxes.append({"center": monitor_pos, "size": Vector3(0.55, 0.4, 0.12)})
+		
+		var keyboard_pos: Vector3 = point + Vector3(0.0, 0.55, 0.3)
+		placements.append([MODEL_KEYBOARD, keyboard_pos, 0.0, Vector3(0.5, 0.05, 0.2)])
+	
+	var shelf_positions: Array = []
+	for z in range(1, depth - 1):
+		if z % 2 == 0:
+			shelf_positions.append(Vector3(x0 + 0.35, 0.95, z0 + float(z) + 0.5))
+			shelf_positions.append(Vector3(x0 + float(width) - 0.35, 0.95, z0 + float(z) + 0.5))
+	
+	for shelf in shelf_positions:
 		placements.append([MODEL_SHELF, shelf, PI * 0.5, Vector3(1.2, 1.9, 0.4)])
 		boxes.append({"center": shelf, "size": Vector3(0.4, 1.9, 1.2)})
+	
 	placements.append([MODEL_PLANT, Vector3(x0 + 0.6, 0.5, z0 + 0.6), 0.0, Vector3(0.7, 1.0, 0.7)])
 	placements.append([MODEL_PLANT, Vector3(x0 + float(width) - 0.7, 0.5, z0 + 0.6), 0.0, Vector3(0.7, 1.0, 0.7)])
 	placements.append([MODEL_PLANT, Vector3(x0 + 1.0, 0.5, z0 + float(depth) - 0.7), 0.0, Vector3(0.7, 1.0, 0.7)])
+	placements.append([MODEL_PLANT, Vector3(x0 + float(width) - 1.0, 0.5, z0 + float(depth) - 0.7), 0.0, Vector3(0.7, 1.0, 0.7)])
+	
+	var meeting_table_center := Vector3(x0 + float(width) * 0.5, 0.6, z0 + float(depth) * 0.5)
+	placements.append([MODEL_MEETING_TABLE, meeting_table_center, 0.0, Vector3(2.5, 0.75, 1.5)])
+	boxes.append({"center": meeting_table_center, "size": Vector3(2.5, 0.75, 1.5)})
+	
+	for i in range(4):
+		var angle := PI * 0.5 * i
+		var chair_pos := meeting_table_center + Vector3(
+			sin(angle) * 1.8,
+			0.25,
+			cos(angle) * 1.2
+		)
+		placements.append([MODEL_CHAIR, chair_pos, angle + PI, Vector3(0.55, 0.9, 0.55)])
+		boxes.append({"center": chair_pos, "size": Vector3(0.55, 0.9, 0.55)})
+	
+	var water_cooler_pos := Vector3(x0 + float(width) - 1.0, 1.0, z0 + 1.0)
+	placements.append([MODEL_WATER_COOLER, water_cooler_pos, 0.0, Vector3(0.4, 1.0, 0.4)])
+	boxes.append({"center": water_cooler_pos, "size": Vector3(0.4, 1.0, 0.4)})
+	
+	var printer_pos := Vector3(x0 + 1.0, 0.5, z0 + 1.5)
+	placements.append([MODEL_PRINTER, printer_pos, PI * 0.5, Vector3(0.6, 0.4, 0.5)])
+	boxes.append({"center": printer_pos, "size": Vector3(0.6, 0.4, 0.5)})
+	
+	var filing_pos := Vector3(x0 + 0.5, 1.0, z0 + float(depth) - 1.5)
+	placements.append([MODEL_FILING_CABINET, filing_pos, PI, Vector3(0.5, 1.3, 0.6)])
+	boxes.append({"center": filing_pos, "size": Vector3(0.5, 1.3, 0.6)})
+	
 	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + 1.5, OFFICE_WALL_HEIGHT - 0.05, z0 + 1.3), 0.0, Vector3(0.5, 0.12, 0.5)])
 	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + float(width) * 0.5, OFFICE_WALL_HEIGHT - 0.05, z0 + minf(3.0, float(depth) - 0.7)), 0.0, Vector3(0.5, 0.12, 0.5)])
 	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + float(width) - 1.3, OFFICE_WALL_HEIGHT - 0.05, z0 + float(depth) - 1.3), 0.0, Vector3(0.5, 0.12, 0.5)])
+	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + float(width) * 0.5, OFFICE_WALL_HEIGHT - 0.05, z0 + float(depth) * 0.5), 0.0, Vector3(0.5, 0.12, 0.5)])
+	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + 1.5, OFFICE_WALL_HEIGHT - 0.05, z0 + float(depth) - 1.5), 0.0, Vector3(0.5, 0.12, 0.5)])
+	placements.append([MODEL_CEILING_LAMP, Vector3(x0 + float(width) - 1.5, OFFICE_WALL_HEIGHT - 0.05, z0 + 1.5), 0.0, Vector3(0.5, 0.12, 0.5)])
 
 
 static func _office_spec(

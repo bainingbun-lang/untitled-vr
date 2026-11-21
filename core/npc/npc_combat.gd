@@ -257,6 +257,76 @@ func note_threat(source_id: String = "", danger: float = 0.5, p_position: Vector
 		controller.memory.add_event({"type": "threat", "kind": "hearing", "severity": clampf(danger, 0.0, 1.0), "source_id": source_id})
 
 
+# Agresion: disparo del jugador impacta (golpe directo).
+func note_gunshot_impact(source_id: String = "", p_position: Vector3 = Vector3.ZERO) -> void:
+	under_attack = 2.0
+	alert_level = 1.0
+	if p_position.length_squared() > 0.0001:
+		last_threat_position = p_position
+	if controller != null and controller.memory != null:
+		controller.memory.add_event({"type": "attack", "kind": "gunshot_impact", "severity": 1.0, "source_id": source_id})
+	if personality != null:
+		personality.fear = clampf(personality.fear + 0.2, 0.0, 1.0)
+	_note_aggression(source_id)
+
+
+# Agresion: disparo del jugador a menos de 3m (pasada cerca).
+func note_gunshot_nearby(source_id: String = "", distance: float = 2.5, p_position: Vector3 = Vector3.ZERO) -> void:
+	if distance > 3.0:
+		return
+	under_attack = 1.5
+	alert_level = clampf(alert_level + 0.7, 0.0, 1.0)
+	if p_position.length_squared() > 0.0001:
+		last_threat_position = p_position
+	if controller != null and controller.memory != null:
+		controller.memory.add_event({"type": "attack", "kind": "gunshot_nearby", "severity": 0.8, "source_id": source_id})
+	if personality != null:
+		personality.fear = clampf(personality.fear + 0.15, 0.0, 1.0)
+	_note_aggression(source_id)
+
+
+# Agresion: golpe o cuchillo (melee).
+func note_melee_attack(source_id: String = "", danger: float = 0.8, p_position: Vector3 = Vector3.ZERO) -> void:
+	under_attack = 2.0
+	alert_level = 1.0
+	if p_position.length_squared() > 0.0001:
+		last_threat_position = p_position
+	if controller != null and controller.memory != null:
+		controller.memory.add_event({"type": "attack", "kind": "melee", "severity": clampf(danger, 0.0, 1.0), "source_id": source_id})
+	if personality != null:
+		personality.fear = clampf(personality.fear + 0.25, 0.0, 1.0)
+	_note_aggression(source_id)
+
+
+# Agresion: apuntar con arma cargada a menos de 8m por 2s.
+var _aim_tracker: Dictionary = {"source_id": "", "timer": 0.0, "active": false}
+func note_aimed_at(source_id: String = "", distance: float = 5.0, armed: bool = true, delta: float = 0.0) -> void:
+	if not armed or distance > 8.0:
+		_aim_tracker.active = false
+		_aim_tracker.timer = 0.0
+		return
+	if _aim_tracker.source_id != source_id:
+		_aim_tracker.source_id = source_id
+		_aim_tracker.timer = 0.0
+	_aim_tracker.active = true
+	_aim_tracker.timer += delta
+	if _aim_tracker.timer >= 2.0:
+		under_attack = 1.0
+		alert_level = clampf(alert_level + 0.5, 0.0, 1.0)
+		if controller != null and controller.memory != null:
+			controller.memory.add_event({"type": "attack", "kind": "aimed_at", "severity": 0.6, "source_id": source_id})
+		if personality != null:
+			personality.fear = clampf(personality.fear + 0.1, 0.0, 1.0)
+		_note_aggression(source_id)
+		_aim_tracker.active = false
+		_aim_tracker.timer = 0.0
+
+
+func _note_aggression(source_id: String) -> void:
+	if behavior != null and behavior.has_method("note_aggression"):
+		behavior.call("note_aggression", source_id)
+
+
 func update(delta: float, p_context: Dictionary = {}) -> Dictionary:
 	advance(delta)
 	return decide(p_context)

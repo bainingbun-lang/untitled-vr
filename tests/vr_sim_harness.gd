@@ -101,6 +101,8 @@ func cleanup() -> void:
 
 # Cabeza y manos estan en espacio del XROrigin; se aplican a los nodos reales del rig.
 func apply_poses() -> void:
+	if rig == null or not is_instance_valid(rig):
+		return
 	rig.xr_camera.transform = input.head
 	rig.left_controller.transform = input.poses["left"]
 	rig.right_controller.transform = input.poses["right"]

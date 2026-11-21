@@ -4,7 +4,7 @@ extends RefCounted
 const WorldMaterialsScript = preload("res://core/maps/world_materials.gd")
 const BuildingScript = preload("res://core/maps/building_generator.gd")
 
-const MAX_NODES: int = 180
+const MAX_NODES: int = 200
 const MAX_OBSTACLES: int = 8
 const MAX_PROPS: int = 6
 const MAX_SPAWN_MARKERS: int = 16
@@ -21,6 +21,18 @@ const MODEL_BARREL: String = "res://assets/models/props/barrel_01/model.gltf"
 const MODEL_CRATE: String = "res://assets/models/props/wooden_crate_02/model.gltf"
 const MODEL_ROCK: String = "res://assets/models/maps/nature/rock_largeA.glb"
 const MODEL_TANK: String = "res://assets/models/maps/city-industrial/detail-tank.glb"
+const MODEL_TREE_DEFAULT: String = "res://assets/models/maps/nature/tree_default.glb"
+const MODEL_TREE_OAK: String = "res://assets/models/maps/nature/tree_oak.glb"
+const MODEL_TREE_PINE: String = "res://assets/models/maps/nature/tree_pineDefaultA.glb"
+const MODEL_BUSH: String = "res://assets/models/maps/nature/plant_bush.glb"
+const MODEL_FENCE: String = "res://assets/models/maps/nature/fence_simple.glb"
+const VEGETATION_MARGIN: float = 1.0
+const FENCE_MARGIN: float = 0.5
+const TREE_SPACING: float = 3.0
+const BUSH_SPACING: float = 2.0
+const FENCE_SPACING: float = 1.0
+const MAX_TREES: int = 12
+const MAX_BUSHES: int = 12
 const GEOMETRY_CONVENTION: String = (
 	"1 celda = 1 unidad * scale; grid[y][x] -> (x+0.5, 0, y+0.5); "
 	+ "suelo caminable en y=0 (caja de 0.5 de grosor centrada en y=-0.25); "
@@ -33,8 +45,139 @@ const GEOMETRY_CONVENTION: String = (
 	+ "superficies PBR triplanar y props glTF reales con colision convexa simple y set_meta('surface')"
 )
 
+static var _prop_multimesh_cache: Dictionary = {}
+static var _prop_visual_mesh_cache: Dictionary = {}
+static var _prop_visual_material_cache: Dictionary = {}
 
-static func build(meta: Dictionary, parent: Node3D) -> Dictionary:
+
+static func _build_vegetation(root: Node3D, bounds: AABB, spawn_points: Array, theme: String, perf: VrPerformance = null) -> void:
+	var tree_path := MODEL_TREE_DEFAULT
+	var bush_path := MODEL_BUSH
+	if theme == "rural":
+		tree_path = MODEL_TREE_OAK
+	elif theme == "industrial":
+		tree_path = MODEL_TREE_PINE
+	
+	var transforms_trees: Array = []
+	var transforms_bushes: Array = []
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(bounds.position.x * 1000 + bounds.position.z)
+	
+	var min_x: float = bounds.position.x + VEGETATION_MARGIN
+	var max_x: float = bounds.end.x - VEGETATION_MARGIN
+	var min_z: float = bounds.position.z + VEGETATION_MARGIN
+	var max_z: float = bounds.end.z - VEGETATION_MARGIN
+	
+	var tree_count: int = 0
+	var bush_count: int = 0
+	
+	var cull_dist: float = 80.0
+	if perf != null:
+		cull_dist = perf.get_culling_distance()
+	
+	for x_pos in range(int(min_x), int(max_x), int(TREE_SPACING)):
+		if tree_count >= MAX_TREES:
+			break
+		for z_pos in range(int(min_z), int(max_z), int(TREE_SPACING)):
+			if tree_count >= MAX_TREES:
+				break
+			var point := Vector3(
+				float(x_pos) + rng.randf_range(-0.3, 0.3),
+				0.0,
+				float(z_pos) + rng.randf_range(-0.3, 0.3)
+			)
+			if _too_close_planar(point, spawn_points, 3.5):
+				continue
+			transforms_trees.append(BuildingScript.model_transform(
+				tree_path, point, rng.randf_range(0.0, TAU), Vector3(1.0, 1.0, 1.0)
+			))
+			tree_count += 1
+	
+	for x_pos in range(int(min_x), int(max_x), int(BUSH_SPACING)):
+		if bush_count >= MAX_BUSHES:
+			break
+		for z_pos in range(int(min_z), int(max_z), int(BUSH_SPACING)):
+			if bush_count >= MAX_BUSHES:
+				break
+			var point := Vector3(
+				float(x_pos) + rng.randf_range(-0.4, 0.4),
+				0.0,
+				float(z_pos) + rng.randf_range(-0.4, 0.4)
+			)
+			if _too_close_planar(point, spawn_points, 2.5):
+				continue
+			transforms_bushes.append(BuildingScript.model_transform(
+				bush_path, point, rng.randf_range(0.0, TAU), Vector3(0.7, 0.7, 0.7)
+			))
+			bush_count += 1
+	
+	if not transforms_trees.is_empty():
+		BuildingScript.model_batch(root, "Trees", tree_path, transforms_trees, Vector3(1.0, 1.0, 1.0), cull_dist)
+	if not transforms_bushes.is_empty():
+		BuildingScript.model_batch(root, "Bushes", bush_path, transforms_bushes, Vector3(0.7, 0.7, 0.7), cull_dist * 0.75)
+
+
+static func _build_fences(root: Node3D, bounds: AABB, theme: String, perf: VrPerformance = null) -> void:
+	if theme != "rural" and theme != "industrial":
+		return
+	var path := MODEL_FENCE
+	if not ResourceLoader.exists(path):
+		return
+	var transforms: Array = []
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(str(bounds.position.x) + "," + str(bounds.position.z) + ",997")
+	
+	var min_x: float = bounds.position.x + FENCE_MARGIN
+	var max_x: float = bounds.end.x - FENCE_MARGIN
+	var min_z: float = bounds.position.z + FENCE_MARGIN
+	var max_z: float = bounds.end.z - FENCE_MARGIN
+	
+	var count: int = 0
+	for x_pos in range(int(min_x), int(max_x), int(FENCE_SPACING)):
+		if count >= 20:
+			break
+		for z_pos in [int(min_z), int(max_z)]:
+			if count >= 20:
+				break
+			var point := Vector3(
+				float(x_pos) + rng.randf_range(-0.2, 0.2),
+				0.0,
+				float(z_pos) + rng.randf_range(-0.2, 0.2)
+			)
+			if _too_close_planar(point, [], 1.5):
+				continue
+			transforms.append(BuildingScript.model_transform(
+				path, point, PI * 0.5, Vector3(2.0, 1.0, 0.2)
+			))
+			count += 1
+	
+	for z_pos in range(int(min_z), int(max_z), int(FENCE_SPACING)):
+		if count >= 20:
+			break
+		for x_pos in [int(min_x), int(max_x)]:
+			if count >= 20:
+				break
+			var point := Vector3(
+				float(x_pos) + rng.randf_range(-0.2, 0.2),
+				0.0,
+				float(z_pos) + rng.randf_range(-0.2, 0.2)
+			)
+			if _too_close_planar(point, [], 1.5):
+				continue
+			transforms.append(BuildingScript.model_transform(
+				path, point, 0.0, Vector3(2.0, 1.0, 0.2)
+			))
+			count += 1
+	
+	var cull_dist: float = 70.0
+	if perf != null:
+		cull_dist = perf.get_culling_distance()
+	
+	if not transforms.is_empty():
+		BuildingScript.model_batch(root, "Fences", path, transforms, Vector3(2.0, 1.0, 0.2), cull_dist)
+
+
+static func build(meta: Dictionary, parent: Node3D, perf: VrPerformance = null) -> Dictionary:
 	var errors: Array = []
 	if parent == null:
 		errors.append("parent: se requiere un Node3D")
@@ -64,25 +207,28 @@ static func build(meta: Dictionary, parent: Node3D) -> Dictionary:
 	root.name = "WorldGeometry"
 	parent.add_child(root)
 
-	var ground_material := WorldMaterialsScript.surface_material("ground")
-	var wall_material := WorldMaterialsScript.surface_material("brick")
+	var mobile := WorldMaterialsScript.is_mobile()
+	var ground_material := WorldMaterialsScript.surface_material("ground", mobile)
+	var wall_material := WorldMaterialsScript.surface_material("brick", mobile)
 	var obstacle_materials := [
-		WorldMaterialsScript.surface_material("concrete"),
-		WorldMaterialsScript.surface_material("wood"),
-		WorldMaterialsScript.surface_material("metal"),
+		WorldMaterialsScript.surface_material("concrete", mobile),
+		WorldMaterialsScript.surface_material("wood", mobile),
+		WorldMaterialsScript.surface_material("metal", mobile),
 	]
 	var obstacle_surfaces := ["concrete", "wood", "metal"]
 
 	var theme_name := str(meta.get("theme", ""))
 	var time_of_day := str(meta.get("time_of_day", "atardecer"))
-	_build_floor(root, bounds, ground_material)
-	_build_real_ground(root, bounds, theme_name)
-	_build_walls(root, bounds, wall_material, "brick")
-	_build_obstacles(root, obstacle_points, obstacle_materials, obstacle_surfaces, theme_name)
+	_build_floor(root, bounds, ground_material, perf)
+	_build_real_ground(root, bounds, theme_name, perf)
+	_build_walls(root, bounds, wall_material, "brick", perf)
+	_build_obstacles(root, obstacle_points, obstacle_materials, obstacle_surfaces, theme_name, perf)
+	_build_vegetation(root, bounds, spawn_points, theme_name, perf)
+	_build_fences(root, bounds, theme_name, perf)
 	_build_environment(root, time_of_day, theme_name)
 	_build_spawn_markers(root, spawn_points, marker_count)
 	var props: Array = populate_physics_props(
-		root, meta, bounds, spawn_points, prop_limit
+		root, meta, bounds, spawn_points, prop_limit, null, perf
 	)
 
 	var report: Dictionary = {
@@ -105,7 +251,7 @@ static func build(meta: Dictionary, parent: Node3D) -> Dictionary:
 
 static func create_physics_prop(
 	parent: Node3D, position: Vector3, kind: String = "barrel_metal", size: float = 0.6,
-	material: StandardMaterial3D = null
+	material: StandardMaterial3D = null, perf: VrPerformance = null
 ) -> RigidBody3D:
 	var config := WorldMaterialsScript.prop_config(kind)
 	var base_height := maxf(0.05, float(config.get("height", 0.8)))
@@ -113,7 +259,7 @@ static func create_physics_prop(
 	var height := base_height * ratio
 	var shape := _collision_shape(config, height)
 	var shape_height := _shape_height(shape)
-	var ground_y := position.y
+	var ground_y := _estimate_ground_y(position)
 	var surface := _ground_hit(parent, position + Vector3.UP * 2.0)
 	if not surface.is_empty():
 		var hit_pos: Vector3 = surface.get("position", position)
@@ -137,14 +283,17 @@ static func create_physics_prop(
 	collision.shape = shape
 	body.add_child(collision)
 
-	var packed := WorldMaterialsScript.prop_scene(str(config.get("kind", kind)))
-	if packed != null:
-		var visual: Node = packed.instantiate()
-		if visual is Node3D:
-			body.add_child(visual)
-			_fit_visual(visual as Node3D, shape_height)
-		else:
-			visual.queue_free()
+	var multimesh_instance := _get_or_create_prop_multimesh(parent, str(config.get("kind", kind)), perf)
+	if multimesh_instance != null:
+		var bounds := BuildingScript.model_bounds(str(config.get("path", "")))
+		var fit_transform := BuildingScript.model_transform(
+			str(config.get("path", "")), Vector3.ZERO, 0.0, Vector3.ONE, false
+		)
+		var visual_transform := Transform3D(
+			fit_transform.basis,
+			Vector3(0, -shape_height * 0.5 + 0.01, 0)
+		)
+		_add_prop_visual_instance(multimesh_instance, body.transform * visual_transform)
 
 	body.add_to_group("physics_props")
 	if parent != null:
@@ -155,11 +304,15 @@ static func create_physics_prop(
 
 static func populate_physics_props(
 	parent: Node3D, meta: Dictionary, bounds: AABB, spawn_points: Array, limit: int,
-	material: StandardMaterial3D = null
+	material: StandardMaterial3D = null, perf: VrPerformance = null
 ) -> Array:
 	var result: Array = []
 	if parent == null or limit <= 0:
 		return result
+
+	_prop_multimesh_cache.clear()
+	_prop_visual_mesh_cache.clear()
+	_prop_visual_material_cache.clear()
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _as_int(meta.get("seed", 0), 0)
@@ -174,6 +327,8 @@ static func populate_physics_props(
 
 	var placed: Array = []
 	var attempts: int = 0
+	var bodies: Array = []
+	var kinds: Array = []
 	while result.size() < limit and attempts < limit * 40:
 		attempts += 1
 		var point := Vector3(
@@ -185,7 +340,32 @@ static func populate_physics_props(
 			continue
 		var kind: String = WorldMaterialsScript.prop_kind(rng.randi())
 		placed.append(point)
-		result.append(create_physics_prop(parent, point, kind, 0.6))
+		var body := create_physics_prop(parent, point, kind, 0.6, null, perf)
+		bodies.append(body)
+		kinds.append(kind)
+		result.append(body)
+
+	for i in range(bodies.size()):
+		var body: RigidBody3D = bodies[i]
+		var kind: String = kinds[i]
+		var multimesh_instance: MultiMeshInstance3D = _prop_multimesh_cache.get(kind, null)
+		if multimesh_instance != null:
+			var config := WorldMaterialsScript.prop_config(kind)
+			var base_height := maxf(0.05, float(config.get("height", 0.8)))
+			var ratio := clampf(0.6 / 0.6, 0.4, 3.0)
+			var height := base_height * ratio
+			var shape := _collision_shape(config, height)
+			var shape_height := _shape_height(shape)
+			var bounds_mesh := BuildingScript.model_bounds(str(config.get("path", "")))
+			var fit_transform := BuildingScript.model_transform(
+				str(config.get("path", "")), Vector3.ZERO, 0.0, Vector3.ONE, false
+			)
+			var visual_transform := Transform3D(
+				fit_transform.basis,
+				Vector3(0, -shape_height * 0.5 + 0.01, 0)
+			)
+			_add_prop_visual_instance(multimesh_instance, body.global_transform * visual_transform)
+
 	return result
 
 
@@ -218,7 +398,7 @@ static func _shape_height(shape: Shape3D) -> float:
 
 static func _ground_hit(parent: Node, from: Vector3) -> Dictionary:
 	var world_3d: World3D = parent.get_world_3d() if parent is Node3D else null
-	if world_3d == null:
+	if world_3d == null or world_3d.direct_space_state == null:
 		return {}
 	var query := PhysicsRayQueryParameters3D.create(
 		from, from - Vector3.UP * 4.0
@@ -228,6 +408,70 @@ static func _ground_hit(parent: Node, from: Vector3) -> Dictionary:
 	query.collision_mask = 1
 	return world_3d.direct_space_state.intersect_ray(query)
 
+static func _estimate_ground_y(position: Vector3) -> float:
+	return 0.0
+
+static func _get_or_create_prop_multimesh(root: Node3D, kind: String, perf: VrPerformance = null) -> MultiMeshInstance3D:
+	if _prop_multimesh_cache.has(kind):
+		return _prop_multimesh_cache[kind]
+	
+	var config := WorldMaterialsScript.prop_config(kind)
+	var path: String = str(config.get("path", ""))
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return null
+	
+	if not _prop_visual_mesh_cache.has(kind):
+		var packed := load(path) as PackedScene
+		if packed != null:
+			var instance: Node = packed.instantiate()
+			if instance != null:
+				var mesh_instance: MeshInstance3D = _find_first_mesh_instance(instance)
+				if mesh_instance != null and mesh_instance.mesh != null:
+					_prop_visual_mesh_cache[kind] = mesh_instance.mesh
+					_prop_visual_material_cache[kind] = mesh_instance.material_override
+				instance.free()
+	
+	var mesh: Mesh = _prop_visual_mesh_cache.get(kind, null)
+	if mesh == null:
+		return null
+	
+	var multimesh_instance := MultiMeshInstance3D.new()
+	multimesh_instance.name = "PropVisuals_%s" % kind
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = mesh
+	multimesh.instance_count = 0
+	multimesh_instance.multimesh = multimesh
+	var material: Material = _prop_visual_material_cache.get(kind, null)
+	if material != null:
+		multimesh_instance.material_override = material
+	multimesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	var cull_dist: float = 80.0
+	if perf != null:
+		cull_dist = perf.get_culling_distance()
+	multimesh_instance.visibility_range_end = cull_dist
+	multimesh_instance.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+	root.add_child(multimesh_instance)
+	_prop_multimesh_cache[kind] = multimesh_instance
+	return multimesh_instance
+
+static func _find_first_mesh_instance(node: Node) -> MeshInstance3D:
+	if node is MeshInstance3D:
+		return node as MeshInstance3D
+	for child in node.get_children():
+		var result := _find_first_mesh_instance(child)
+		if result != null:
+			return result
+	return null
+
+static func _add_prop_visual_instance(multimesh_instance: MultiMeshInstance3D, transform: Transform3D) -> int:
+	var multimesh: MultiMesh = multimesh_instance.multimesh
+	if multimesh == null:
+		return -1
+	var current_count: int = multimesh.instance_count
+	multimesh.instance_count = current_count + 1
+	multimesh.set_instance_transform(current_count, transform)
+	return current_count
 
 static func _fit_visual(visual: Node3D, target_height: float) -> void:
 	var bounds := _visual_aabb(visual)
@@ -291,7 +535,7 @@ static func _failure(errors: Array) -> Dictionary:
 	}
 
 
-static func _build_floor(root: Node3D, bounds: AABB, material: StandardMaterial3D) -> void:
+static func _build_floor(root: Node3D, bounds: AABB, material: StandardMaterial3D, perf: VrPerformance = null) -> void:
 	var body := StaticBody3D.new()
 	body.name = "Ground"
 	body.collision_layer = 1
@@ -308,6 +552,9 @@ static func _build_floor(root: Node3D, bounds: AABB, material: StandardMaterial3
 	mesh_instance.mesh = box
 	mesh_instance.material_override = material
 	mesh_instance.visible = false
+	if perf != null:
+		mesh_instance.visibility_range_end = perf.get_culling_distance() * 1.5
+		mesh_instance.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	body.add_child(mesh_instance)
 	body.position = Vector3(
 		bounds.position.x + bounds.size.x * 0.5,
@@ -317,7 +564,7 @@ static func _build_floor(root: Node3D, bounds: AABB, material: StandardMaterial3
 	root.add_child(body)
 
 
-static func _build_real_ground(root: Node3D, bounds: AABB, theme: String) -> void:
+static func _build_real_ground(root: Node3D, bounds: AABB, theme: String, perf: VrPerformance = null) -> void:
 	var path := MODEL_GROUND_GRASS
 	if theme == "urbano" or theme == "industrial":
 		path = MODEL_ROAD_TILE
@@ -334,44 +581,54 @@ static func _build_real_ground(root: Node3D, bounds: AABB, theme: String) -> voi
 				bounds.position.z + float(y) + 0.5
 			)
 			transforms.append(BuildingScript.model_transform(path, position, 0.0, Vector3.ZERO))
+	
+	var cull_dist: float = 90.0
+	if perf != null:
+		cull_dist = perf.get_culling_distance() * 1.2
+	
 	BuildingScript.model_batch(
-		root, "GroundTiles", path, transforms, Vector3(1.02, 0.04, 1.02), 90.0
+		root, "GroundTiles", path, transforms, Vector3(1.02, 0.04, 1.02), cull_dist
 	)
 
 
 static func _build_walls(
-	root: Node3D, bounds: AABB, material: StandardMaterial3D, surface: String
+	root: Node3D, bounds: AABB, material: StandardMaterial3D, surface: String, perf: VrPerformance = null
 ) -> void:
 	var center_x: float = bounds.position.x + bounds.size.x * 0.5
 	var center_z: float = bounds.position.z + bounds.size.z * 0.5
 	var span_x: float = bounds.size.x + WALL_THICKNESS * 2.0
 	var span_z: float = bounds.size.z + WALL_THICKNESS * 2.0
 	var center_y: float = WALL_HEIGHT * 0.5
+	
+	var cull_dist: float = 80.0
+	if perf != null:
+		cull_dist = perf.get_culling_distance()
+	
 	_static_box(
 		root, "WallNorth",
 		Vector3(center_x, center_y, bounds.position.z - WALL_THICKNESS * 0.5),
-		Vector3(span_x, WALL_HEIGHT, WALL_THICKNESS), material, surface
+		Vector3(span_x, WALL_HEIGHT, WALL_THICKNESS), material, surface, cull_dist
 	)
 	_static_box(
 		root, "WallSouth",
 		Vector3(center_x, center_y, bounds.end.z + WALL_THICKNESS * 0.5),
-		Vector3(span_x, WALL_HEIGHT, WALL_THICKNESS), material, surface
+		Vector3(span_x, WALL_HEIGHT, WALL_THICKNESS), material, surface, cull_dist
 	)
 	_static_box(
 		root, "WallWest",
 		Vector3(bounds.position.x - WALL_THICKNESS * 0.5, center_y, center_z),
-		Vector3(WALL_THICKNESS, WALL_HEIGHT, span_z), material, surface
+		Vector3(WALL_THICKNESS, WALL_HEIGHT, span_z), material, surface, cull_dist
 	)
 	_static_box(
 		root, "WallEast",
 		Vector3(bounds.end.x + WALL_THICKNESS * 0.5, center_y, center_z),
-		Vector3(WALL_THICKNESS, WALL_HEIGHT, span_z), material, surface
+		Vector3(WALL_THICKNESS, WALL_HEIGHT, span_z), material, surface, cull_dist
 	)
 
 
 static func _static_box(
 	root: Node3D, node_name: String, center: Vector3, size: Vector3,
-	material: StandardMaterial3D, surface: String = "concrete"
+	material: StandardMaterial3D, surface: String = "concrete", visibility_end: float = 0.0
 ) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.name = node_name
@@ -389,6 +646,9 @@ static func _static_box(
 	mesh_instance.mesh = box
 	mesh_instance.material_override = material
 	mesh_instance.visible = false
+	if visibility_end > 0.0:
+		mesh_instance.visibility_range_end = visibility_end
+		mesh_instance.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	body.add_child(mesh_instance)
 	body.position = center
 	root.add_child(body)
@@ -396,7 +656,7 @@ static func _static_box(
 
 
 static func _build_obstacles(
-	root: Node3D, points: Array, materials: Array, surfaces: Array, theme: String
+	root: Node3D, points: Array, materials: Array, surfaces: Array, theme: String, perf: VrPerformance = null
 ) -> void:
 	var path := MODEL_CRATE
 	var fit := Vector3(0.9, 0.9, 0.9)
@@ -423,7 +683,12 @@ static func _build_obstacles(
 		transforms.append(
 			BuildingScript.model_transform(path, point, float(i) * 0.7, fit)
 		)
-	BuildingScript.model_batch(root, "ObstacleModels", path, transforms, fit, 80.0)
+	
+	var cull_dist: float = 80.0
+	if perf != null:
+		cull_dist = perf.get_culling_distance()
+	
+	BuildingScript.model_batch(root, "ObstacleModels", path, transforms, fit, cull_dist)
 
 
 static func _build_environment(root: Node3D, time_of_day: String, theme: String) -> void:

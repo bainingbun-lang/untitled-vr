@@ -90,6 +90,7 @@ static func _parse_params(params: Dictionary, errors: Array) -> Dictionary:
 		"density": DEFAULT_DENSITY,
 		"spawn_count": DEFAULT_SPAWNS,
 		"forced_cells": [],
+		"theme": "",
 	}
 
 	for key in SIZE_ALIASES + WIDTH_ALIASES + HEIGHT_ALIASES + DENSITY_ALIASES + SPAWN_ALIASES:
@@ -125,6 +126,10 @@ static func _parse_params(params: Dictionary, errors: Array) -> Dictionary:
 			settings["density"] = float(parsed)
 
 	_apply_spawns(params, settings, errors)
+
+	var theme_value: Variant = params.get("theme", null)
+	if theme_value != null:
+		settings["theme"] = str(theme_value)
 
 	var width: int = int(settings["width"])
 	var height: int = int(settings["height"])
@@ -550,6 +555,7 @@ static func _build_metadata(
 		"author": "MapGenerator",
 		"license": "Project-Standard",
 		"scale": 1.0,
+		"theme": settings.get("theme", ""),
 		"main_scene": "res://scenes/maps/generated_map.tscn",
 		"has_collisions": true,
 		"has_navigation": true,

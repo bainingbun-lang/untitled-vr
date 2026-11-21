@@ -4,17 +4,18 @@ extends RefCounted
 const GAME_SESSION_PATH := "res://core/game/game_session.gd"
 const VrPerfScript = preload("res://core/vr/vr_performance.gd")
 const WoundDecalsScript = preload("res://core/game/wound_decals.gd")
+const ContentRegistryScript = preload("res://core/game/content_registry.gd")
 
 enum GoreLevel { OFF = 0, NORMAL = 1, EXTREME = 2 }
 
-const MAX_DECALS_NORMAL := 96
-const MAX_DECALS_EXTREME := 160
-const MAX_PUDDLES_NORMAL := 32
-const MAX_PUDDLES_EXTREME := 64
-const MAX_PARTS_NORMAL := 16
-const MAX_PARTS_EXTREME := 32
-const MAX_ACTIVE_PARTICLES_NORMAL := 48
-const MAX_ACTIVE_PARTICLES_EXTREME := 96
+const MAX_DECALS_NORMAL := 24
+const MAX_DECALS_EXTREME := 48
+const MAX_PUDDLES_NORMAL := 16
+const MAX_PUDDLES_EXTREME := 32
+const MAX_PARTS_NORMAL := 12
+const MAX_PARTS_EXTREME := 24
+const MAX_ACTIVE_PARTICLES_NORMAL := 24
+const MAX_ACTIVE_PARTICLES_EXTREME := 48
 const MAX_SCREEN_SPLATTERS := 4
 const MAX_DISTANCE_DECAL := 25.0
 const MAX_DISTANCE_PARTICLE := 30.0
@@ -63,6 +64,25 @@ static func _apply_limits_for_level() -> void:
 		GoreLevel.EXTREME:
 			WoundDecalsScript.set_limits(MAX_DECALS_EXTREME, MAX_PUDDLES_EXTREME, MAX_PARTS_EXTREME, MAX_ACTIVE_PARTICLES_EXTREME)
 	_limits_applied = true
+	
+	var registry := ContentRegistryScript.instance()
+	var profiles := registry.entries("gore_profile")
+	var level_str := "off"
+	match _gore_level:
+		GoreLevel.NORMAL:
+			level_str = "normal"
+		GoreLevel.EXTREME:
+			level_str = "extreme"
+	
+	var profile_id := "untitled.base:%s" % level_str
+	if profiles.has(profile_id):
+		var profile: Dictionary = profiles[profile_id]
+		WoundDecalsScript.set_limits(
+			profile.get("decal_limit", WoundDecalsScript.get_decal_limit()),
+			profile.get("puddle_limit", WoundDecalsScript.get_puddle_limit()),
+			profile.get("parts_limit", WoundDecalsScript.get_part_limit()),
+			profile.get("particle_limit", WoundDecalsScript.get_active_particle_limit())
+		)
 
 static func get_gore_level() -> int:
 	if typeof(_forced_level) == TYPE_INT:
@@ -103,7 +123,7 @@ static func log_budgets() -> void:
 static func set_screen_root(viewport: Viewport) -> void:
 	_screen_root = viewport
 
-static func create_bullet_wound(parent: Node, pos: Vector3, normal: Vector3, is_exit: bool = false, zone: String = "") -> Dictionary:
+static func create_bullet_wound(parent: Node, pos: Vector3, normal: Vector3, is_exit: bool = false, zone: String = "", npc_id: int = -1, uv: Vector2 = Vector2(0.5, 0.5), depth: float = 0.5) -> Dictionary:
 	if not gore_enabled() or parent == null:
 		return {}
 	var level := get_gore_level()
@@ -111,7 +131,7 @@ static func create_bullet_wound(parent: Node, pos: Vector3, normal: Vector3, is_
 		return {}
 	var size := 0.12 if not is_exit else 0.22
 	var depth_layers := 3 if level == GoreLevel.EXTREME else 2
-	return WoundDecalsScript.create_wound(parent, pos, normal, size, depth_layers, zone)
+	return WoundDecalsScript.create_wound(parent, pos, normal, size, depth_layers, zone, npc_id, uv, depth)
 
 static func create_directional_splatter(parent: Node, pos: Vector3, direction: Vector3, force: float, surface_normal: Vector3 = Vector3.UP) -> void:
 	if not gore_enabled() or parent == null:
@@ -471,3 +491,15 @@ static func stump_bleed_count() -> int:
 
 static func screen_splatter_count() -> int:
 	return _screen_splatters.size()
+
+static func get_damage_mask(npc_id: int) -> Image:
+	return WoundDecalsScript.get_damage_mask(npc_id)
+
+static func damage_mask_count() -> int:
+	return WoundDecalsScript.damage_mask_count()
+
+static func release_npc_damage_mask(npc_id: int) -> void:
+	WoundDecalsScript.release_npc_damage_mask(npc_id)
+
+static func apply_damage_to_mask(npc_id: int, uv: Vector2, depth: float, radius_px: int = 8) -> void:
+	WoundDecalsScript.apply_damage_to_mask(npc_id, uv, depth, radius_px)

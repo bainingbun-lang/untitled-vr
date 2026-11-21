@@ -3,7 +3,7 @@
   "mod": "untitled.base",
   "content": [
     {"type": "gore_profile", "id": "untitled.base:off", "name": "Sin sangre", "level": "off", "decal_limit": 0, "particle_limit": 0, "parts_limit": 0, "puddle_limit": 0},
-    {"type": "gore_profile", "id": "untitled.base:normal", "name": "Normal", "level": "normal", "decal_limit": 96, "particle_limit": 256, "parts_limit": 24, "puddle_limit": 32},
-    {"type": "gore_profile", "id": "untitled.base:extreme", "name": "Extremo", "level": "extreme", "decal_limit": 256, "particle_limit": 768, "parts_limit": 64, "puddle_limit": 96}
+    {"type": "gore_profile", "id": "untitled.base:normal", "name": "Normal", "level": "normal", "decal_limit": 24, "particle_limit": 24, "parts_limit": 12, "puddle_limit": 16},
+    {"type": "gore_profile", "id": "untitled.base:extreme", "name": "Extremo", "level": "extreme", "decal_limit": 48, "particle_limit": 48, "parts_limit": 24, "puddle_limit": 32}
   ]
 }

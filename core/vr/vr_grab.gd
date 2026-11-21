@@ -33,6 +33,12 @@ var _pose: Transform3D = Transform3D.IDENTITY
 var _velocity: Vector3 = Vector3.ZERO
 var _prop: Node3D = null
 var _prop_frozen: bool = false
+var _secondary_grabbed: bool = false
+var _secondary_hand: String = "left"
+var _secondary_zone: String = ""
+var _secondary_grip: float = 0.0
+var _secondary_hand_offset: Vector3 = Vector3.ZERO
+var _secondary_hand_basis: Basis = Basis.IDENTITY
 
 
 func _init(weapon_mass: float = 1.0) -> void:
@@ -141,19 +147,64 @@ func grab(
 	return true
 
 
+func grab_secondary(
+	hand_pose: Transform3D, weapon_pose: Transform3D, weapon_id: String,
+	grip_value: float = 1.0, zone: String = ""
+) -> bool:
+	if _secondary_grabbed:
+		return false
+	if not _grabbed:
+		return false
+	var found: Dictionary = nearest_zone(hand_pose, weapon_pose, weapon_id, grab_radius)
+	if zone.is_empty():
+		if not bool(found["ok"]):
+			return false
+		zone = str(found["zone"])
+	elif not grip_zones(weapon_id).has(zone):
+		return false
+	if zone == _zone:
+		return false
+	_secondary_grabbed = true
+	_secondary_zone = zone
+	_secondary_grip = clampf(grip_value, 0.0, 1.0)
+	var delta_pose: Vector3 = weapon_pose.origin - hand_pose.origin
+	_secondary_hand_offset = hand_pose.basis.inverse() * safe_vector(delta_pose)
+	_secondary_hand_basis = hand_pose.basis.inverse() * weapon_pose.basis
+	_pulse(0.03, 0.25)
+	return true
+
+
 func set_hand(hand_name: String) -> void:
 	_hand = "left" if hand_name == "left" else "right"
 
 
-func step(delta: float, hand_pose: Transform3D, grip_value: float = 1.0) -> Transform3D:
+func step(delta: float, hand_pose: Transform3D, grip_value: float = 1.0, secondary_hand_pose: Transform3D = Transform3D.IDENTITY) -> Transform3D:
 	if not _grabbed:
 		return _pose
 	_grip = clampf(grip_value, 0.0, 1.0)
+	var target_origin: Vector3 = Vector3.ZERO
+	var target_basis: Basis = Basis.IDENTITY
+	if _secondary_grabbed:
+		var secondary_grip: float = clampf(_secondary_grip, 0.0, 1.0)
+		var total_weight: float = _grip + secondary_grip
+		if total_weight <= 0.0:
+			return _pose
+		var primary_target_origin: Vector3 = hand_pose.origin + hand_pose.basis * _hand_offset
+		var primary_target_basis: Basis = hand_pose.basis * _hand_basis
+		var secondary_target_origin: Vector3 = secondary_hand_pose.origin + secondary_hand_pose.basis * _secondary_hand_offset
+		var secondary_target_basis: Basis = secondary_hand_pose.basis * _secondary_hand_basis
+		var w_primary: float = _grip / total_weight
+		var w_secondary: float = secondary_grip / total_weight
+		target_origin = primary_target_origin * w_primary + secondary_target_origin * w_secondary
+		var q1: Quaternion = primary_target_basis.get_rotation_quaternion()
+		var q2: Quaternion = secondary_target_basis.get_rotation_quaternion()
+		target_basis = Basis(q1.slerp(q2, w_secondary))
+	else:
+		target_origin = hand_pose.origin + hand_pose.basis * _hand_offset
+		target_basis = hand_pose.basis * _hand_basis
 	var total: float = clampf(delta, 0.0, MAX_DELTA)
 	if total <= 0.0:
 		return _pose
-	var target_origin: Vector3 = hand_pose.origin + hand_pose.basis * _hand_offset
-	var target_basis: Basis = hand_pose.basis * _hand_basis
 	var ticks: int = maxi(1, int(ceil(total / MAX_SUBSTEP)))
 	ticks = mini(ticks, 32)
 	var dt: float = total / float(ticks)
@@ -188,6 +239,29 @@ func release(mode: String = "fall", velocity: Vector3 = Vector3.ZERO) -> Diction
 	_velocity = safe_vector(velocity)
 	released.emit(str(result["mode"]), result["velocity"])
 	return result
+
+
+func release_secondary() -> bool:
+	if not _secondary_grabbed:
+		return false
+	_secondary_grabbed = false
+	_secondary_zone = ""
+	_secondary_grip = 0.0
+	_secondary_hand_offset = Vector3.ZERO
+	_secondary_hand_basis = Basis.IDENTITY
+	return true
+
+
+func is_two_hand_grabbing() -> bool:
+	return _grabbed and _secondary_grabbed
+
+
+func held_secondary_zone() -> String:
+	return _secondary_zone
+
+
+func held_secondary_hand() -> String:
+	return _secondary_hand
 
 
 static func throw_velocity(current: Transform3D, previous: Transform3D, delta: float) -> Vector3:
@@ -276,6 +350,11 @@ func reset() -> void:
 	_grip = 0.0
 	_pose = Transform3D.IDENTITY
 	_velocity = Vector3.ZERO
+	_secondary_grabbed = false
+	_secondary_zone = ""
+	_secondary_grip = 0.0
+	_secondary_hand_offset = Vector3.ZERO
+	_secondary_hand_basis = Basis.IDENTITY
 
 
 func _pulse(duration: float, amplitude: float) -> void:

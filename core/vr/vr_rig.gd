@@ -12,6 +12,7 @@ signal recentered()
 const VrHandModelScript = preload("res://core/vr/vr_hand_model.gd")
 const VrBagScript = preload("res://core/vr/vr_bag.gd")
 const VrWeaponHandScript = preload("res://core/vr/vr_weapon_hand.gd")
+const VrClimbScript = preload("res://core/vr/vr_climb.gd")
 const DbScript = preload("res://core/game/weapon_db.gd")
 const VrComfortScript = preload("res://core/vr/vr_comfort.gd")
 
@@ -31,6 +32,10 @@ const VrComfortScript = preload("res://core/vr/vr_comfort.gd")
 @export var seated_mode: bool = false
 @export var height_offset: float = 0.0
 @export var auto_process: bool = true
+@export var climb_enabled: bool = true
+@export var climb_forward_push: float = 1.0
+@export var climb_fling_multiplier: float = 1.0
+@export var climb_velocity_averages: int = 5
 const BODY_RADIUS: float = 0.25
 
 var xr_availability_override: Callable = Callable()
@@ -57,6 +62,7 @@ var inputs_suspended: bool = false
 
 var _was_menu: bool = false
 var _reload_was: Dictionary = {}
+var _climb_grip_was: Dictionary = {}
 var _active: bool = false
 var _built: bool = false
 var _xr_origin: XROrigin3D = null
@@ -64,6 +70,7 @@ var _snap_timer: float = 0.0
 var _body_shape: CapsuleShape3D = null
 var _vignette: float = 0.0
 var _vignette_ring: MeshInstance3D = null
+var _climb: VrClimb = null
 
 
 func _ready() -> void:
@@ -113,6 +120,13 @@ func build() -> bool:
 	right_hand = _make_hand("right")
 	add_child(left_hand)
 	add_child(right_hand)
+
+	if climb_enabled:
+		_climb = VrClimbScript.new()
+		_climb.forward_push = climb_forward_push
+		_climb.fling_multiplier = climb_fling_multiplier
+		_climb.velocity_averages = climb_velocity_averages
+		_climb.setup(self)
 
 	if comfort_vignette_enabled:
 		_build_vignette_ring()
@@ -302,6 +316,14 @@ func step(delta: float) -> void:
 		return
 	if bag != null and xr_camera != null:
 		bag.set_head_transform(xr_camera.global_transform)
+	
+	# Climbing physics (runs before locomotion to override gravity)
+	if _climb != null and climb_enabled and xr_origin != null:
+		var did_climb: bool = _climb.physics_movement(delta, xr_origin, not climb_enabled)
+		if did_climb:
+			# Climbing handled movement, skip gravity for this frame
+			pass
+	
 	step_locomotion(delta)
 	if left_hand != null:
 		left_hand.step(delta)
@@ -323,6 +345,26 @@ func _poll_buttons() -> void:
 			if hand_node != null and hand_node.has_method("try_reload"):
 				hand_node.call("try_reload")
 		_reload_was[hand_name] = down
+	
+	# Climbing grip detection
+	if _climb != null and climb_enabled:
+		for hand_name in ["left", "right"]:
+			var grip_pressed: bool = is_grip_pressed(hand_name)
+			var hand_node = left_hand if hand_name == "left" else right_hand
+			var hand_empty: bool = hand_node != null and str(hand_node.weapon_id).is_empty()
+			
+			# Track grip state for climb
+			var was_grip: bool = bool(_climb_grip_was.get(hand_name, false))
+			_climb_grip_was[hand_name] = grip_pressed
+			
+			if grip_pressed and not was_grip and hand_empty:
+				_try_climb_grab(hand_name)
+			elif not grip_pressed and was_grip:
+				# Grip released
+				if hand_name == "left":
+					_climb.on_left_dropped()
+				else:
+					_climb.on_right_dropped()
 
 
 func set_inputs_suspended(value: bool) -> void:
@@ -349,6 +391,56 @@ func _controller_button(hand_name: String, action: StringName) -> bool:
 	if controller == null or not controller.has_method("is_button_pressed"):
 		return false
 	return bool(controller.call("is_button_pressed", action))
+
+
+func _try_climb_grab(hand_name: String) -> void:
+	if _climb == null or xr_origin == null:
+		return
+	var controller = controller_for(hand_name)
+	if controller == null:
+		return
+	
+	var space = get_world_3d().direct_space_state if is_inside_tree() else null
+	if space == null:
+		return
+	
+	# Raycast from controller to find climbable objects
+	var query = PhysicsRayQueryParameters3D.new()
+	query.from = controller.global_position
+	query.to = controller.global_position + (-controller.global_transform.basis.z) * 1.5
+	query.collision_mask = 1  # Default physics layer for static bodies
+	query.exclude = [xr_origin.get_rid()] if xr_origin else []
+	
+	var result: Dictionary = space.intersect_ray(query)
+	if result.is_empty():
+		return
+	
+	var collider: Node3D = result.collider as Node3D
+	if collider == null:
+		return
+	
+	# Check if collider has VrClimbable
+	var climbable = _find_climbable(collider)
+	if climbable == null:
+		return
+	
+	# Notify climb system
+	if hand_name == "left":
+		_climb.on_left_picked_up(climbable)
+	else:
+		_climb.on_right_picked_up(climbable)
+
+
+func _find_climbable(node: Node) -> Node:
+	var current := node
+	while current != null:
+		if current is VrClimbable:
+			return current
+		if current.has_method("get_parent"):
+			current = current.get_parent()
+		else:
+			break
+	return null
 
 
 func take_damage(amount: float, _point: Vector3 = Vector3.ZERO, _normal: Vector3 = Vector3.UP, _attacker = null) -> void:

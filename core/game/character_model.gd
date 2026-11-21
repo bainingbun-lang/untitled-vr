@@ -1,10 +1,14 @@
 class_name CharacterModel
 extends Node3D
 
+const MeshSlicerScript = preload("res://core/game/mesh_slicer.gd")
+
 const TARGET_HEIGHT: float = 1.75
 const MAX_RAGDOLLS: int = 8
 const MAX_WOUNDS: int = 12
-const MAX_DETACHED_LIMBS: int = 8
+const MAX_DETACHED_LIMBS: int = 6
+const DISMEMBER_THRESHOLD: float = 100.0
+const LIMB_LIFETIME: float = 30.0
 const GAME_SESSION_PATH: String = "res://core/game/game_session.gd"
 const V2_MANIFEST_PATH: String = "res://assets/models/characters/v2/manifest.json"
 const V2_SCALE_MIN: float = 0.95
@@ -122,6 +126,9 @@ var _anim_map: Dictionary = {}
 var _current_anim: String = ""
 var _wounds: Array = []
 var _limbs: Array = []
+var _limb_damage: Dictionary = {}
+var _stumps: Dictionary = {}
+var _limb_timers: Dictionary = {}
 var _ragdolled: bool = false
 var _variation_scale: float = 1.0
 var _variation_tint: Color = Color.WHITE
@@ -783,7 +790,7 @@ func apply_wound(bone_name: String, normal: Vector3, size: float) -> Node3D:
 	var world_pos := global_position + Vector3.UP * (_height * 0.55)
 	var idx := _find_bone(bone_name)
 	if idx >= 0 and skeleton != null:
-		world_pos = skeleton.to_global(skeleton.get_bone_global_pose(idx).origin)
+		world_pos = skeleton.global_transform * skeleton.get_bone_global_pose(idx).origin
 	var decal := MeshInstance3D.new()
 	decal.name = "CharacterWound"
 	var plane := PlaneMesh.new()
@@ -843,6 +850,136 @@ func detach_limb(bone_name: String) -> Node3D:
 		if is_instance_valid(old):
 			old.queue_free()
 	return body
+
+
+func find_bone(bone_name: String) -> int:
+	return _find_bone(bone_name)
+
+
+func accumulate_damage(bone_name: String, amount: float) -> void:
+	if not _gore_enabled():
+		return
+	var idx := _find_bone(bone_name)
+	if idx < 0:
+		return
+	var current: float = _limb_damage.get(bone_name, 0.0)
+	current += amount
+	_limb_damage[bone_name] = current
+	if current >= DISMEMBER_THRESHOLD and not _stumps.has(bone_name):
+		_dismember_limb(bone_name, idx)
+
+
+func get_detached_limbs_count() -> int:
+	_prune_expired_limbs()
+	return _limbs.size()
+
+
+func get_stump_for_bone(bone_name: String) -> Node3D:
+	return _stumps.get(bone_name)
+
+
+func _dismember_limb(bone_name: String, bone_idx: int) -> void:
+	var limb := detach_limb(bone_name)
+	if limb == null:
+		return
+	_create_stump_with_cut_surface(bone_name, bone_idx)
+	_limb_timers[bone_name] = Time.get_ticks_msec() + int(LIMB_LIFETIME * 1000)
+	_limb_damage.erase(bone_name)
+
+
+func _create_stump_with_cut_surface(bone_name: String, bone_idx: int) -> void:
+	if skeleton == null:
+		return
+	var stump := MeshInstance3D.new()
+	stump.name = "Stump_%s" % bone_name.replace(".", "_")
+	
+	var bone_global_pos := skeleton.global_transform * skeleton.get_bone_global_pose(bone_idx).origin
+	var bone_global_rot := skeleton.global_transform.basis * skeleton.get_bone_global_pose(bone_idx).basis
+	
+	var length: float = _bone_length(bone_idx)
+	var radius: float = clampf(length * 0.15, 0.05, 0.12)
+	
+	var cylinder := CylinderMesh.new()
+	cylinder.top_radius = radius
+	cylinder.bottom_radius = radius
+	cylinder.height = 0.04
+	cylinder.radial_segments = 12
+	stump.mesh = cylinder
+	stump.material_override = _get_wound_material()
+	
+	add_child(stump)
+	stump.global_position = bone_global_pos + bone_global_rot.z * 0.02
+	stump.global_transform.basis = bone_global_rot
+	stump.set_meta("cut_surface", true)
+	_stumps[bone_name] = stump
+
+
+func _combine_meshes_for_slicing(meshes: Array, bone_idx: int) -> Mesh:
+	var surfaces: Array[Dictionary] = []
+	for mesh_inst in meshes:
+		if mesh_inst is MeshInstance3D:
+			var mesh_res: Mesh = mesh_inst.mesh
+			if mesh_res != null:
+				for surface_idx in range(mesh_res.get_surface_count()):
+					var arrays: Array = mesh_res.surface_get_arrays(surface_idx)
+					if arrays.size() >= 9:
+						var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+						if verts.size() > 0:
+							surfaces.append({
+								"mesh": mesh_res,
+								"surface": surface_idx,
+								"transform": mesh_inst.global_transform.affine_inverse() * skeleton.global_transform
+							})
+	
+	if surfaces.is_empty():
+		return null
+	
+	var combined := ArrayMesh.new()
+	var all_verts: PackedVector3Array = []
+	var all_normals: PackedVector3Array = []
+	var all_uvs: PackedVector2Array = []
+	
+	for surf in surfaces:
+		var arrays: Array = surf["mesh"].surface_get_arrays(surf["surface"])
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL] if arrays.size() > Mesh.ARRAY_NORMAL else PackedVector3Array()
+		var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV] if arrays.size() > Mesh.ARRAY_TEX_UV else PackedVector2Array()
+		
+		var xform: Transform3D = surf["transform"]
+		for i in range(verts.size()):
+			all_verts.append(xform * verts[i])
+			if normals.size() > i:
+				all_normals.append((xform.basis.orthonormalized() * normals[i]).normalized())
+			if uvs.size() > i:
+				all_uvs.append(uvs[i])
+	
+	var final_arrays: Array = []
+	final_arrays.resize(Mesh.ARRAY_MAX)
+	final_arrays[Mesh.ARRAY_VERTEX] = all_verts
+	if all_normals.size() > 0:
+		final_arrays[Mesh.ARRAY_NORMAL] = all_normals
+	if all_uvs.size() > 0:
+		final_arrays[Mesh.ARRAY_TEX_UV] = all_uvs
+	
+	combined.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, final_arrays)
+	return combined
+
+
+func _prune_expired_limbs() -> void:
+	var now := Time.get_ticks_msec()
+	for bone_name in _limb_timers.keys():
+		if now >= _limb_timers[bone_name]:
+			var limb_idx: int = _limbs.find(func(l: RigidBody3D): return l.name.contains(bone_name.replace(".", "_")))
+			if limb_idx >= 0:
+				var limb: RigidBody3D = _limbs[limb_idx]
+				if is_instance_valid(limb):
+					limb.queue_free()
+				_limbs.remove_at(limb_idx)
+			var stump: Node3D = _stumps.get(bone_name)
+			if is_instance_valid(stump):
+				stump.queue_free()
+			_stumps.erase(bone_name)
+			_limb_timers.erase(bone_name)
 
 
 func _find_skeleton(node: Node) -> Skeleton3D:

@@ -3,6 +3,8 @@ extends SceneTree
 const ViewModelScript = preload("res://core/game/weapon_viewmodel.gd")
 const MuzzleFxScript = preload("res://core/game/muzzle_fx.gd")
 const WeaponDbScript = preload("res://core/game/weapon_db.gd")
+const RecordedSfx = preload("res://core/game/recorded_sfx.gd")
+const MuzzleFx = preload("res://core/game/muzzle_fx.gd")
 
 var _failures: Array = []
 var _checks := 0

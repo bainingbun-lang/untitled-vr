@@ -35,6 +35,7 @@ const NPCLODScript = preload("res://core/npc/npc_lod.gd")
 const GameModeScript = preload("res://core/game/game_mode.gd")
 const VehicleSpawnerScript = preload("res://core/game/vehicle_spawner.gd")
 const VrVehicleInputScript = preload("res://core/vr/vr_vehicle_input.gd")
+const ArmedNpcScript = preload("res://core/game/armed_npc.gd")
 
 const DUMMY_COUNT: int = 6
 const STATIC_DUMMY_COUNT: int = 2
@@ -75,7 +76,7 @@ var performance: Node = null
 var vr_state: Node = null
 var vr_active: bool = false
 var vr_result: Dictionary = {}
-var debug_panel: VrDebugPanel = null
+var debug_panel: VrDebugPanelScript = null
 var _models: Dictionary = {}
 var _skins: Dictionary = {}
 var _impacts: Dictionary = {}
@@ -192,7 +193,7 @@ func setup(meta: Dictionary) -> void:
 
 
 func _process(delta: float) -> void:
-	ArmedNpc.advance_fx(maxf(delta, 0.0))
+	ArmedNpcScript.advance_fx(maxf(delta, 0.0))
 	_locomotion_timer -= maxf(delta, 0.0)
 	if _locomotion_timer <= 0.0:
 		_locomotion_timer = 0.2
@@ -794,8 +795,8 @@ func _spawn_living_npcs(center: Vector3, meta: Dictionary) -> void:
 		return
 	var platform: String = _session_platform()
 	if platform.is_empty():
-		platform = ArmedNpc.detect_platform()
-	var capacity: int = ArmedNpc.max_active(platform)
+		platform = ArmedNpcScript.detect_platform()
+	var capacity: int = ArmedNpcScript.max_active(platform)
 	var wanted: int = mini(capacity, 16)
 	var meta_limit: int = maxi(0, int(meta.get("max_npcs", 0)))
 	if meta_limit > 0:
@@ -930,7 +931,7 @@ func _spawn_living_npcs(center: Vector3, meta: Dictionary) -> void:
 			"realistic": true, "avoid_center": center, "avoid_radius": SAFE_RADIUS,
 			"drop_weapon_on_death": role == "hostile",
 		}
-		var npc: Node3D = ArmedNpc.spawn(_npcs_root, point, options) as Node3D
+		var npc: Node3D = ArmedNpcScript.spawn(_npcs_root, point, options) as Node3D
 		if npc == null:
 			continue
 		_attach_character_model(npc, _skin_for_role(role), "npc_%s" % npc_id)

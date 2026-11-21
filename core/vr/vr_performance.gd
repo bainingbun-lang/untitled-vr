@@ -16,6 +16,10 @@ const DEFAULT_PROFILES := {
 		"particles": 120,
 		"npcs": 12,
 		"decals": 48,
+		"culling_distance": 80.0,
+		"lod_bias": 1.0,
+		"max_draw_calls": 120,
+		"max_triangles": 150000,
 	},
 	MODE_90: {
 		"mode": MODE_90,
@@ -28,6 +32,10 @@ const DEFAULT_PROFILES := {
 		"particles": 96,
 		"npcs": 10,
 		"decals": 40,
+		"culling_distance": 70.0,
+		"lod_bias": 1.2,
+		"max_draw_calls": 100,
+		"max_triangles": 120000,
 	},
 }
 
@@ -39,6 +47,10 @@ const MIN_SETTINGS := {
 	"particles": 24,
 	"npcs": 4,
 	"decals": 8,
+	"culling_distance": 40.0,
+	"lod_bias": 2.0,
+	"max_draw_calls": 50,
+	"max_triangles": 50000,
 }
 
 const MAX_SETTINGS := {
@@ -49,6 +61,10 @@ const MAX_SETTINGS := {
 	"particles": 160,
 	"npcs": 16,
 	"decals": 64,
+	"culling_distance": 100.0,
+	"lod_bias": 0.8,
+	"max_draw_calls": 200,
+	"max_triangles": 200000,
 }
 
 var target_mode: String = MODE_72
@@ -63,6 +79,15 @@ var downshift_margin_ms: float = 1.0
 var upshift_margin_ms: float = 1.5
 var xr_available: bool = false
 var _built: bool = false
+
+var culling_camera: Camera3D = null
+var frustum_planes: Array[Plane] = []
+var last_frustum_update: float = 0.0
+var frustum_update_interval: float = 0.1
+var occlusion_queries: Dictionary = {}
+var draw_call_count: int = 0
+var triangle_count: int = 0
+var last_gpu_time: float = 0.0
 
 
 func _init(mode: String = MODE_72) -> void:
@@ -178,3 +203,112 @@ static func detect_openxr_available() -> bool:
 	if iface.has_method("is_initialized"):
 		return bool(iface.call("is_initialized"))
 	return true
+
+
+func set_culling_camera(camera: Camera3D) -> void:
+	culling_camera = camera
+	update_frustum()
+
+
+func update_frustum() -> void:
+	if culling_camera == null:
+		return
+	var current_time := Time.get_ticks_msec() / 1000.0
+	if (current_time - last_frustum_update) < frustum_update_interval:
+		return
+	last_frustum_update = current_time
+	if culling_camera.has_method("get_frustum"):
+		frustum_planes = culling_camera.get_frustum()
+	else:
+		frustum_planes = []
+
+
+func is_visible(aabb: AABB) -> bool:
+	if frustum_planes.is_empty():
+		return true
+	for plane in frustum_planes:
+		if plane.distance_to(aabb.position) + plane.normal.dot(aabb.size.abs()) < 0.0:
+			return false
+	return true
+
+
+func is_visible_sphere(position: Vector3, radius: float) -> bool:
+	if frustum_planes.is_empty():
+		return true
+	for plane in frustum_planes:
+		if plane.distance_to(position) < -radius:
+			return false
+	return true
+
+
+func get_culling_distance() -> float:
+	return float(profile.get("culling_distance", 80.0))
+
+
+func get_lod_bias() -> float:
+	return float(profile.get("lod_bias", 1.0))
+
+
+func get_max_draw_calls() -> int:
+	return int(profile.get("max_draw_calls", 120))
+
+
+func get_max_triangles() -> int:
+	return int(profile.get("max_triangles", 150000))
+
+
+func record_frame_stats(draw_calls: int, triangles: int, gpu_time_ms: float) -> void:
+	draw_call_count = draw_calls
+	triangle_count = triangles
+	last_gpu_time = gpu_time_ms
+
+
+func get_frame_stats() -> Dictionary:
+	return {
+		"draw_calls": draw_call_count,
+		"triangles": triangle_count,
+		"gpu_time_ms": last_gpu_time,
+		"budget_draw_calls": get_max_draw_calls(),
+		"budget_triangles": get_max_triangles(),
+		"over_budget_draw_calls": draw_call_count > get_max_draw_calls(),
+		"over_budget_triangles": triangle_count > get_max_triangles(),
+	}
+
+
+func apply_profile_to_rendering() -> void:
+	if not xr_available:
+		return
+	var iface = XRServer.find_interface("OpenXR")
+	if iface == null:
+		return
+	
+	iface.set_render_target_size_multiplier(float(profile.get("render_scale", 1.0)))
+	
+	if iface.has_method("set_foveation_level"):
+		iface.call("set_foveation_level", int(profile.get("foveation", 1)))
+	
+	if iface.has_method("set_msaa"):
+		iface.call("set_msaa", int(profile.get("msaa", 2)))
+	
+	# Shadow atlas quadrant subdivision not available in Godot 4.7 headless
+	# if RenderingServer.has_method("shadow_atlas_set_quadrant_subdivision"):
+	# 	RenderingServer.shadow_atlas_set_quadrant_subdivision(0, int(profile.get("shadow_distance", 18.0)) / 4.0)
+
+
+func _apply_profile_recursive(node: Node3D, cull_dist: float) -> void:
+	if node is MultiMeshInstance3D:
+		node.visibility_range_end = cull_dist
+		node.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+	elif node is MeshInstance3D:
+		node.visibility_range_end = cull_dist
+		node.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+	
+	for child in node.get_children():
+		if child is Node3D:
+			_apply_profile_recursive(child, cull_dist)
+
+func apply_profile_to_scene(root: Node3D) -> void:
+	var cull_dist := get_culling_distance()
+	var lod_bias := get_lod_bias()
+	
+	_apply_profile_recursive(root, cull_dist)

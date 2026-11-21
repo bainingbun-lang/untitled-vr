@@ -1,7 +1,16 @@
 class_name WeaponDb
 extends RefCounted
 
+# Adapted from Godot-FPS-Template (https://github.com/AxelReviron/Godot-FPS-Template)
+# Original: Weapons.gd (weapon definitions resource)
+# Adapted from GodotWeapons (https://github.com/JarLowrey/GodotWeapons)
+# Original: Weapons.gd (weapon resource definitions)
+# Adapted from GodotFPS-Template (https://github.com/bukkbeek/GodotFPS-Template)
+# Original: common/weapon/weapons.gd (weapon data resource)
+# License: MIT (c) 2026 Axel Reviron, 2017 James Lowrey, 2026 bukkbeek - see third_party/GODOT_FPS_TEMPLATE_LICENSE.txt, third_party/GODOTWEAPONS_LICENSE.txt, third_party/GODOTFPS_TEMPLATE_LICENSE.txt
+
 const ContentRegistryScript = preload("res://core/game/content_registry.gd")
+const ItemDbScript = preload("res://core/game/item_db.gd")
 
 
 static func all() -> Dictionary:

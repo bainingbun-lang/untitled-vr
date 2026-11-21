@@ -1,6 +1,10 @@
 class_name ContentRegistry
 extends RefCounted
 
+# Original content registry system with mod loading, validation, and priority-based overrides
+# No direct reference repo equivalent - inspired by Godot resource system patterns
+# License: MIT (c) 2026 UNTITLED project - see third_party/ for dependency licenses
+
 const TYPES: Array[String] = [
 	"weapon", "ammo", "item", "npc_type", "surface", "vehicle", "sound_bank", "gore_profile",
 ]
@@ -420,13 +424,14 @@ func _allowed_keys(type_name: String) -> Array:
 				"falloff_end", "falloff_min", "projectile_speed", "projectile_gravity",
 				"projectile_min_distance", "impact_speed", "effect_scale", "max_penetrations",
 				"max_ricochets", "model", "ammo_id", "caliber",
+				"fire_mode", "burst_count", "burst_delay", "vr_knife",
 			]
 		"ammo":
-			return common + ["weapon", "caliber", "magazine", "damage", "uses_ammo", "tags"]
+			return common + ["weapon", "caliber", "magazine", "damage", "uses_ammo", "tags", "magazine_sizes", "box_sizes", "price_per_round", "pellets"]
 		"item":
-			return ["id", "nombre", "name", "apilable", "max_stack", "peso", "tags", "description"]
+			return ["id", "nombre", "name", "apilable", "max_stack", "peso", "tags", "description", "ammo_type", "rounds", "model", "weight_kg", "price"]
 		"npc_type":
-			return common + ["role", "models", "aliases", "health", "speed", "weapon_id", "zombie"]
+			return common + ["role", "models", "aliases", "health", "speed", "weapon_id", "zombie", "behavior_tree"]
 		"surface":
 			return common + [
 				"penetration", "bounce", "absorption", "thickness", "transfer", "effect",
@@ -447,6 +452,15 @@ func _validate_weapon(def: Dictionary, errors: Array) -> void:
 	_check_num(def, "fire_rate", 0.0001, errors)
 	_check_num(def, "range", 0.0001, errors)
 	_check_int(def, "mag", 0, errors)
+	_check_enum(def, "fire_mode", ["semi", "auto", "burst"], errors)
+	# burst_count and burst_delay are only required for burst fire mode
+	var fire_mode := str(def.get("fire_mode", "semi"))
+	if fire_mode == "burst":
+		_check_int(def, "burst_count", 1, errors)
+		_check_num(def, "burst_delay", 0.0, errors)
+	else:
+		_check_optional_int(def, "burst_count", 1, errors)
+		_check_optional_num(def, "burst_delay", 0.0, errors)
 	_check_bool(def, "auto", errors)
 	_check_num(def, "spread", 0.0, errors)
 	_check_int(def, "pellets", 1, errors)
@@ -580,6 +594,39 @@ func _check_optional_string(def: Dictionary, key: String, errors: Array) -> void
 	def[key] = str(def[key])
 
 
+func _check_optional_int(def: Dictionary, key: String, minimum: int, errors: Array) -> void:
+	if not def.has(key):
+		return
+	var value: Variant = def.get(key, null)
+	var number: int = 0
+	match typeof(value):
+		TYPE_INT:
+			number = int(value)
+		TYPE_FLOAT:
+			var real: float = value
+			if floor(real) != real:
+				errors.append("%s: debe ser un entero" % key)
+				return
+			number = int(real)
+		_:
+			errors.append("%s: entero obligatorio" % key)
+			return
+	if number < minimum:
+		errors.append("%s: debe ser >= %s" % [key, str(minimum)])
+
+
+func _check_optional_num(def: Dictionary, key: String, minimum: float, errors: Array) -> void:
+	if not def.has(key):
+		return
+	var value: Variant = def.get(key, null)
+	if typeof(value) != TYPE_FLOAT and typeof(value) != TYPE_INT:
+		errors.append("%s: numero obligatorio" % key)
+		return
+	var number := float(value)
+	if number < minimum:
+		errors.append("%s: debe ser >= %s" % [key, str(minimum)])
+
+
 func _check_num(def: Dictionary, key: String, minimum: float, errors: Array) -> void:
 	var value: Variant = def.get(key, null)
 	if typeof(value) != TYPE_FLOAT and typeof(value) != TYPE_INT:
@@ -622,6 +669,15 @@ func _check_int(def: Dictionary, key: String, minimum: int, errors: Array) -> vo
 func _check_bool(def: Dictionary, key: String, errors: Array) -> void:
 	if typeof(def.get(key, null)) != TYPE_BOOL:
 		errors.append("%s: bool obligatorio" % key)
+
+
+func _check_enum(def: Dictionary, key: String, allowed: Array, errors: Array) -> void:
+	var value: Variant = def.get(key, null)
+	if typeof(value) != TYPE_STRING:
+		errors.append("%s: String obligatorio" % key)
+		return
+	if not allowed.has(value):
+		errors.append("%s: valor no valido '%s', permitidos: %s" % [key, value, allowed])
 
 
 func _check_strings(def: Dictionary, key: String, errors: Array, required: bool) -> void:

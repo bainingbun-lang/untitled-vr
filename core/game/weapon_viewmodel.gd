@@ -1,9 +1,18 @@
 class_name WeaponViewmodel
 extends Node3D
 
+# Adapted from Godot-FPS-Template (https://github.com/AxelReviron/Godot-FPS-Template)
+# Original: WeaponViewmodel.gd (viewmodel configs, bob, recoil, reload animation phases)
+# Adapted from GodotFPS-Template (https://github.com/bukkbeek/GodotFPS-Template)
+# Original: common/weapon/weapon.gd (viewmodel setup, fire/anim patterns)
+# Adapted from godot_openvr_fps (https://github.com/GodotVR/godot_openvr_fps)
+# Original: VR_Controller.gd (attach_to VR hand pattern)
+# License: MIT (c) 2026 Axel Reviron, 2026 bukkbeek, 2019 Bastiaan Olij & Noah Beard - see third_party/GODOT_FPS_TEMPLATE_LICENSE.txt, third_party/GODOTFPS_TEMPLATE_LICENSE.txt, third_party/GODOT_OPENVR_FPS_LICENSE.txt
+
 const MuzzleFxScript = preload("res://core/game/muzzle_fx.gd")
 const WeaponPartsScript = preload("res://core/game/weapon_parts.gd")
 const HandsViewmodelScript = preload("res://core/game/hands_viewmodel.gd")
+const RecordedSfx = preload("res://core/game/recorded_sfx.gd")
 
 const MODEL_DIR := "res://assets/models/weapons/"
 
@@ -17,6 +26,8 @@ const VIEW: Dictionary = {
 		"eject": Vector3(0.03, 0.02, 0.04),
 		"kick": Vector3(0.3, 1.4, 1.8),
 		"fx": 0.7,
+		"fire_mode": "semi",
+		"fire_rate": 6.0,
 	},
 
 	"submachine_gun": {
@@ -28,6 +39,8 @@ const VIEW: Dictionary = {
 		"eject": Vector3(0.04, 0.025, 0.10),
 		"fx": 0.9,
 		"kick": Vector3(0.30, 1.4, 2.0),
+		"fire_mode": "auto",
+		"fire_rate": 12.0,
 	},
 	"assault_rifle": {
 		"model": MODEL_DIR + "v2/assault_rifle.glb",
@@ -38,6 +51,8 @@ const VIEW: Dictionary = {
 		"eject": Vector3(0.05, 0.03, 0.20),
 		"fx": 1.0,
 		"kick": Vector3(0.35, 2.1, 2.8),
+		"fire_mode": "burst",
+		"fire_rate": 9.0,
 	},
 	"shotgun": {
 		"model": MODEL_DIR + "v2/shotgun.glb",
@@ -48,6 +63,8 @@ const VIEW: Dictionary = {
 		"eject": Vector3(0.045, 0.03, 0.24),
 		"fx": 1.3,
 		"kick": Vector3(0.45, 3.2, 3.8),
+		"fire_mode": "semi",
+		"fire_rate": 1.2,
 	},
 	"sniper_rifle": {
 		"model": MODEL_DIR + "v2/sniper_rifle.glb",
@@ -58,6 +75,8 @@ const VIEW: Dictionary = {
 		"eject": Vector3(0.045, 0.035, 0.28),
 		"fx": 1.4,
 		"kick": Vector3(0.50, 4.0, 4.6),
+		"fire_mode": "semi",
+		"fire_rate": 0.8,
 	},
 	"bat": {
 		"model": MODEL_DIR + "v2/bat.glb",
@@ -67,6 +86,19 @@ const VIEW: Dictionary = {
 		"muzzle": Vector3(0.0, 0.02, -0.80),
 		"fx": 0.0,
 		"kick": Vector3(0.20, 1.0, 1.4),
+		"fire_mode": "semi",
+		"fire_rate": 2.5,
+	},
+	"knife": {
+		"model": MODEL_DIR + "v2/bat.glb",
+		"pos": Vector3(0.20, -0.26, -0.28),
+		"align_y": 180.0,
+		"length": 0.85,
+		"muzzle": Vector3(0.0, 0.02, -0.80),
+		"fx": 0.0,
+		"kick": Vector3(0.20, 1.0, 1.4),
+		"fire_mode": "semi",
+		"fire_rate": 3.0,
 	},
 }
 
@@ -83,12 +115,16 @@ const PART_STROKE := 0.11
 const PUMP_STROKE := 0.16
 const MAG_INSERT_DROP := 0.22
 
+const CAMERA_RECOIL_STIFFNESS := 80.0
+const CAMERA_RECOIL_DAMPING := 12.0
+const CAMERA_RECOIL_RETURN_SPEED := 40.0
+
 var walk_intensity: float = 0.0
 
 var _motion: Node3D = null
 var _rig: Node3D = null
 var _model_holder: Node3D = null
-var _fx: MuzzleFx = null
+var _fx: MuzzleFxScript = null
 var _hands: Node3D = null
 var _current_id: String = ""
 var _base_pos: Vector3 = Vector3.ZERO
@@ -98,6 +134,9 @@ var _recoil_offset: Vector3 = Vector3.ZERO
 var _recoil_velocity: Vector3 = Vector3.ZERO
 var _bob_phase: float = 0.0
 var _bob_offset: Vector3 = Vector3.ZERO
+
+var _camera_recoil_offset: Vector3 = Vector3.ZERO
+var _camera_recoil_velocity: Vector3 = Vector3.ZERO
 
 var _reload_active: bool = false
 var _reload_elapsed: float = 0.0
@@ -193,8 +232,20 @@ func on_fired() -> void:
 	var cfg: Dictionary = VIEW.get(_current_id, {})
 	var kick: Vector3 = cfg.get("kick", Vector3(0.3, 1.5, 2.0))
 	_recoil_velocity += kick
+	var cam_kick: Vector3 = Vector3(
+		-kick.y * 0.15,
+		-kick.x * 0.1,
+		randf_range(-kick.z * 0.05, kick.z * 0.05)
+	)
+	_camera_recoil_velocity += cam_kick
 	if _fx != null and float(cfg.get("fx", 1.0)) > 0.0:
-		_fx.fire(float(cfg.get("fx", 1.0)), Vector3.FORWARD, cfg.get("eject", Vector3.ZERO))
+		_fx.fire_with_mode(
+			float(cfg.get("fx", 1.0)),
+			Vector3.FORWARD,
+			cfg.get("eject", Vector3.ZERO),
+			str(cfg.get("fire_mode", "semi")),
+			float(cfg.get("fire_rate", 6.0))
+		)
 	_start_fire_stroke()
 	if _current_id == "shotgun":
 		_pump_active = true
@@ -251,6 +302,7 @@ func advance(delta: float) -> void:
 	_ensure_setup()
 	var dt: float = maxf(delta, 0.0)
 	_step_recoil(dt)
+	_step_camera_recoil(dt)
 	_step_bob(dt)
 	_step_reload(dt)
 	_step_switch(dt)
@@ -296,6 +348,10 @@ func recoil_offset() -> Vector3:
 	return _recoil_offset
 
 
+func camera_recoil_offset() -> Vector3:
+	return _camera_recoil_offset
+
+
 func rig_position() -> Vector3:
 	return _rig.position if is_instance_valid(_rig) else Vector3.ZERO
 
@@ -308,7 +364,7 @@ func hands_viewmodel() -> Node:
 	return _hands
 
 
-func muzzle_fx() -> MuzzleFx:
+func muzzle_fx() -> MuzzleFxScript:
 	return _fx
 
 
@@ -432,14 +488,35 @@ func _step_recoil(delta: float) -> void:
 		_recoil_velocity = Vector3.ZERO
 		return
 	var remaining: float = minf(delta, 0.25)
-	while remaining > 0.0:
+	var iterations: int = 0
+	var max_iterations: int = 30
+	while remaining > 0.0 and iterations < max_iterations:
 		var step: float = minf(remaining, 1.0 / 90.0)
 		var accel := -RECOIL_STIFFNESS * _recoil_offset - RECOIL_DAMPING * _recoil_velocity
 		_recoil_velocity += accel * step
 		_recoil_offset += _recoil_velocity * step
 		remaining -= step
+		iterations += 1
 	if _recoil_offset.length() > 1.0:
 		_recoil_offset = _recoil_offset.normalized() * 1.0
+
+
+func _step_camera_recoil(delta: float) -> void:
+	if _camera_recoil_offset.length_squared() < 0.00000001 and _camera_recoil_velocity.length_squared() < 0.00000001:
+		_camera_recoil_offset = Vector3.ZERO
+		_camera_recoil_velocity = Vector3.ZERO
+		return
+	var remaining: float = minf(delta, 0.25)
+	var iterations: int = 0
+	var max_iterations: int = 30
+	while remaining > 0.0 and iterations < max_iterations:
+		var step: float = minf(remaining, 1.0 / 90.0)
+		var return_accel := -CAMERA_RECOIL_RETURN_SPEED * _camera_recoil_offset
+		var accel := return_accel - CAMERA_RECOIL_DAMPING * _camera_recoil_velocity
+		_camera_recoil_velocity += accel * step
+		_camera_recoil_offset += _camera_recoil_velocity * step
+		remaining -= step
+		iterations += 1
 
 
 func _step_bob(delta: float) -> void:

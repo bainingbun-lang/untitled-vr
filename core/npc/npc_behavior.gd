@@ -25,13 +25,23 @@ var follower = null
 
 var _actions: Dictionary = {}
 
+# AI2: Modo de comportamiento y agresion
+var behavior_mode: String = "pacifico"
+var _aggression_cooldown: float = 0.0
+var _calm_after_seconds: float = 30.0
+var _last_aggression_source: String = ""
+var _blackboard: Variant = null
 
-func _init(p_controller: NPCController = null, p_navigation: Variant = null, p_options: Dictionary = {}) -> void:
+
+func _init(p_controller = null, p_navigation = null, p_options = {}) -> void:
 	controller = p_controller
 	navigation = p_navigation
 	seed_value = int(p_options.get("seed", DEFAULT_SEED))
 	hysteresis = clampf(float(p_options.get("hysteresis", DEFAULT_HYSTERESIS)), 0.0, 1.0)
 	current_action_id = str(p_options.get("current_action", p_options.get("current_action_id", "")))
+	behavior_mode = str(p_options.get("behavior_mode", "pacifico")).to_lower()
+	_calm_after_seconds = maxf(0.0, float(p_options.get("calm_after_seconds", 30.0)))
+	_blackboard = p_options.get("blackboard", null)
 	if bool(p_options.get("defaults", true)):
 		_install_default_actions()
 	var extra: Variant = p_options.get("actions", [])
@@ -65,6 +75,27 @@ func get_current_action() -> String:
 	return current_action_id
 
 
+func get_behavior_mode() -> String:
+	return behavior_mode
+
+
+func set_behavior_mode(mode: String) -> void:
+	var m: String = str(mode).to_lower()
+	if m == "hostil" or m == "pacifico":
+		behavior_mode = m
+	else:
+		behavior_mode = "pacifico"
+
+
+func update_aggression_cooldown(delta: float) -> void:
+	_aggression_cooldown = maxf(0.0, _aggression_cooldown - delta)
+	if _aggression_cooldown <= 0.0:
+		_aggression_cooldown = 0.0
+		_last_aggression_source = ""
+		if behavior_mode == "hostil":
+			behavior_mode = "pacifico"
+
+
 func register_action(id: String, config: Dictionary) -> void:
 	var key: String = str(id)
 	if key.is_empty():
@@ -94,13 +125,34 @@ func action_ids() -> Array:
 
 func select(p_context: Dictionary = {}) -> Dictionary:
 	var ctx: Dictionary = _build_context(p_context)
+	_apply_behavior_mode(ctx)
+	_update_blackboard(ctx)
 	var candidates: Array = []
+	var aggressiveness: float = float(ctx.get("aggressiveness", 0.5))
+	var is_hostile_npc: bool = aggressiveness > 0.6
+	var is_civilian_npc: bool = aggressiveness <= 0.4
 	for key in _actions.keys():
 		var id: String = str(key)
 		var config: Dictionary = _actions[key]
 		if not _is_available(config, ctx):
 			continue
 		var utility: float = _score_action(id, config, ctx)
+		if id == "hostile_attack" and not is_hostile_npc:
+			continue
+		if id == "attack" and is_hostile_npc:
+			continue
+		if id == "civilian_flee" and not is_civilian_npc:
+			continue
+		if id == "flee" and is_civilian_npc:
+			continue
+		if (id == "hostile_attack" or id == "attack") and not bool(ctx.get("force_attack", false)) and not (_aggression_cooldown > 0.0 and is_hostile_npc):
+			continue
+		if (id == "chase") and not bool(ctx.get("force_chase", false)) and not (_aggression_cooldown > 0.0 and is_hostile_npc):
+			continue
+		if (id == "civilian_flee" or id == "flee") and not bool(ctx.get("force_flee", false)):
+			continue
+		if id == "witness_alert" and not bool(ctx.get("force_witness", false)):
+			continue
 		candidates.append({
 			"id": id,
 			"utility": utility,
@@ -184,7 +236,9 @@ func apply(result: Dictionary = {}, p_context: Dictionary = {}) -> Dictionary:
 func update(delta: float, p_context: Dictionary = {}) -> Dictionary:
 	if controller != null and controller.needs != null:
 		controller.needs.tick(delta)
-	return apply(select(p_context), p_context)
+	var ctx: Dictionary = p_context.duplicate(true)
+	ctx["delta"] = delta
+	return apply(select(ctx), ctx)
 
 
 func _install_default_actions() -> void:
@@ -196,6 +250,13 @@ func _install_default_actions() -> void:
 	register_action("explore", {"score": "explore", "state": "walk", "movement": true})
 	register_action("patrol", {"score": "patrol", "state": "walk", "movement": true})
 	register_action("idle", {"score": "idle", "state": "idle"})
+	register_action("peaceful_patrol", {"score": "patrol", "state": "walk", "movement": true})
+	register_action("peaceful_idle", {"score": "idle", "state": "idle"})
+	register_action("attack", {"score": "attack", "state": "attack", "movement": true})
+	register_action("chase", {"score": "chase", "state": "chase", "movement": true})
+	register_action("witness_alert", {"score": "witness_alert", "state": "alert"})
+	register_action("hostile_attack", {"score": "attack", "state": "attack", "movement": true})
+	register_action("civilian_flee", {"score": "flee", "state": "flee", "movement": true})
 
 
 func _build_context(p_context: Dictionary) -> Dictionary:
@@ -312,6 +373,20 @@ func _score_builtin(kind: String, ctx: Dictionary) -> float:
 			return (0.45 + 0.15 * curiosity) if bool(ctx["routine_active"]) else 0.0
 		"idle":
 			return 0.05
+		"attack":
+			return aggressiveness * 0.8 * (1.0 - fear) * (0.5 + 0.5 * danger) + confidence * 0.3
+		"chase":
+			return aggressiveness * 0.6 * (1.0 - fear) * (0.6 + 0.4 * danger) + confidence * 0.2
+		"witness_alert":
+			return sociability * 0.7 * (1.0 - fear) * danger * 0.5
+		"hostile_attack":
+			return aggressiveness * 0.9 * (1.0 - fear) * (0.6 + 0.4 * danger) + confidence * 0.4
+		"civilian_flee":
+			return fear * 0.9 + danger + (1.0 - bravery) * 0.4 * danger + low_health * 0.4
+		"peaceful_patrol":
+			return (0.5 + 0.1 * curiosity) if bool(ctx["routine_active"]) else 0.0
+		"peaceful_idle":
+			return 0.1
 		_:
 			return 0.0
 
@@ -371,6 +446,87 @@ func _memory_danger(mem: NPCMemory) -> float:
 
 func _is_danger_kind(kind: String) -> bool:
 	return kind.contains("danger") or kind.contains("threat") or kind.contains("attack") or kind.contains("hostile") or kind.contains("peligro")
+
+
+func note_aggression(source_id: String) -> void:
+	_aggression_cooldown = _calm_after_seconds
+	_last_aggression_source = source_id
+	behavior_mode = "hostil"
+	if controller != null:
+		var combat: Variant = controller.get("combat")
+		if combat != null and combat.has_method("note_aggression"):
+			combat.call("note_aggression", source_id)
+
+
+func _is_hostile() -> bool:
+	if controller == null:
+		return false
+	var personality: NPCPersonality = controller.personality
+	if personality != null:
+		return float(personality.aggressiveness) > 0.6
+	return false
+
+
+func _is_civilian() -> bool:
+	if controller == null:
+		return false
+	var personality: NPCPersonality = controller.personality
+	if personality != null:
+		return float(personality.aggressiveness) <= 0.4
+	return false
+
+
+func _is_witness() -> bool:
+	if controller == null:
+		return false
+	var personality: NPCPersonality = controller.personality
+	if personality != null:
+		return float(personality.sociability) > 0.5 and float(personality.aggressiveness) <= 0.6
+	return false
+
+
+func _update_blackboard(ctx: Dictionary) -> void:
+	if _blackboard == null or not _blackboard.has_method("set"):
+		return
+	_blackboard.call("set", "danger", float(ctx.get("danger", 0.0)))
+	_blackboard.call("set", "fear", float(ctx.get("fear", 0.0)))
+	_blackboard.call("set", "aggression_cooldown", _aggression_cooldown)
+	_blackboard.call("set", "last_aggression_source", _last_aggression_source)
+	_blackboard.call("set", "behavior_mode", behavior_mode)
+	_blackboard.call("set", "visible", bool(ctx.get("visible", false)))
+	_blackboard.call("set", "target_position", ctx.get("target_position", Vector3.ZERO))
+	if controller != null:
+		var combat: Variant = controller.get("combat")
+		if combat != null:
+			_blackboard.call("set", "under_attack", float(combat.get("under_attack", 0.0)))
+			_blackboard.call("set", "alert_level", float(combat.get("alert_level", 0.0)))
+
+
+func _apply_behavior_mode(ctx: Dictionary) -> void:
+	var delta: float = float(ctx.get("delta", 1.0 / 60.0))
+	if _aggression_cooldown > 0.0:
+		_aggression_cooldown -= delta
+		if _aggression_cooldown <= 0.0:
+			_aggression_cooldown = 0.0
+			_last_aggression_source = ""
+	
+	var mem: NPCMemory = controller.memory if controller != null else null
+	var danger: float = _memory_danger(mem)
+	var aggressiveness: float = float(ctx.get("aggressiveness", 0.5))
+	
+	if behavior_mode == "hostil" and aggressiveness <= 0.4:
+		behavior_mode = "pacifico"
+	
+	match behavior_mode:
+		"hostil":
+			if aggressiveness > 0.6:
+				ctx["force_attack"] = true
+				ctx["force_chase"] = _aggression_cooldown > 0.0
+		"pacifico":
+			if aggressiveness <= 0.4:
+				ctx["force_flee"] = danger > 0.3 or _aggression_cooldown > 0.0
+			elif float(ctx.get("sociability", 0.5)) > 0.5 and aggressiveness <= 0.6:
+				ctx["force_witness"] = danger > 0.2 and _aggression_cooldown > 0.0
 
 
 func _resolve_navigation(result: Dictionary, ctx: Dictionary) -> void:

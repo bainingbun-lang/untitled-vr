@@ -42,11 +42,18 @@ const SURFACE_TEXTURES := {
 		"roughness": TEXTURE_DIR + "brick/brick_roughness.jpg",
 		"scale": 0.38,
 	},
+	"glass": {
+		"albedo": "",
+		"normal": "",
+		"roughness": "",
+		"scale": 1.0,
+	},
 }
 
 const PROP_KINDS := [
 	"barrel_metal", "barrel_rust", "tyre", "wooden_crate", "cement_bag",
 	"ammo_box", "trash_bag", "security_light", "plastic_crate",
+	"street_light", "bench", "trash_can", "fence_section",
 ]
 
 const PROPS := {
@@ -89,25 +96,56 @@ const PROPS := {
 		"path": "res://assets/models/props/security_light/model.gltf",
 		"surface": "metal", "mass": 6.0, "height": 1.4,
 		"shape": "box", "collision": [0.45, 1.4, 0.45],
+		"emissive": Color(1.0, 0.9, 0.7, 1.0),
+		"light_range": 12.0,
+		"light_energy": 2.5,
 	},
 	"plastic_crate": {
 		"path": "res://assets/models/props/plastic_crate_02/model.gltf",
 		"surface": "metal", "mass": 5.0, "height": 0.5,
 		"shape": "box", "collision": [0.65, 0.5, 0.55],
 	},
+	"street_light": {
+		"path": "res://assets/models/props/street_light/model.gltf",
+		"surface": "metal", "mass": 0.0, "height": 6.0,
+		"shape": "box", "collision": [0.3, 6.0, 0.3],
+		"emissive": Color(1.0, 0.9, 0.7, 1.0),
+		"light_range": 12.0,
+		"light_energy": 2.5,
+	},
+	"bench": {
+		"path": "res://assets/models/props/bench/model.gltf",
+		"surface": "wood", "mass": 0.0, "height": 0.9,
+		"shape": "box", "collision": [1.5, 0.9, 0.5],
+	},
+	"trash_can": {
+		"path": "res://assets/models/props/trash_can/model.gltf",
+		"surface": "metal", "mass": 12.0, "height": 1.0,
+		"shape": "cylinder", "collision": [0.4, 1.0, 0.4],
+	},
+	"fence_section": {
+		"path": "res://assets/models/props/fence_section/model.gltf",
+		"surface": "metal", "mass": 0.0, "height": 1.2,
+		"shape": "box", "collision": [2.0, 1.2, 0.1],
+	},
 }
 
 static var _textures: Dictionary = {}
 static var _materials: Dictionary = {}
 static var _scenes: Dictionary = {}
+static var _mobile_materials: Dictionary = {}
+static var _material_ref_counts: Dictionary = {}
 
 
-static func surface_material(surface: String) -> StandardMaterial3D:
+static func surface_material(surface: String, mobile: bool = false) -> StandardMaterial3D:
 	var key := surface.strip_edges().to_lower()
 	if not SURFACE_TEXTURES.has(key):
 		key = "concrete"
-	if _materials.has(key):
-		return _materials[key] as StandardMaterial3D
+	
+	var cache_key := key + (".mobile" if mobile else "")
+	if _materials.has(cache_key):
+		_material_ref_counts[cache_key] = _material_ref_counts.get(cache_key, 0) + 1
+		return _materials[cache_key] as StandardMaterial3D
 
 	var paths: Dictionary = SURFACE_TEXTURES[key]
 	var material := StandardMaterial3D.new()
@@ -123,16 +161,56 @@ static func surface_material(surface: String) -> StandardMaterial3D:
 		material.roughness_texture = roughness
 	if metalness != null:
 		material.metallic_texture = metalness
-	material.roughness = 1.0
-	material.metallic = 1.0 if key == "metal" else 0.0
+	
+	match key:
+		"metal":
+			material.roughness = 0.3
+			material.metallic = 1.0
+		"glass":
+			material.transparency = StandardMaterial3D.TRANSPARENCY_ALPHA
+			material.albedo_color = Color(0.2, 0.3, 0.5, 0.3)
+			material.roughness = 0.05
+			material.metallic = 0.9
+			material.clearcoat = 1.0
+			material.clearcoat_roughness = 0.05
+			material.cull_mode = StandardMaterial3D.CULL_BACK
+		"asphalt":
+			material.roughness = 0.9
+			material.metallic = 0.0
+		"concrete":
+			material.roughness = 0.8
+			material.metallic = 0.0
+		"brick":
+			material.roughness = 0.85
+			material.metallic = 0.0
+		"wood":
+			material.roughness = 0.6
+			material.metallic = 0.0
+		"ground":
+			material.roughness = 0.95
+			material.metallic = 0.0
+		_:
+			material.roughness = 0.7
+			material.metallic = 0.0
 
-	material.uv1_triplanar = true
-	material.uv1_world_triplanar = true
-	material.uv1_triplanar_sharpness = 0.55
+	if mobile:
+		material.uv1_triplanar = false
+		material.uv1_world_triplanar = false
+		material.render_priority = 1
+		material.shading_mode = StandardMaterial3D.SHADING_MODE_PER_PIXEL
+		material.flag_use_point_size = false
+		material.flag_disable_ambient_light = true
+		material.flag_disable_fog = true
+	else:
+		material.uv1_triplanar = true
+		material.uv1_world_triplanar = true
+		material.uv1_triplanar_sharpness = 0.55
+	
 	var tile := float(paths.get("scale", 0.4))
 	material.uv1_scale = Vector3(tile, tile, tile)
 
-	_materials[key] = material
+	_materials[cache_key] = material
+	_material_ref_counts[cache_key] = 1
 	return material
 
 
@@ -157,27 +235,34 @@ static func make_environment(mobile: bool) -> Environment:
 	environment.background_mode = Environment.BG_SKY
 	environment.sky = sky
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	environment.ambient_light_energy = 0.45 if not mobile else 0.38
+	environment.ambient_light_energy = 0.5 if not mobile else 0.4
+	environment.ambient_light_color = Color(0.15, 0.12, 0.1)
 
 	environment.fog_enabled = true
-	environment.fog_light_color = Color(0.64, 0.49, 0.38)
-	environment.fog_density = 0.006 if not mobile else 0.004
-	environment.fog_sun_scatter = 0.18
+	environment.fog_light_color = Color(0.55, 0.42, 0.32)
+	environment.fog_density = 0.005 if not mobile else 0.0035
+	environment.fog_sun_scatter = 0.2
+	environment.fog_height = 0.0
+	environment.fog_height_density = 0.02
 
-	# tonemap filmic + sin glow en movil/VR: sin esto la escena sale quemada y blanca
 	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	environment.tonemap_exposure = 1.0
-	environment.tonemap_white = 6.0
-	environment.background_energy_multiplier = 0.8
+	environment.tonemap_exposure = 1.1
+	environment.tonemap_white = 5.5
+	environment.background_energy_multiplier = 0.85
 	environment.glow_enabled = not mobile
-	environment.glow_intensity = 0.16
-	environment.glow_bloom = 0.04
-	environment.glow_hdr_threshold = 1.05
+	environment.glow_intensity = 0.12
+	environment.glow_bloom = 0.035
+	environment.glow_hdr_threshold = 1.0
 
-	environment.ssao_enabled = false
-	environment.ssil_enabled = false
+	environment.ssao_enabled = not mobile
+	environment.ssao_radius = 1.5
+	environment.ssao_intensity = 0.6
+	environment.ssil_enabled = not mobile
 	environment.sdfgi_enabled = false
-	environment.volumetric_fog_enabled = false
+	environment.volumetric_fog_enabled = not mobile
+	environment.volumetric_fog_emission = Color(0.05, 0.03, 0.01)
+	environment.volumetric_fog_density = 0.02
+	environment.volumetric_fog_albedo = Color(0.4, 0.3, 0.2)
 	return environment
 
 
@@ -206,6 +291,36 @@ static func prop_scene(kind: String) -> PackedScene:
 	return scene
 
 
+static func create_street_light(kind: String, position: Vector3, rotation: float = 0.0) -> Node3D:
+	var config := prop_config(kind)
+	var scene := prop_scene(kind)
+	if scene == null:
+		var root := Node3D.new()
+		var light := OmniLight3D.new()
+		light.light_color = Color(1.0, 0.9, 0.7)
+		light.omni_range = float(config.get("light_range", 12.0))
+		light.light_energy = float(config.get("light_energy", 2.5))
+		light.light_shadow_enabled = false
+		root.add_child(light)
+		root.position = position
+		root.rotation.y = rotation
+		return root
+	
+	var instance := scene.instantiate() as Node3D
+	instance.position = position
+	instance.rotation.y = rotation
+	
+	var light := OmniLight3D.new()
+	light.light_color = config.get("emissive", Color(1.0, 0.9, 0.7))
+	light.omni_range = float(config.get("light_range", 12.0))
+	light.light_energy = float(config.get("light_energy", 2.5))
+	light.light_shadow_enabled = false
+	instance.add_child(light)
+	light.position = Vector3(0, 5.5, 0)
+	
+	return instance
+
+
 static func prop_kind(index: int) -> String:
 	if PROP_KINDS.is_empty():
 		return ""
@@ -221,3 +336,31 @@ static func _texture(path: String) -> Texture2D:
 	var texture := load(path) as Texture2D
 	_textures[path] = texture
 	return texture
+
+
+static func release_material(surface: String, mobile: bool = false) -> void:
+	var cache_key := surface.strip_edges().to_lower() + (".mobile" if mobile else "")
+	if _material_ref_counts.has(cache_key):
+		_material_ref_counts[cache_key] -= 1
+		if _material_ref_counts[cache_key] <= 0:
+			_materials.erase(cache_key)
+			_material_ref_counts.erase(cache_key)
+
+
+static func get_material_stats() -> Dictionary:
+	return {
+		"material_count": _materials.size(),
+		"texture_count": _textures.size(),
+		"scene_count": _scenes.size(),
+		"ref_counts": _material_ref_counts.duplicate(),
+	}
+
+
+static func clear_unused_materials() -> void:
+	var to_erase: Array = []
+	for key in _material_ref_counts.keys():
+		if _material_ref_counts[key] <= 0:
+			to_erase.append(key)
+	for key in to_erase:
+		_materials.erase(key)
+		_material_ref_counts.erase(key)

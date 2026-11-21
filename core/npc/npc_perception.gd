@@ -12,9 +12,9 @@ extends RefCounted
 #   true si hay vision despejada; por defecto se considera despejada.
 # - Todo determinista: sin azar, orden por prioridad y desempate estable.
 
-const DEFAULT_VISION_RANGE: float = 12.0
-const DEFAULT_VISION_HALF_ANGLE_DEG: float = 45.0
-const DEFAULT_HEARING_RANGE: float = 8.0
+const DEFAULT_VISION_RANGE: float = 25.0
+const DEFAULT_VISION_HALF_ANGLE_DEG: float = 55.0
+const DEFAULT_HEARING_RANGE: float = 25.0
 const DEFAULT_MAX_STIMULI_PER_TICK: int = 8
 const TIE_EPSILON: float = 0.000001
 
@@ -146,6 +146,14 @@ func evaluate_stimulus(stimulus: Dictionary, observer_position: Variant, observe
 			evaluated["reason"] = str(vision_check["reason"])
 		else:
 			evaluated["reason"] = str(vision_check["reason"])
+	elif perception_channel == "gunshot" or perception_channel == "disparo" or kind == "gunshot" or kind == "disparo":
+		var gunshot: Dictionary = can_hear_gunshot(stimulus, observer_position, options)
+		evaluated["heard"] = bool(gunshot["heard"])
+		evaluated["channel"] = "gunshot"
+		evaluated["reason"] = str(gunshot["reason"])
+		if evaluated["heard"]:
+			evaluated["intensity"] = clampf(float(gunshot["intensity"]), 0.0, 1.0)
+			evaluated["priority"] = evaluated["intensity"] * 2.0
 	elif perception_channel == "hearing" or perception_channel == "sound" or perception_channel == "noise":
 		var hearing: Dictionary = can_hear(stimulus, observer_position, options)
 		evaluated["heard"] = bool(hearing["heard"])
@@ -181,6 +189,31 @@ func can_hear(stimulus: Dictionary, observer_position: Variant, options: Diction
 	result["intensity"] = intensity
 	result["heard"] = intensity > 0.0
 	result["reason"] = "heard" if result["heard"] else "silent"
+	return result
+
+
+# Disparo: sonido muy fuerte audible a mayor distancia (hasta 50m por defecto).
+# Usa channel "gunshot" o kind "gunshot"/"disparo".
+func can_hear_gunshot(stimulus: Dictionary, observer_position: Variant, options: Dictionary = {}) -> Dictionary:
+	var base_loudness: float = 1.0
+	var base_radius: float = float(options.get("gunshot_range", 50.0))
+	var distance: float = _distance(observer_position, stimulus.get("position", stimulus.get("target", Vector2.ZERO)))
+	var result: Dictionary = {
+		"heard": false,
+		"distance": distance,
+		"loudness": base_loudness,
+		"radius": base_radius,
+		"intensity": 0.0,
+		"reason": "",
+	}
+	if distance > base_radius:
+		result["reason"] = "out_of_range"
+		return result
+	var attenuation: float = 1.0 - distance / base_radius
+	var intensity: float = clampf(base_loudness * attenuation * 1.5, 0.0, 1.0)
+	result["intensity"] = intensity
+	result["heard"] = intensity > 0.0
+	result["reason"] = "gunshot_heard" if result["heard"] else "out_of_range"
 	return result
 
 

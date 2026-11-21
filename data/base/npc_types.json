@@ -17,7 +17,12 @@
       "health": 100.0,
       "speed": 3.2,
       "weapon_id": "untitled.base:bat",
-      "zombie": false
+      "zombie": false,
+      "behavior_tree": {
+        "pacific_mode": "res://core/npc/bt/trees/civil_pacific.tres",
+        "hostile_mode": "res://core/npc/bt/trees/civil_hostile.tres",
+        "default_mode": "pacifico"
+      }
     },
     {
       "type": "npc_type",
@@ -29,7 +34,12 @@
       "health": 140.0,
       "speed": 3.6,
       "weapon_id": "untitled.base:pistol",
-      "zombie": false
+      "zombie": false,
+      "behavior_tree": {
+        "pacific_mode": "res://core/npc/bt/trees/police_pacific.tres",
+        "hostile_mode": "res://core/npc/bt/trees/police_hostile.tres",
+        "default_mode": "pacifico"
+      }
     },
     {
       "type": "npc_type",
@@ -41,7 +51,12 @@
       "health": 180.0,
       "speed": 3.8,
       "weapon_id": "untitled.base:assault_rifle",
-      "zombie": false
+      "zombie": false,
+      "behavior_tree": {
+        "pacific_mode": "res://core/npc/bt/trees/soldier_pacific.tres",
+        "hostile_mode": "res://core/npc/bt/trees/soldier_hostile.tres",
+        "default_mode": "pacifico"
+      }
     },
     {
       "type": "npc_type",
@@ -53,7 +68,12 @@
       "health": 120.0,
       "speed": 4.0,
       "weapon_id": "untitled.base:submachine_gun",
-      "zombie": false
+      "zombie": false,
+      "behavior_tree": {
+        "pacific_mode": "res://core/npc/bt/trees/criminal_pacific.tres",
+        "hostile_mode": "res://core/npc/bt/trees/criminal_hostile.tres",
+        "default_mode": "pacifico"
+      }
     },
     {
       "type": "npc_type",
@@ -65,7 +85,12 @@
       "health": 90.0,
       "speed": 3.0,
       "weapon_id": "untitled.base:pistol",
-      "zombie": false
+      "zombie": false,
+      "behavior_tree": {
+        "pacific_mode": "res://core/npc/bt/trees/office_pacific.tres",
+        "hostile_mode": "res://core/npc/bt/trees/office_hostile.tres",
+        "default_mode": "pacifico"
+      }
     },
     {
       "type": "npc_type",
@@ -80,7 +105,12 @@
       "aliases": ["zombie", "enemy", "enemigo", "undead"],
       "health": 80.0,
       "speed": 2.1,
-      "zombie": true
+      "zombie": true,
+      "behavior_tree": {
+        "pacific_mode": "res://core/npc/bt/trees/zombie_pacific.tres",
+        "hostile_mode": "res://core/npc/bt/trees/zombie_hostile.tres",
+        "default_mode": "hostil"
+      }
     }
   ]
 }

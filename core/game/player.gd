@@ -12,6 +12,7 @@ const ReloadSystemScript = preload("res://core/game/reload_system.gd")
 const ModHooksScript = preload("res://core/game/mod_hooks.gd")
 const SFX_BANK_PATH := "res://core/game/sfx_bank.gd"
 const AUDIO_SYNTH_PATH := "res://core/game/audio_synth.gd"
+const RecordedSfx = preload("res://core/game/recorded_sfx.gd")
 const TOUCH_SIGNALS := [
 	["move", "_on_touch_move"],
 	["look", "_on_touch_look"],

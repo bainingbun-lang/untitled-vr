@@ -1,11 +1,13 @@
 class_name MapRegistry
 extends RefCounted
 
+const ValidatorScript = preload("res://core/maps/map_validator.gd")
+
 var _maps: Dictionary = {}
-var _validator: MapValidator
+var _validator
 
 func _init():
-	_validator = MapValidator.new()
+	_validator = ValidatorScript.new()
 
 func register(meta: Dictionary) -> bool:
 	var id = meta.get("id")
@@ -16,7 +18,7 @@ func register(meta: Dictionary) -> bool:
 		return false
 		
 	var result = _validator.validate(meta)
-	if result.status > MapValidator.Status.COMPATIBLE_WITH_WARNINGS:
+	if result.status > ValidatorScript.Status.COMPATIBLE_WITH_WARNINGS:
 		return false
 		
 	_maps[id] = meta

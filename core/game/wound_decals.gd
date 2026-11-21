@@ -5,6 +5,14 @@ const GROUND_MASK := 1
 const GROUND_PROBE := 8.0
 const MAX_DECAL_AGE := 30.0
 const PUDDLE_MAX_SIZE_MULT := 3.0
+const DAMAGE_MASK_SIZE := 256
+const MAX_DAMAGE_MASKS := 24
+
+enum DamageLayer {
+	SKIN = 0,
+	MUSCLE = 1,
+	BONE = 2
+}
 
 static var _wound_decals: Array = []
 static var _surface_decals: Array = []
@@ -19,6 +27,10 @@ static var _decal_limit: int = 96
 static var _puddle_limit: int = 32
 static var _part_limit: int = 16
 static var _active_particle_limit: int = 48
+
+static var _damage_masks: Dictionary = {}
+static var _damage_mask_pool: Array = []
+static var _npc_mask_refs: Dictionary = {}
 
 static func set_limits(decals: int, puddles: int, parts: int, active_particles: int) -> void:
 	_decal_limit = maxi(decals, 0)
@@ -39,9 +51,83 @@ static func get_part_limit() -> int:
 static func get_active_particle_limit() -> int:
 	return _active_particle_limit
 
-static func create_wound(parent: Node, pos: Vector3, normal: Vector3, size: float, layers: int, zone: String = "") -> Dictionary:
+static func get_or_create_damage_mask(npc_id: int) -> Image:
+	if _damage_masks.has(npc_id):
+		return _damage_masks[npc_id]
+	
+	if _damage_mask_pool.size() >= MAX_DAMAGE_MASKS:
+		var oldest_key: int = _damage_mask_pool.pop_front()
+		if _damage_masks.has(oldest_key):
+			_damage_masks.erase(oldest_key)
+	
+	var mask := Image.create_empty(DAMAGE_MASK_SIZE, DAMAGE_MASK_SIZE, false, Image.FORMAT_RGBA8)
+	mask.fill(Color(0, 0, 0, 0))
+	_damage_masks[npc_id] = mask
+	_damage_mask_pool.append(npc_id)
+	return mask
+
+static func release_damage_mask(npc_id: int) -> void:
+	if _damage_masks.has(npc_id):
+		_damage_masks.erase(npc_id)
+		if npc_id in _damage_mask_pool:
+			_damage_mask_pool.erase(npc_id)
+
+static func apply_damage_to_mask(npc_id: int, uv: Vector2, depth: float, radius_px: int = 8) -> void:
+	var mask := get_or_create_damage_mask(npc_id)
+	var cx := int(uv.x * DAMAGE_MASK_SIZE)
+	var cy := int(uv.y * DAMAGE_MASK_SIZE)
+	
+	var layer: int
+	if depth < 0.33:
+		layer = DamageLayer.SKIN
+	elif depth < 0.66:
+		layer = DamageLayer.MUSCLE
+	else:
+		layer = DamageLayer.BONE
+	
+	var color = _get_layer_color(layer)
+	var r_sq := radius_px * radius_px
+	var r: float = sqrt(r_sq)
+	
+	var min_x: int = max(0, cx - radius_px)
+	var max_x: int = min(DAMAGE_MASK_SIZE - 1, cx + radius_px)
+	var min_y: int = max(0, cy - radius_px)
+	var max_y: int = min(DAMAGE_MASK_SIZE - 1, cy + radius_px)
+	
+	for y in range(min_y, max_y + 1):
+		var dy: int = y - cy
+		var dy_sq: int = dy * dy
+		if dy_sq > r_sq:
+			continue
+		var dx_max: int = int(sqrt(r_sq - dy_sq))
+		var x_start: int = max(min_x, cx - dx_max)
+		var x_end: int = min(max_x, cx + dx_max)
+		for x in range(x_start, x_end + 1):
+			var dx: int = x - cx
+			var dist_sq: int = dx * dx + dy_sq
+			if dist_sq <= r_sq:
+				var falloff: float = 1.0 - sqrt(dist_sq) / r
+				var alpha: float = color.a * falloff
+				var existing: Color = mask.get_pixel(x, y)
+				var new_alpha: float = max(existing.a, alpha)
+				mask.set_pixel(x, y, Color(color.r, color.g, color.b, new_alpha))
+
+static func _get_layer_color(layer: int) -> Color:
+	match layer:
+		DamageLayer.SKIN:
+			return Color(0.55, 0.05, 0.05, 0.85)
+		DamageLayer.MUSCLE:
+			return Color(0.45, 0.02, 0.02, 0.9)
+		DamageLayer.BONE:
+			return Color(0.35, 0.01, 0.01, 0.95)
+	return Color(0.5, 0.03, 0.03, 0.85)
+
+static func create_wound(parent: Node, pos: Vector3, normal: Vector3, size: float, layers: int, zone: String = "", npc_id: int = -1, uv: Vector2 = Vector2(0.5, 0.5), depth: float = 0.5) -> Dictionary:
 	if parent == null or _decal_limit <= 0:
 		return {}
+	
+	if npc_id >= 0:
+		apply_damage_to_mask(npc_id, uv, depth, int(size * 128))
 	
 	var wound := Node3D.new()
 	wound.name = "Wound_%s" % (zone if not zone.is_empty() else "generic")
@@ -55,7 +141,7 @@ static func create_wound(parent: Node, pos: Vector3, normal: Vector3, size: floa
 		layer_size = clampf(layer_size, 0.025, size)
 		plane.size = Vector2(layer_size, layer_size)
 		layer_decal.mesh = plane
-		layer_decal.material_override = _get_decal_material_for_layer(i, layers)
+		layer_decal.material_override = _get_decal_material_for_layer(i, layers, depth)
 		
 		var surface := _raycast_ground(parent, pos + Vector3.UP * 0.3)
 		var impact_pos: Vector3 = surface.get("position", pos)
@@ -84,6 +170,8 @@ static func create_wound(parent: Node, pos: Vector3, normal: Vector3, size: floa
 		"zone": zone,
 		"age": 0.0,
 		"is_character": parent is CharacterBody3D or parent.has_method("take_damage"),
+		"npc_id": npc_id,
+		"depth": depth,
 	}
 	
 	if wound_data["is_character"]:
@@ -256,6 +344,9 @@ static func clear() -> void:
 	_surface_decals.clear()
 	_puddles.clear()
 	_trails.clear()
+	_damage_masks.clear()
+	_damage_mask_pool.clear()
+	_npc_mask_refs.clear()
 
 static func shutdown() -> void:
 	clear()
@@ -300,17 +391,22 @@ static func _make_irregular_disc(radius: float, segments: int) -> Mesh:
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
 
-static func _get_decal_material_for_layer(layer: int, total_layers: int) -> Material:
-	var key := "wound_%d_%d" % [layer, total_layers]
+static func _get_decal_material_for_layer(layer: int, total_layers: int, depth: float) -> Material:
+	var key := "wound_%d_%d_%d" % [layer, total_layers, int(depth * 10)]
 	if _decal_materials.has(key):
 		return _decal_materials[key]
 	var material := StandardMaterial3D.new()
 	var depth_factor := float(layer) / float(max(total_layers - 1, 1))
-	var r: float = lerp(0.45, 0.15, depth_factor)
-	var g: float = lerp(0.02, 0.005, depth_factor)
-	var b: float = lerp(0.02, 0.005, depth_factor)
-	var a: float = lerp(0.9, 0.6, depth_factor)
-	material.albedo_color = Color(r, g, b, a)
+	var layer_type: int
+	if depth < 0.33:
+		layer_type = DamageLayer.SKIN
+	elif depth < 0.66:
+		layer_type = DamageLayer.MUSCLE
+	else:
+		layer_type = DamageLayer.BONE
+	
+	var color = _get_layer_color(layer_type)
+	material.albedo_color = color
 	material.albedo_texture = _get_decal_texture()
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.roughness = 0.95
@@ -375,3 +471,12 @@ static func puddle_count() -> int:
 
 static func total_decal_count() -> int:
 	return _wound_decals.size() + _surface_decals.size()
+
+static func damage_mask_count() -> int:
+	return _damage_masks.size()
+
+static func get_damage_mask(npc_id: int) -> Image:
+	return _damage_masks.get(npc_id, null)
+
+static func release_npc_damage_mask(npc_id: int) -> void:
+	release_damage_mask(npc_id)

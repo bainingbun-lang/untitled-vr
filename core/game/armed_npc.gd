@@ -18,6 +18,28 @@ const NAVIGATION_PATH: String = "res://core/npc/npc_navigation.gd"
 const RELATIONS_PATH: String = "res://core/npc/npc_relations.gd"
 const FACTIONS_PATH: String = "res://core/npc/npc_factions.gd"
 const LOD_PATH: String = "res://core/npc/npc_lod.gd"
+const BEHAVIOR_PATH: String = "res://core/npc/npc_behavior.gd"
+const STEERING_AGENT_PATH: String = "res://core/npc/steering/steering_agent.gd"
+const STEERING_BEHAVIOR_PATH: String = "res://core/npc/steering/steering_behavior.gd"
+const ARRIVE_PATH: String = "res://core/npc/steering/behaviors/arrive.gd"
+const FACE_PATH: String = "res://core/npc/steering/behaviors/face.gd"
+const SEPARATION_PATH: String = "res://core/npc/steering/behaviors/separation.gd"
+const AVOID_COLLISIONS_PATH: String = "res://core/npc/steering/behaviors/avoid_collisions.gd"
+const RADIUS_PROXIMITY_PATH: String = "res://core/npc/steering/proximities/radius_proximity.gd"
+const PRIORITY_PATH: String = "res://core/npc/steering/behaviors/priority.gd"
+const MATCH_ORIENTATION_PATH: String = "res://core/npc/steering/behaviors/match_orientation.gd"
+const BLEND_PATH: String = "res://core/npc/steering/behaviors/blend.gd"
+const TARGET_ACCELERATION_PATH: String = "res://core/npc/steering/target_acceleration.gd"
+const TargetAcceleration = preload("res://core/npc/steering/target_acceleration.gd")
+const BEHAVIOR_TREE_PATH: String = "res://core/npc/bt/behavior_tree.gd"
+const BT_BLACKBOARD_PATH: String = "res://core/npc/bt/blackboard.gd"
+const BT_SELECTOR_PATH: String = "res://core/npc/bt/bt_selector.gd"
+const BT_SEQUENCE_PATH: String = "res://core/npc/bt/bt_sequence.gd"
+const BT_CONDITION_PATH: String = "res://core/npc/bt/bt_condition.gd"
+const BT_ACTION_PATH: String = "res://core/npc/bt/bt_action.gd"
+const BT_CONTEXT_PATH: String = "res://core/npc/bt/bt_context.gd"
+const BT_TREE_BUILDER_PATH: String = "res://core/npc/bt/bt_tree_builder.gd"
+const NPC_TYPES_PATH: String = "res://data/base/npc_types.json"
 const WEAPON_VIEWMODEL_PATH: String = "res://core/game/weapon_viewmodel.gd"
 const MUZZLE_FX_PATH: String = "res://core/game/muzzle_fx.gd"
 const RECORDED_SFX_PATH: String = "res://core/game/recorded_sfx.gd"
@@ -148,6 +170,17 @@ var _home: Vector3 = Vector3.ZERO
 var _last_investigate_goal: Vector3 = Vector3.ZERO
 var _flee_goal_cache: Vector3 = Vector3.ZERO
 var _flee_goal_age: float = 0.0
+
+# AI2 Steering and Behavior Tree integration
+var steering_agent = null
+var steering_behavior = null
+var behavior_tree = null
+var bt_blackboard = null
+var _steering_arrive_target = null
+var _steering_initialized: bool = false
+var _behavior_tree_initialized: bool = false
+var _use_steering: bool = true
+var _use_behavior_tree: bool = true
 
 
 static func detect_platform() -> String:
@@ -439,6 +472,9 @@ func _build() -> void:
 		_sfx_bank_script = load(SFX_BANK_PATH) as Script
 	_rng.seed = absi(seed_value) ^ 0xA5A5
 
+	_initialize_steering()
+	_initialize_behavior_tree()
+
 	_apply_weapon_definition()
 	_attach_weapon_model()
 
@@ -669,6 +705,190 @@ func _apply_pending_options() -> void:
 	_attach_weapon_model()
 
 
+func _initialize_steering() -> void:
+	if _steering_initialized or not _use_steering:
+		return
+	if not ResourceLoader.exists(STEERING_AGENT_PATH) or not ResourceLoader.exists(ARRIVE_PATH) or not ResourceLoader.exists(FACE_PATH) or not ResourceLoader.exists(SEPARATION_PATH) or not ResourceLoader.exists(AVOID_COLLISIONS_PATH) or not ResourceLoader.exists(RADIUS_PROXIMITY_PATH) or not ResourceLoader.exists(PRIORITY_PATH) or not ResourceLoader.exists(MATCH_ORIENTATION_PATH) or not ResourceLoader.exists(TARGET_ACCELERATION_PATH) or not ResourceLoader.exists("res://core/npc/steering/agent_location.gd"):
+		return
+	var SteeringAgent = load(STEERING_AGENT_PATH) as Script
+	var Arrive = load(ARRIVE_PATH) as Script
+	var Face = load(FACE_PATH) as Script
+	var Separation = load(SEPARATION_PATH) as Script
+	var AvoidCollisions = load(AVOID_COLLISIONS_PATH) as Script
+	var RadiusProximity = load(RADIUS_PROXIMITY_PATH) as Script
+	var Priority = load(PRIORITY_PATH) as Script
+	var MatchOrientation = load(MATCH_ORIENTATION_PATH) as Script
+	var TargetAcceleration = load(TARGET_ACCELERATION_PATH) as Script
+	var SteeringAgentLocation = load("res://core/npc/steering/agent_location.gd") as Script
+	if SteeringAgent == null or Arrive == null or Face == null or Separation == null or AvoidCollisions == null or RadiusProximity == null or Priority == null or MatchOrientation == null or TargetAcceleration == null or SteeringAgentLocation == null:
+		return
+	steering_agent = SteeringAgent.new()
+	steering_agent.linear_speed_max = run_speed
+	steering_agent.linear_acceleration_max = run_speed * 3.0
+	steering_agent.angular_speed_max = 8.0
+	steering_agent.angular_acceleration_max = 20.0
+	steering_agent.bounding_radius = 0.5
+	steering_agent.position = global_position
+	steering_agent.orientation = rotation.y
+	var arrive_target = SteeringAgentLocation.new()
+	arrive_target.position = _goal if _goal != Vector3.ZERO else global_position
+	arrive_target.orientation = rotation.y
+	var arrive_behavior = Arrive.new(steering_agent, arrive_target)
+	arrive_behavior.arrival_tolerance = 0.5
+	arrive_behavior.deceleration_radius = 3.0
+	var face_behavior = Face.new(steering_agent, steering_agent, false)
+	var match_orientation_behavior = MatchOrientation.new(steering_agent, steering_agent)
+	match_orientation_behavior.alignment_tolerance = 0.05
+	match_orientation_behavior.deceleration_radius = 0.5
+	match_orientation_behavior.time_to_reach = 0.1
+	match_orientation_behavior.use_z = true
+	var proximity = RadiusProximity.new(steering_agent, [], 4.0)
+	var separation_behavior = Separation.new(steering_agent, proximity)
+	separation_behavior.decay_coefficient = 1.5
+	var avoid_collisions_behavior = AvoidCollisions.new(steering_agent, proximity)
+	var priority_behavior = Priority.new(steering_agent, 0.01)
+	priority_behavior.add(avoid_collisions_behavior)
+	priority_behavior.add(separation_behavior)
+	priority_behavior.add(arrive_behavior)
+	priority_behavior.add(face_behavior)
+	priority_behavior.add(match_orientation_behavior)
+	steering_behavior = priority_behavior
+	_steering_arrive_target = arrive_target
+	_steering_initialized = true
+
+
+func _initialize_behavior_tree() -> void:
+	if _behavior_tree_initialized or not _use_behavior_tree:
+		return
+	if not ResourceLoader.exists(BEHAVIOR_TREE_PATH) or not ResourceLoader.exists(BT_BLACKBOARD_PATH) or not ResourceLoader.exists(BT_TREE_BUILDER_PATH) or not ResourceLoader.exists(NPC_TYPES_PATH):
+		return
+	var BehaviorTree = load(BEHAVIOR_TREE_PATH) as Script
+	var BTBlackboard = load(BT_BLACKBOARD_PATH) as Script
+	var BTTreeBuilder = load(BT_TREE_BUILDER_PATH) as Script
+	if BehaviorTree == null or BTBlackboard == null or BTTreeBuilder == null:
+		return
+	bt_blackboard = BTBlackboard.new()
+	behavior_tree = BehaviorTree.new(bt_blackboard, false)
+	_setup_behavior_tree_for_role(BTTreeBuilder)
+	_behavior_tree_initialized = true
+
+
+func _setup_behavior_tree_for_role(BTTreeBuilder: Script) -> void:
+	if behavior_tree == null:
+		return
+	var role_map: Dictionary = {
+		"civilian": "civil",
+		"hostile": "criminal",
+		"criminal": "criminal",
+		"soldier": "soldier",
+		"defender": "police",
+		"police": "police",
+		"zombie": "zombie",
+	}
+	var role_key: String = role_map.get(role.to_lower(), "civil")
+	var mode: String = "pacifico"
+	if combat != null:
+		var combat_mode: Variant = combat.get("behavior_mode")
+		if combat_mode != null:
+			mode = str(combat_mode).to_lower()
+		else:
+			mode = "hostil"
+	var tree = BTTreeBuilder.build_tree_for_role(role_key, mode)
+	if tree != null:
+		behavior_tree = tree
+		behavior_tree._blackboard = bt_blackboard
+
+
+func _setup_civilian_tree(root: BTSelector) -> void:
+	var flee_seq = load(BT_SEQUENCE_PATH).new()
+	root.add_child(flee_seq)
+	var flee_cond = load(BT_CONDITION_PATH).new()
+	flee_cond.condition_name = "is_threatened"
+	flee_cond.set_script(load("res://core/npc/bt/conditions/is_threatened.gd") if ResourceLoader.exists("res://core/npc/bt/conditions/is_threatened.gd") else null)
+	flee_seq.add_child(flee_cond)
+	var flee_act = load(BT_ACTION_PATH).new()
+	flee_act.action_name = "flee"
+	flee_act.set_script(load("res://core/npc/bt/actions/flee.gd") if ResourceLoader.exists("res://core/npc/bt/actions/flee.gd") else null)
+	flee_seq.add_child(flee_act)
+	var patrol_seq = load(BT_SEQUENCE_PATH).new()
+	root.add_child(patrol_seq)
+	var patrol_cond = load(BT_CONDITION_PATH).new()
+	patrol_cond.condition_name = "has_patrol"
+	patrol_seq.add_child(patrol_cond)
+	var patrol_act = load(BT_ACTION_PATH).new()
+	patrol_act.action_name = "patrol"
+	patrol_seq.add_child(patrol_act)
+	var idle_act = load(BT_ACTION_PATH).new()
+	idle_act.action_name = "idle"
+	root.add_child(idle_act)
+
+
+func _setup_hostile_tree(root: BTSelector) -> void:
+	var attack_seq = load(BT_SEQUENCE_PATH).new()
+	root.add_child(attack_seq)
+	var attack_cond = load(BT_CONDITION_PATH).new()
+	attack_cond.condition_name = "can_attack"
+	attack_seq.add_child(attack_cond)
+	var attack_act = load(BT_ACTION_PATH).new()
+	attack_act.action_name = "attack"
+	attack_seq.add_child(attack_act)
+	var pursue_seq = load(BT_SEQUENCE_PATH).new()
+	root.add_child(pursue_seq)
+	var pursue_cond = load(BT_CONDITION_PATH).new()
+	pursue_cond.condition_name = "has_target"
+	pursue_seq.add_child(pursue_cond)
+	var pursue_act = load(BT_ACTION_PATH).new()
+	pursue_act.action_name = "pursue"
+	pursue_seq.add_child(pursue_act)
+	var patrol_seq = load(BT_SEQUENCE_PATH).new()
+	root.add_child(patrol_seq)
+	var patrol_cond = load(BT_CONDITION_PATH).new()
+	patrol_cond.condition_name = "has_patrol"
+	patrol_seq.add_child(patrol_cond)
+	var patrol_act = load(BT_ACTION_PATH).new()
+	patrol_act.action_name = "patrol"
+	patrol_seq.add_child(patrol_act)
+	var idle_act = load(BT_ACTION_PATH).new()
+	idle_act.action_name = "idle"
+	root.add_child(idle_act)
+
+
+func _setup_defender_tree(root: BTSelector) -> void:
+	var defend_seq = load(BT_SEQUENCE_PATH).new()
+	root.add_child(defend_seq)
+	var defend_cond = load(BT_CONDITION_PATH).new()
+	defend_cond.condition_name = "ally_threatened"
+	defend_seq.add_child(defend_cond)
+	var defend_act = load(BT_ACTION_PATH).new()
+	defend_act.action_name = "defend"
+	defend_seq.add_child(defend_act)
+	var patrol_seq = load(BT_SEQUENCE_PATH).new()
+	root.add_child(patrol_seq)
+	var patrol_cond = load(BT_CONDITION_PATH).new()
+	patrol_cond.condition_name = "has_patrol"
+	patrol_seq.add_child(patrol_cond)
+	var patrol_act = load(BT_ACTION_PATH).new()
+	patrol_act.action_name = "patrol"
+	patrol_seq.add_child(patrol_act)
+	var idle_act = load(BT_ACTION_PATH).new()
+	idle_act.action_name = "idle"
+	root.add_child(idle_act)
+
+
+func _setup_default_tree(root: BTSelector) -> void:
+	var patrol_seq = load(BT_SEQUENCE_PATH).new()
+	root.add_child(patrol_seq)
+	var patrol_cond = load(BT_CONDITION_PATH).new()
+	patrol_cond.condition_name = "has_patrol"
+	patrol_seq.add_child(patrol_cond)
+	var patrol_act = load(BT_ACTION_PATH).new()
+	patrol_act.action_name = "patrol"
+	patrol_seq.add_child(patrol_act)
+	var idle_act = load(BT_ACTION_PATH).new()
+	idle_act.action_name = "idle"
+	root.add_child(idle_act)
+
+
 func pending_target_id() -> String:
 	if _pending_options.has("target_id"):
 		return str(_pending_options["target_id"])
@@ -716,6 +936,8 @@ func set_navigation(value) -> void:
 	navigation = value
 	if combat != null:
 		combat.set("navigation", value)
+		if combat.behavior != null:
+			combat.behavior.navigation = value
 
 
 func initial_attitude() -> String:
@@ -1231,7 +1453,12 @@ func _physics_process(delta: float) -> void:
 		var decision_delta: float = _tick_accumulator
 		_tick_accumulator = 0.0
 		tick(decision_delta)
-	_move_toward_goal(step)
+	if _use_steering and _steering_initialized and steering_agent != null:
+		_update_steering(step)
+	else:
+		_move_toward_goal(step)
+	if _use_behavior_tree and _behavior_tree_initialized and behavior_tree != null:
+		_update_behavior_tree(step)
 
 
 func _move_toward_goal(delta: float) -> void:
@@ -1302,6 +1529,93 @@ func _move_toward_goal(delta: float) -> void:
 		_stuck_time += delta
 	else:
 		_stuck_time = maxf(0.0, _stuck_time - delta * 0.5)
+
+
+func _update_steering(delta: float) -> void:
+	if steering_agent == null or steering_behavior == null:
+		return
+	steering_agent.position = global_position
+	steering_agent.orientation = rotation.y
+	steering_agent.linear_velocity = velocity
+	if _steering_arrive_target != null:
+		var destination: Vector3 = _goal
+		if _path_index < _path.size():
+			destination = _path[_path_index]
+		elif destination == Vector3.ZERO and bt_blackboard != null:
+			var bt_target = bt_blackboard.get_value("move_target", null)
+			if bt_target is Vector3 and bt_target.length_squared() > 0.001:
+				destination = bt_target
+		if destination == Vector3.ZERO:
+			var home_pos: Vector3 = _home if _home != Vector3.ZERO else global_position
+			var angle: float = _rng.randf_range(0.0, TAU)
+			var radius: float = _rng.randf_range(5.0, 15.0)
+			destination = home_pos + Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
+		_steering_arrive_target.position = destination
+	if steering_behavior is Priority:
+		var priority: Priority = steering_behavior
+		for i in range(priority._behaviors.size()):
+			var behavior = priority.get_behavior_at(i)
+			if behavior != null and behavior is AvoidCollisions:
+				var avoid_collisions: AvoidCollisions = behavior
+				if avoid_collisions.proximity != null and avoid_collisions.proximity is RadiusProximity:
+					var proximity: RadiusProximity = avoid_collisions.proximity
+					var agents: Array = []
+					for ally in _active:
+						if ally == self or not is_instance_valid(ally):
+							continue
+						if ally.has_method("get_steering_agent"):
+							var other_agent = ally.get_steering_agent()
+							if other_agent != null:
+								agents.append(other_agent)
+						elif ally.steering_agent != null:
+							agents.append(ally.steering_agent)
+					proximity.agents = agents
+				break
+		var accel = TargetAcceleration.new()
+		steering_behavior.calculate_steering(accel)
+		if accel.linear.length_squared() > 0.0001:
+			var max_accel: float = steering_agent.linear_acceleration_max
+			var max_speed: float = steering_agent.linear_speed_max
+			accel.linear = accel.linear.clamp(Vector3(-max_accel, -max_accel, -max_accel), Vector3(max_accel, max_accel, max_accel))
+			velocity.x = clampf(velocity.x + accel.linear.x * delta, -max_speed, max_speed)
+			velocity.z = clampf(velocity.z + accel.linear.z * delta, -max_speed, max_speed)
+		if abs(accel.angular) > 0.0001:
+			var max_angular: float = steering_agent.angular_speed_max
+			steering_agent.angular_velocity = clampf(steering_agent.angular_velocity + accel.angular * delta, -max_angular, max_angular)
+			rotation.y = lerp_angle(rotation.y, steering_agent.orientation + steering_agent.angular_velocity * delta, 0.5)
+		var previous: Vector3 = global_position
+		move_and_slide()
+		if _has_navigation_grid() and not bool(navigation.call("is_walkable_world", global_position, nav_cell_size)):
+			global_position = previous
+			velocity.x = 0.0
+			velocity.z = 0.0
+		if has_world_bounds:
+			var inset: float = 0.6
+			var x: float = clampf(global_position.x, world_bounds.position.x + inset, world_bounds.end.x - inset)
+			var z: float = clampf(global_position.z, world_bounds.position.z + inset, world_bounds.end.z - inset)
+			if x != global_position.x or z != global_position.z:
+				global_position = Vector3(x, global_position.y, z)
+
+
+func _update_behavior_tree(delta: float) -> void:
+	if behavior_tree == null or bt_blackboard == null:
+		return
+	var ctx: Dictionary = _context()
+	var role_lower: String = role.to_lower()
+	var mode: String = "pacifico"
+	if combat != null:
+		var combat_mode: Variant = combat.get("behavior_mode")
+		if combat_mode != null:
+			mode = str(combat_mode).to_lower()
+	bt_blackboard.set_value("role", role_lower, behavior_tree)
+	bt_blackboard.set_value("behavior_mode", mode, behavior_tree)
+	bt_blackboard.set_value("ctx", ctx, behavior_tree)
+	bt_blackboard.set_value("delta", delta, behavior_tree)
+	bt_blackboard.set_value("npc", self, behavior_tree)
+	behavior_tree.tick_with(self, bt_blackboard, false)
+	var action_id: String = str(bt_blackboard.get_value("current_action", behavior_tree))
+	if not action_id.is_empty() and action_id != _last_action:
+		_last_action = action_id
 
 
 func _context() -> Dictionary:

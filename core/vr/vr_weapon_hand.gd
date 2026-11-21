@@ -1,6 +1,13 @@
 class_name VrWeaponHand
 extends Node3D
 
+# Adapted from godot_openvr_fps (https://github.com/GodotVR/godot_openvr_fps)
+# Original: VR_Controller.gd (VR grab/hold, weapon interaction, haptic feedback)
+# Original: Pistol.gd (VR muzzle flash, raycast shooting)
+# Adapted from Godot-FPS-Template (https://github.com/AxelReviron/Godot-FPS-Template)
+# Original: WeaponViewmodel.gd (viewmodel integration, aim direction)
+# License: MIT (c) 2019 Bastiaan Olij & Noah Beard, 2026 Axel Reviron - see third_party/GODOT_OPENVR_FPS_LICENSE.txt, third_party/GODOT_FPS_TEMPLATE_LICENSE.txt
+
 signal weapon_taken(weapon_id: String, hand: String)
 signal weapon_stowed(weapon_id: String, hand: String)
 signal fired(result: Dictionary)
@@ -13,6 +20,7 @@ const DbScript = preload("res://core/game/weapon_db.gd")
 const ViewmodelScript = preload("res://core/game/weapon_viewmodel.gd")
 const MuzzleFxScript = preload("res://core/game/muzzle_fx.gd")
 const SfxBankScript = preload("res://core/game/sfx_bank.gd")
+const RecordedSfx = preload("res://core/game/recorded_sfx.gd")
 const GrabScript = preload("res://core/vr/vr_grab.gd")
 const HandPoseScript = preload("res://core/vr/vr_hand_pose.gd")
 const HolsterScript = preload("res://core/vr/vr_holsters.gd")
@@ -557,20 +565,21 @@ func try_fire(space = null) -> Dictionary:
 	var base := _aim_dir.normalized()
 	if base.length_squared() <= 0.000001:
 		base = aim_direction(primary, Transform3D.IDENTITY, false)
-	# 1) municion/recamara
-	var origin := _muzzle_origin(primary)
+	# 1) municion/recamara - use sight-ray alignment for origin and direction
+	var origin := sight_ray_origin()
+	var direction := sight_ray_direction()
 	var blocked := ""
 	if weapon_system.has_method("fire_block_reason"):
 		blocked = str(weapon_system.call("fire_block_reason", weapon_id))
 	_trace("ammo")
 	if not blocked.is_empty():
-		var refused = weapon_system.call("fire", weapon_id, origin, base, space, exclude.duplicate())
+		var refused = weapon_system.call("fire", weapon_id, origin, direction, space, exclude.duplicate())
 		last_shot = refused if refused is Dictionary else {"fired": false, "reason": blocked}
 		if blocked.find("municion") >= 0 and viewmodel != null and viewmodel.has_method("on_empty"):
 			viewmodel.call("on_empty")
 		return last_shot
 	# la direccion lleva el climb del disparo anterior (se calcula antes del nuevo impulso)
-	var direction: Vector3 = recoil.aim_direction(base)
+	direction = recoil.aim_direction(direction)
 	# 2) impulso de retroceso sobre el arma en la mano
 	recoil.primary_hand = hand
 	recoil.secondary_hand = other_hand()
@@ -614,13 +623,12 @@ func try_fire(space = null) -> Dictionary:
 
 
 func _play_shot_sound(origin: Vector3) -> void:
-	var host: Node = get_parent() if get_parent() != null else self
+	var host: Node3D = get_parent() as Node3D
+	if host == null:
+		host = self
 	RecordedSfx.play(weapon_id, "fire", host, origin)
 	if not RecordedSfx.has_sample(weapon_id, "fire"):
-		var audio_host: Node3D = get_parent() as Node3D
-		if audio_host == null:
-			audio_host = self
-		SfxBankScript.play_synth(audio_host, "shot", weapon_id, origin, "sfx")
+		SfxBankScript.play_synth(host, "shot", weapon_id, origin, "sfx")
 
 
 func try_reload() -> bool:
@@ -649,8 +657,29 @@ func try_reload() -> bool:
 func on_impact(info: Dictionary) -> void:
 	if weapon_id.is_empty() or str(info.get("weapon_id", "")) != weapon_id:
 		return
+	var mass: float = float(info.get("mass", 0.0))
+	var impact_velocity: float = float(info.get("impact_velocity", 0.0))
+	if mass > 0.0 and impact_velocity > 0.0:
+		var haptic: Dictionary = impact_haptic(mass, impact_velocity)
+		pulse(hand, float(haptic["duration"]), float(haptic["frequency"]), float(haptic["amplitude"]))
+		return
 	var strength: float = clampf(float(info.get("damage", 0.0)) / 50.0, 0.1, 1.0)
 	pulse(hand, 0.08, 0.5, strength)
+
+
+static func impact_haptic(mass: float, impact_velocity: float) -> Dictionary:
+	var energy: float = 0.5 * maxf(mass, 0.0) * impact_velocity * impact_velocity
+	var strength: float = clampf(energy / 10.0, 0.0, 1.0)
+	var duration: float = lerpf(0.04, 0.16, strength)
+	var frequency: float = lerpf(0.8, 0.3, strength)
+	var amplitude: float = lerpf(0.2, 1.0, strength)
+	return {
+		"duration": duration,
+		"frequency": frequency,
+		"amplitude": amplitude,
+		"strength": strength,
+		"energy": energy,
+	}
 
 
 func pulse(target_hand: String, duration: float = 0.05, frequency: float = 0.6, amplitude: float = 0.5) -> void:
@@ -698,7 +727,7 @@ func _in_bag_zone(pose: Transform3D) -> bool:
 	return bag != null and bag.is_in_bag_zone(pose.origin)
 
 
-func _space():
+func _space() -> PhysicsDirectSpaceState3D:
 	var world := get_world_3d()
 	return world.direct_space_state if world != null else null
 
@@ -722,6 +751,56 @@ func _aim_basis(primary: Transform3D) -> Basis:
 func _muzzle_origin(primary: Transform3D) -> Vector3:
 	var basis := _aim_basis(primary)
 	return primary.origin + basis.x * muzzle_offset.x + basis.y * muzzle_offset.y + basis.z * muzzle_offset.z
+
+
+func sight_ray_origin() -> Vector3:
+	if viewmodel == null or not is_instance_valid(viewmodel):
+		return _muzzle_origin(_pose(hand))
+	var cfg: Dictionary = ViewmodelScript.VIEW.get(weapon_id, {})
+	if cfg.is_empty() or not cfg.has("muzzle"):
+		return _muzzle_origin(_pose(hand))
+	var muzzle_local: Vector3 = cfg.get("muzzle", Vector3.ZERO)
+	if viewmodel.has_method("rig_position") and viewmodel.has_method("rig_rotation"):
+		var rig_pos: Vector3 = viewmodel.rig_position()
+		var rig_rot: Vector3 = viewmodel.rig_rotation()
+		var holder_transform := Transform3D(Basis.from_euler(rig_rot), rig_pos)
+		return holder_transform * muzzle_local
+	return _muzzle_origin(_pose(hand))
+
+
+func sight_ray_direction() -> Vector3:
+	if viewmodel == null or not is_instance_valid(viewmodel):
+		return _aim_dir.normalized()
+	var cfg: Dictionary = ViewmodelScript.VIEW.get(weapon_id, {})
+	if cfg.is_empty() or not cfg.has("muzzle"):
+		return _aim_dir.normalized()
+	if viewmodel.has_method("rig_position") and viewmodel.has_method("rig_rotation"):
+		var rig_rot: Vector3 = viewmodel.rig_rotation()
+		var basis := Basis.from_euler(rig_rot)
+		return (-basis.z).normalized()
+	return _aim_dir.normalized()
+
+
+func sight_ray_cast(max_distance: float = 50.0, exclude: Array = []) -> Dictionary:
+	var space := _space()
+	if space == null:
+		return {"hit": false, "point": Vector3.ZERO, "normal": Vector3.ZERO, "collider": null}
+	var origin := sight_ray_origin()
+	var direction := sight_ray_direction()
+	var query = PhysicsRayQueryParameters3D.new()
+	query.from = origin
+	query.to = origin + direction * max_distance
+	query.exclude = exclude.duplicate()
+	var result: Dictionary = space.intersect_ray(query)
+	if result.is_empty():
+		return {"hit": false, "point": origin + direction * max_distance, "normal": Vector3.ZERO, "collider": null}
+	return {
+		"hit": true,
+		"point": result.position,
+		"normal": result.normal,
+		"collider": result.collider,
+		"rid": result.rid
+	}
 
 
 func _update_visual(primary: Transform3D, delta: float = 0.0) -> void:

@@ -58,7 +58,7 @@ class SpawnedNPC extends RefCounted:
 			personality_data[key] = float(personality.get(key)) if personality != null else 0.5
 		var stops: Array = []
 		if routine != null:
-			stops = routine.stops.duplicate(true)
+			stops = routine.patrol_waypoints.duplicate(true)
 		return {
 			"id": id,
 			"spawn_index": spawn_index,

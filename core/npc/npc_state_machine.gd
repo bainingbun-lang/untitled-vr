@@ -7,7 +7,7 @@ var current_state: String = "idle"
 
 const VALID_STATES: Array[String] = [
 	"idle", "walk", "run", "sit", "rest", 
-	"converse", "alert", "flee", "stunned", "recover", "need_help"
+	"converse", "alert", "flee", "stunned", "recover", "need_help", "crawl"
 ]
 
 const VALID_TRANSITIONS: Dictionary = {

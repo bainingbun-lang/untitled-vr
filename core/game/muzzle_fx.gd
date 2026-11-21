@@ -1,6 +1,14 @@
 class_name MuzzleFx
 extends Node3D
 
+# Adapted from Godot-FPS-Template (https://github.com/AxelReviron/Godot-FPS-Template)
+# Original: muzzle flash/smoke effects in WeaponController.gd, ShootingWeaponState.gd
+# Adapted from GodotFPS-Template (https://github.com/bukkbeek/GodotFPS-Template)
+# Original: common/weapon/weapon.gd (fire effects, casing ejection)
+# Adapted from GodotWeapons (https://github.com/JarLowrey/GodotWeapons)
+# Original: weapon.gd (muzzle effects patterns)
+# License: MIT (c) 2026 Axel Reviron, 2026 bukkbeek, 2017 James Lowrey - see third_party/GODOT_FPS_TEMPLATE_LICENSE.txt, third_party/GODOTFPS_TEMPLATE_LICENSE.txt, third_party/GODOTWEAPONS_LICENSE.txt
+
 const MAX_CASINGS := 24
 const MAX_FLASHES := 8
 const MAX_FLASH_LIGHTS := 8
@@ -46,6 +54,20 @@ func fire(scale: float = 1.0, forward_local: Vector3 = Vector3.FORWARD, eject_lo
 	eject_casing(_resolve_casing_parent(), port, world_dir)
 
 
+func fire_with_mode(scale: float = 1.0, forward_local: Vector3 = Vector3.FORWARD, eject_local: Vector3 = Vector3.ZERO, fire_mode: String = "semi", fire_rate: float = 6.0) -> void:
+	var dir_local := forward_local.normalized() if forward_local.length_squared() > 0.0001 else Vector3.FORWARD
+	var flash_life := FLASH_LIFE
+	if fire_mode == "auto":
+		flash_life *= 0.7
+	elif fire_mode == "burst":
+		flash_life *= 0.85
+	spawn_flash(self, Vector3.ZERO, dir_local, scale, flash_life)
+	spawn_smoke(self, Vector3.ZERO, dir_local, scale)
+	var world_dir: Vector3 = (global_transform.basis * dir_local).normalized()
+	var port: Vector3 = global_transform * eject_local
+	eject_casing(_resolve_casing_parent(), port, world_dir)
+
+
 static func advance(delta: float) -> void:
 	var dt: float = maxf(delta, 0.0)
 	for node in _flash_lights:
@@ -76,7 +98,7 @@ static func advance(delta: float) -> void:
 			_mag_active.erase(mag)
 
 
-static func spawn_flash(parent: Node, pos: Vector3, direction: Vector3, scale: float = 1.0) -> void:
+static func spawn_flash(parent: Node, pos: Vector3, direction: Vector3, scale: float = 1.0, flash_life: float = FLASH_LIFE) -> void:
 	if parent == null:
 		return
 	var power: float = clampf(scale, 0.2, 3.0)
@@ -102,7 +124,7 @@ static func spawn_flash(parent: Node, pos: Vector3, direction: Vector3, scale: f
 	sprite.material_override = _get_flash_material()
 	sprite.pixel_size = clampf(0.16 * power, 0.08, 0.28) / float(SPRITE_RES)
 	anchor.add_child(sprite)
-	anchor.set_meta("life", FLASH_LIFE)
+	anchor.set_meta("life", flash_life)
 	_flashes.append(anchor)
 	while _flashes.size() > MAX_FLASHES:
 		_retire(_flashes.pop_front())

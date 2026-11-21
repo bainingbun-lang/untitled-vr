@@ -29,6 +29,7 @@ var impulse_scale: float = 1.0
 var projectile_mode: String = "auto"
 var dismember_on_kill: bool = false
 var effects_enabled: bool = true
+var manual_cycle: bool = false
 
 var _time: float = 0.0
 var _next_allowed: Dictionary = {}
@@ -39,7 +40,10 @@ var _reload_total: Dictionary = {}
 var _manual_locks: Dictionary = {}
 var _cycle_pending: Dictionary = {}
 var _stroke_back: Dictionary = {}
-var manual_cycle: bool = false
+var _trigger_held: Dictionary = {}
+var _burst_active: Dictionary = {}
+var _burst_shots_fired: Dictionary = {}
+var _burst_next_shot: Dictionary = {}
 var _log: Array = []
 var _projectiles: Array = []
 var _projectile_events: Array = []
@@ -207,6 +211,53 @@ func fire_block_reason(weapon_id: String) -> String:
 	if _time < float(_next_allowed.get(weapon_id, 0.0)):
 		return "cadencia"
 	return ""
+
+
+func get_fire_mode(weapon_id: String) -> String:
+	var def: Dictionary = DbScript.get_def(weapon_id)
+	if def.is_empty():
+		return "semi"
+	return str(def.get("fire_mode", "semi"))
+
+
+func trigger_pressed(weapon_id: String) -> void:
+	_trigger_held[weapon_id] = true
+	var def: Dictionary = DbScript.get_def(weapon_id)
+	if not def.is_empty():
+		var mode: String = str(def.get("fire_mode", "semi"))
+		if mode == "burst":
+			_burst_active[weapon_id] = true
+			_burst_shots_fired[weapon_id] = 0
+			_burst_next_shot[weapon_id] = _time
+
+
+func trigger_released(weapon_id: String) -> void:
+	_trigger_held[weapon_id] = false
+	_burst_active.erase(weapon_id)
+	_burst_shots_fired.erase(weapon_id)
+	_burst_next_shot.erase(weapon_id)
+
+
+func try_fire_auto(weapon_id: String) -> bool:
+	if not _trigger_held.get(weapon_id, false):
+		return false
+	if not can_fire(weapon_id):
+		return false
+	return true
+
+
+func get_burst_count(weapon_id: String) -> int:
+	var def: Dictionary = DbScript.get_def(weapon_id)
+	if def.is_empty():
+		return 3
+	return int(def.get("burst_count", 3))
+
+
+func get_burst_delay(weapon_id: String) -> float:
+	var def: Dictionary = DbScript.get_def(weapon_id)
+	if def.is_empty():
+		return 0.08
+	return maxf(float(def.get("burst_delay", 0.08)), 0.0)
 
 
 func fire_interval(weapon_id: String) -> float:

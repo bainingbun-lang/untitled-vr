@@ -1,0 +1,143 @@
+# Third-Party Licenses
+
+This project uses assets and code from various third-party sources. Below is a summary of the licenses.
+
+## CC0 1.0 Universal (Public Domain Dedication)
+
+The majority of 3D models, textures, and audio assets are released under CC0 1.0:
+
+- **ambientCG** (Lenka Dohnalova) - PBR textures (Ground037, Concrete046, Metal021, Wood089, Bricks051, Asphalt033)
+- **Poly Haven / Poly Haven Community** - HDRI (Qwantani Sunset) and 3D props (Barrel_01, barrel_03, old_tyre, wooden_crate_02, cement_bag, ammo_box, trashbag, security_light, plastic_crate_02)
+- **Quaternius (Laulhet)** - Weapons (H3 pack: pistol, submachine_gun, assault_rifle, shotgun, sniper_rifle, bat), Characters (H2 pack: civil, soldier, enemy zombie, robot), Characters v2 (C6 P1: 11 humanoid models), D1 example mod pistol
+- **Vuena / Popyca** - Robot character (Free Low-Poly Characters)
+- **Kenney (Kenney.NL)** - Multiple 3D kits (City Roads, City Commercial, City Industrial, Building, Car, Factory, Furniture, Nature, Car Kit for vehicles)
+- **Poly by Google** - Steering wheel model
+- **DigitalN8m4r3 (Miodrag Sejic) / GodotVR** - Godot XR Tools low-poly hands
+- **wwwriks** - WRAD Arms
+- **CreativeTrio** - Baseball Bat (nails)
+- **Pichuliru** - Shotgun Pump West
+- **GGBotNet, domasx2, rubberduck, congusbongus, dklon, Peludo, Till Behrend, qubodup, SpringySpringo, zer0_sol, pauliuw, Michel Baradari, Vincent Sevedge, kurt, XCVG, TinyWorlds, SketchMan3, Thimras, tcarisland, Wolfgang_, DonkeyMan, Nocturnal_Vanguard, WeaponGuy, AntumDeluge, JeanMyna_VA, Scribe, StarNinjas, thebardofblasphemy, mikeask, congusbongus, rubberduck** - Audio assets from OpenGameArt
+- **qubodup, Michel Baradari, congusbongus, thebardofblasphemy, mikeask, StarNinjas, DonkeyMan, Nocturnal_Vanguard, WeaponGuy, AntumDeluge, JeanMyna_VA, Scribe, XCVG** - Vocal sounds
+- **Various OpenGameArt contributors** - Impact, footsteps, glass break, explosion, ambient sounds
+
+CC0 1.0 license text:
+```
+Creative Commons Legal Code
+CC0 1.0 Universal
+
+    CREATIVE COMMONS CORPORATION IS NOT A LAW FIRM AND DOES NOT PROVIDE
+    LEGAL SERVICES. DISTRIBUTION OF THIS DOCUMENT DOES NOT CREATE AN
+    ATTORNEY-CLIENT RELATIONSHIP. CREATIVE COMMONS PROVIDES THIS
+    INFORMATION ON AN "AS-IS" BASIS. CREATIVE COMMONS MAKES NO WARRANTIES
+    REGARDING THE USE OF THIS DOCUMENT OR THE INFORMATION OR WORKS
+    PROVIDED HEREUNDER, AND DISCLAIMS LIABILITY FOR DAMAGES RESULTING FROM
+    THE USE OF THIS DOCUMENT OR THE INFORMATION OR WORKS PROVIDED
+    HEREUNDER.
+
+Statement of Purpose
+
+The laws of most jurisdictions throughout the world automatically confer
+exclusive Copyright and Related Rights (defined below) upon the creator
+and subsequent owner(s) (each and all, an "owner") of an original work of
+authorship and/or a database (each, a "Work").
+
+Certain owners wish to permanently relinquish those rights to a Work for
+the purpose of contributing to a commons of creative, cultural and
+scientific works ("the public domain"). Contributing to the public domain
+is not a task that can be accomplished simply by waiving or abandoning
+rights, because the laws of most jurisdictions do not allow owners to
+relinquish rights that are automatically conferred by law. Therefore, the
+Creative Commons CC0 Universal Public Domain Dedication provides a
+reliable legal mechanism for owners to waive copyright and related rights
+in their works to the fullest extent allowed by law.
+
+1. Copyright and Related Rights. A "Work" means the work of authorship
+   and/or database offered under the terms of this License. "Copyright and
+   Related Rights" means all rights of copyright and related rights under
+   law. Related Rights include performance rights, broadcast rights, and
+   database rights.
+
+2. Waiver. To the greatest extent permitted by, but not in contravention
+   of, applicable law, Affirmer hereby overtly, fully, permanently,
+   irrevocably and unconditionally waives, abandons, and surrenders all
+   of Affirmer's Copyright and Related Rights in the Work. This waiver is
+   intended for the benefit of the public at large and is not intended for
+   the benefit of any particular person or entity.
+
+3. Public License Fallback. Should any part of the Waiver be judged
+   legally invalid or ineffective under applicable law, then the Waiver
+   shall be preserved to the maximum extent permitted by law. In such
+   case, Affirmer hereby grants to the public a royalty-free,
+   non-exclusive, irrevocable, non-sublicensable license to exercise all
+   of the Copyright and Related Rights in the Work, for any purpose.
+
+4. Limitations and Disclaimers. No trademark or patent rights held by
+   Affirmer are waived, abandoned, or surrendered by this document. This
+   document does not affect the rights of others in the Work that may
+   exist independently of the Copyright and Related Rights.
+
+   Affirmer offers the Work as-is and makes no representations or
+   warranties of any kind concerning the Work, express, implied,
+   statutory, or otherwise, including without limitation warranties of
+   title, merchantability, fitness for a particular purpose, non-infringement,
+   or the absence of latent or other defects, accuracy, or the presence or
+   absence of errors, whether or not discoverable. Affirmer disclaims
+   responsibility for clearing rights of other persons that may appear in
+   the Work, and makes no warranty that the Work is free from claims of
+   third parties.
+
+   This document is provided "as is" and Creative Commons makes no
+   warranties or representations of any kind concerning this document,
+   express, implied, statutory, or otherwise, including without limitation
+   warranties of title, merchantability, fitness for a particular purpose,
+   non-infringement, or the absence of latent or other defects, accuracy,
+   or the presence or absence of errors.
+```
+
+## Creative Commons Attribution 3.0 Unported (CC BY 3.0)
+
+Some assets require attribution:
+
+- **J-Toastie** - Pistol (Glock), Assault Rifle (AKM), Sniper Rifle, Fps Rig AKM (Poly Pizza)
+- **austincford** - Submachine Gun (MPX)
+- **J-Toastie** - AKM, Sniper Rifle (Poly Pizza)
+- **Poly by Google** - Steering wheel
+- **Various OpenGameArt contributors** - Gunshot sounds, vocal sounds, some ambient sounds
+
+CC BY 3.0 license summary:
+- You are free to share and adapt the material for any purpose, even commercially.
+- You must give appropriate credit, provide a link to the license, and indicate if changes were made.
+- Full license: https://creativecommons.org/licenses/by/3.0/
+
+## MIT License
+
+- **GodotVR / Godot OpenXR contributors** - Godot OpenXR Vendors 5.2.0-stable (build dependency for Quest/OpenXR)
+
+MIT license text:
+```
+MIT License
+
+Copyright (c) 2023 GodotVR / Godot OpenXR contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## Project Code License
+
+The project's own source code (GDScript files under `core/`, `tests/`, `build/`, `tools/`) is licensed under the **MIT License** (see root LICENSE.md or project configuration).

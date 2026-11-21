@@ -1,0 +1,67 @@
+{
+  "name": "Arms Dealer",
+  "_attribution": "Adapted from GodotFPS-Template (bukkbeek) weapon pricing patterns in common/weapon/weapon.gd; Godot-FPS-Template (AxelReviron) weapon interaction/store UI patterns. License: MIT - see third_party/",
+  "categories": {
+    "pistols": {
+      "display_name": "Pistols",
+      "items": [
+        {"id": "pistol", "price": 350}
+      ]
+    },
+    "smgs": {
+      "display_name": "Submachine Guns",
+      "items": [
+        {"id": "submachine_gun", "price": 750}
+      ]
+    },
+    "rifles": {
+      "display_name": "Rifles",
+      "items": [
+        {"id": "assault_rifle", "price": 1800},
+        {"id": "sniper_rifle", "price": 2600}
+      ]
+    },
+    "shotguns": {
+      "display_name": "Shotguns",
+      "items": [
+        {"id": "shotgun", "price": 900}
+      ]
+    },
+    "melee": {
+      "display_name": "Melee Weapons",
+      "items": [
+        {"id": "bat", "price": 50}
+      ]
+    },
+    "ammo": {
+      "display_name": "Ammunition",
+      "items": [
+        "ammo_box_9mm_small",
+        "ammo_box_9mm_medium",
+        "ammo_box_45acp_small",
+        "ammo_box_556_small",
+        "ammo_box_556_medium",
+        "ammo_box_762x39_small",
+        "ammo_box_762x39_medium",
+        "ammo_box_12g_small",
+        "ammo_box_12g_medium",
+        "ammo_box_338lapua_small"
+      ]
+    }
+  },
+  "display": {
+    "table_model": "res://assets/models/props/wooden_crate_02/model.gltf",
+    "slots_per_row": 3,
+    "slot_spacing": 0.9,
+    "rotation_speed": 25.0
+  },
+  "pricing": {
+    "base_multiplier": 1.0,
+    "reputation_discounts": {
+      "neutral": 1.0,
+      "friendly": 0.9,
+      "honored": 0.8,
+      "hostile": 1.5
+    }
+  }
+}
