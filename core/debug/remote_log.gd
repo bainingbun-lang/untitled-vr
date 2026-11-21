@@ -1,6 +1,6 @@
 extends RefCounted
 
-const HOST := "192.168.1.22"
+const HOST := "192.168.1.5"
 const PORT := 8765
 static var dead: bool = false
 
