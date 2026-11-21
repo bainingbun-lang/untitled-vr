@@ -34,28 +34,27 @@ func check(tick: Variant) -> bool:
 	
 	var blackboard = context.blackboard
 	var actor = context.actor
-	var controller = actor.get("controller") if actor.has_method("get") else null
-	if controller == null:
-		return false
 	
-	var needs = controller.needs
-	if needs == null:
-		return false
+	var own_health_ratio: float = 1.0
+	if actor.has_method("health_ratio"):
+		own_health_ratio = float(actor.call("health_ratio"))
+	elif blackboard.has_value("health_ratio", context.tree):
+		own_health_ratio = float(blackboard.get_value("health_ratio", context.tree))
 	
 	var target = blackboard.get_value("target", context.tree)
 	if target == null or not is_instance_valid(target):
 		return false
 	
-	var target_health: float = 1.0
-	if target is Dictionary:
-		target_health = float(target.get("health", 1.0))
-	elif target.has_method("get_health"):
-		target_health = float(target.call("get_health"))
-	elif target.has("health"):
-		target_health = float(target.health)
-	var own_health = float(needs.health)
+	var target_health_ratio: float = 1.0
+	if target.has_method("health_ratio"):
+		target_health_ratio = float(target.call("health_ratio"))
+	elif target.has("health") and target.has("max_health"):
+		var h: float = float(target.health)
+		var mh: float = float(target.max_health)
+		if mh > 0.0:
+			target_health_ratio = clampf(h / mh, 0.0, 1.0)
 	
-	if own_health > target_health + health_advantage:
+	if own_health_ratio > target_health_ratio + health_advantage:
 		return true
 	
 	var allies_nearby = int(blackboard.get_value("allies_nearby", context.tree) or 0)

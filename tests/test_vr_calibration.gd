@@ -48,7 +48,9 @@ func _defaults() -> void:
 	_expect(cal.eye_height() == 1.65 and cal.dominant_hand() == "right" and cal.arm_reach() == 0.7, "defaults razonables")
 	_expect(CalScript.validate(cal.profile) == "", "el perfil por defecto es valido")
 	var offsets: Dictionary = cal.slot_offsets()
-	_expect(offsets["hip"].is_equal_approx(HolsterScript.SLOTS["hip"]["offset"]), "defaults = fundas originales")
+	var eh: float = cal.eye_height()
+	_expect(offsets["hip"].is_equal_approx(Vector3(0.20 * eh, -0.40 * eh, 0.0)), "defaults = fundas proporcionales a la altura (cadera real)")
+	_expect(float(offsets["back"].y) < 0.0, "la funda de la espalda queda por debajo de los ojos")
 	var bad: Array = [null, {}, {"version": 1}, _with("eye_height", 5.0), _with("eye_height", NAN), _with("arm_reach", 0.1),
 		_with("dominant_hand", "centro"), _with("hip", [0, 0]), _with("hip", [0, 0, 9.0]), _with("version", 2), _with("eye_height", "1.7")]
 	var all_rejected := true

@@ -7,7 +7,7 @@ signal haptic(hand: String, duration: float, amplitude: float)
 
 const SLOTS: Dictionary = {
 	"hip": {"offset": Vector3(0.18, -0.36, 0.02), "radius": 0.16},
-	"back": {"offset": Vector3(0.0, 0.02, 0.24), "radius": 0.18},
+	"back": {"offset": Vector3(0.0, -0.30, 0.20), "radius": 0.18},
 	"chest": {"offset": Vector3(0.0, -0.20, -0.16), "radius": 0.13},
 	"bag": {"offset": Vector3(0.26, -0.34, 0.32), "radius": 0.20},
 }
@@ -17,8 +17,9 @@ const LONG_GUN_TAGS: Array = ["rifle", "sniper", "shotgun", "smg"]
 const HIP_Y_RATIO: float = -0.40
 const HIP_X_RATIO: float = 0.20
 const HIP_RADIUS_RATIO: float = 0.20
-const BACK_Y_RATIO: float = 0.08
-const BACK_Z_RATIO: float = 0.15
+# La funda se mide desde los OJOS: la espalda queda por DEBAJO (omoplatos), no por encima de la cabeza.
+const BACK_Y_RATIO: float = -0.18
+const BACK_Z_RATIO: float = 0.12
 const BACK_RADIUS_RATIO: float = 0.11
 const CHEST_Y_RATIO: float = -0.15
 const CHEST_Z_RATIO: float = -0.10

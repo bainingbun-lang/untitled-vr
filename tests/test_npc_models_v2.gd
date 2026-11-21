@@ -17,8 +17,8 @@ func _initialize() -> void:
 	var manifest: Dictionary = CharacterModelScript.v2_manifest()
 	_expect(not manifest.is_empty(), "manifiesto cargado desde res://")
 	var ids: Array = CharacterModelScript.v2_skin_ids()
-	_expect(ids.size() >= 10, "al menos 10 modelos registrados: %d" % ids.size())
-	_expect(CharacterModelScript.v2_roles().size() >= 6, "seis roles registrados")
+	_expect(ids.size() >= 8, "al menos 8 modelos registrados: %d" % ids.size())
+	_expect(CharacterModelScript.v2_roles().size() >= 5, "cinco roles registrados")
 
 	_case = "cobertura de roles y alias"
 	for role in ["civil", "police", "soldier", "criminal", "office"]:

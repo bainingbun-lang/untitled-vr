@@ -84,10 +84,10 @@ func _test_proportional_offsets() -> void:
 	_expect(is_equal_approx(offsets_mid["chest"].y, -0.15 * 1.65), "mid chest.y = -0.15*1.65")
 	_expect(is_equal_approx(offsets_tall["chest"].y, -0.15 * 1.85), "tall chest.y = -0.15*1.85")
 	
-	# Verificar back: y = 0.08 * eye_height (altura cuello/hombro detras)
-	_expect(is_equal_approx(offsets_short["back"].y, 0.08 * 1.45), "short back.y = 0.08*1.45")
-	_expect(is_equal_approx(offsets_mid["back"].y, 0.08 * 1.65), "mid back.y = 0.08*1.65")
-	_expect(is_equal_approx(offsets_tall["back"].y, 0.08 * 1.85), "tall back.y = 0.08*1.85")
+	# Verificar back: y = -0.18 * eye_height (omoplatos, por debajo de los ojos)
+	_expect(is_equal_approx(offsets_short["back"].y, -0.18 * 1.45), "short back.y = -0.18*1.45")
+	_expect(is_equal_approx(offsets_mid["back"].y, -0.18 * 1.65), "mid back.y = -0.18*1.65")
+	_expect(is_equal_approx(offsets_tall["back"].y, -0.18 * 1.85), "tall back.y = -0.18*1.85")
 	
 	# Verificar bag: y = -0.38 * eye_height (cadera trasera)
 	_expect(is_equal_approx(offsets_short["bag"].y, -0.38 * 1.45), "short bag.y = -0.38*1.45")

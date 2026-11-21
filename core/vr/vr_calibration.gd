@@ -117,7 +117,7 @@ func slot_offsets() -> Dictionary:
 	result["hip"] = Vector3(0.20 * hand_side * eh, -0.40 * eh, 0.0)
 	result["hip2"] = Vector3(-0.20 * hand_side * eh, -0.40 * eh, 0.0)
 	result["chest"] = Vector3(0.0, -0.15 * eh, -0.10 * eh)
-	result["back"] = Vector3(0.0, 0.08 * eh, 0.15 * eh)
+	result["back"] = Vector3(0.0, -0.18 * eh, 0.12 * eh)
 	result["bag"] = Vector3(0.16 * hand_side * eh, -0.38 * eh, 0.19 * eh)
 	
 	var hip: Array = profile["hip"]

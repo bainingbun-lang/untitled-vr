@@ -23,11 +23,12 @@ var _fly_end: Vector3 = Vector3.ZERO
 var _fly_start_time: float = 0.0
 var _fly_duration: float = 0.3
 var _space_state: PhysicsDirectSpaceState3D = null
-var _cone_cos: float = cos(deg_to_rad(CONE_ANGLE_DEG))
+var _cone_cos: float = 0.0
 var _query: PhysicsRayQueryParameters3D = null
 
 func _init(hand_name: String = "right") -> void:
 	_hand = hand_name
+	_cone_cos = cos(deg_to_rad(CONE_ANGLE_DEG))
 	_query = PhysicsRayQueryParameters3D.new()
 	_query.collision_mask = 1
 	_query.exclude = []
@@ -105,7 +106,10 @@ func _find_target(space: PhysicsDirectSpaceState3D, hand_pose: Transform3D, hols
 			var dot: float = hand_forward.dot(dir)
 			
 			if dot < _cone_cos:
+				print("DEBUG: skipping target ", node.name, " dot=", dot, " cone_cos=", _cone_cos, " angle_deg=", rad_to_deg(acos(clampf(dot, -1.0, 1.0))))
 				continue
+			else:
+				print("DEBUG: target in cone ", node.name, " dot=", dot, " cone_cos=", _cone_cos, " angle_deg=", rad_to_deg(acos(clampf(dot, -1.0, 1.0))))
 			
 			var angle_score: float = acos(clampf(dot, -1.0, 1.0))
 			var score: float = angle_score * 100.0 + distance

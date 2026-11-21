@@ -761,6 +761,8 @@ func _state_for(action: String) -> String:
 func _reaction_state(active: bool) -> void:
 	if active:
 		reaction_remaining = reaction_delay
+		if role == ROLE_HOSTILE and behavior != null and behavior.has_method("note_aggression"):
+			behavior.note_aggression(target_id)
 	else:
 		reaction_remaining = 0.0
 	_seen_target = active

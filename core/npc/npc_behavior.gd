@@ -140,8 +140,6 @@ func select(p_context: Dictionary = {}) -> Dictionary:
 		var utility: float = _score_action(id, config, ctx)
 		if id == "hostile_attack" and not is_hostile_npc:
 			continue
-		if id == "attack" and is_hostile_npc:
-			continue
 		if id == "civilian_flee" and not is_civilian_npc:
 			continue
 		if (id == "hostile_attack" or id == "attack") and not bool(ctx.get("force_attack", false)) and not (_aggression_cooldown > 0.0 and is_hostile_npc):

@@ -123,8 +123,26 @@ func _test_hostile_mode_attacks() -> void:
 		if npc.role in ["hostile", "criminal", "soldier", "zombie"]:
 			hostile_npcs.append(npc)
 
+	if hostile_npcs.size() == 0:
+		harness.cleanup()
+		await process_frame
+		return
+
+	var provocation_target = hostile_npcs[0].global_position
 	for i in range(60):
 		await physics_frame
+		if i == 10:
+			for npc in hostile_npcs:
+				if npc == null or not is_instance_valid(npc):
+					continue
+				if npc.has_method("get_combat"):
+					var combat = npc.get_combat()
+					if combat != null:
+						combat.note_gunshot_impact("player", provocation_target)
+				if npc.has_method("get_behavior"):
+					var behavior = npc.get_behavior()
+					if behavior != null:
+						behavior.note_aggression("player")
 		harness.step(2)
 
 	var attacked: bool = false
@@ -136,7 +154,7 @@ func _test_hostile_mode_attacks() -> void:
 			attacked = true
 			break
 
-	_expect(attacked or hostile_npcs.size() == 0, "al menos un NPC hostil intenta atacar o no hay hostiles")
+	_expect(attacked, "al menos un NPC hostil intenta atacar tras provocación")
 
 	harness.cleanup()
 	await process_frame

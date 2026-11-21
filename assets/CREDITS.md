@@ -168,7 +168,7 @@ a `assets/models/weapons/`.
 | `assault_rifle` | `assault_rifle.glb` | Assault Rifle (Low Poly Weapons) | Quaternius (Laulhet) | https://poly.pizza/m/Bgvuu4CUMV , original: https://quaternius.com/packs/ultimategun.html | CC0 1.0 | `assault_rifle.glb`, `licenses/QUATERNIUS_CC0.txt` |
 | `shotgun` | `shotgun.glb` | Shotgun (Low Poly Weapons) | Quaternius (Laulhet) | https://poly.pizza/m/ZmPTnh7njL , original: https://quaternius.com/packs/ultimategun.html | CC0 1.0 | `shotgun.glb`, `licenses/QUATERNIUS_CC0.txt` |
 | `sniper_rifle` | `sniper_rifle.glb` | Sniper Rifle (Low Poly Weapons) | Quaternius (Laulhet) | https://poly.pizza/m/ASOMZIErq3 , original: https://quaternius.com/packs/ultimategun.html | CC0 1.0 | `sniper_rifle.glb`, `licenses/QUATERNIUS_CC0.txt` |
-| `bat` | `bat.glb` | Wooden Bat Barbed (Low Poly Weapons) | Quaternius (Laulhet) | https://poly.pizza/m/HSM4KnggSz , original: https://quaternius.com/ | CC0 1.0 | `bat.glb`, `bat_Zombie_Atlas.png` (extraído por el importador del GLB), `licenses/QUATERNIUS_CC0.txt` |
+| `bat` | `bat.glb` | Wooden Bat Barbed (Low Poly Weapons) | Quaternius (Laulhet) | https://poly.pizza/m/HSM4KnggSz , original: https://quaternius.com/ | CC0 1.0 | `bat.glb`, `bat_atlas.png` (extraído por el importador del GLB), `licenses/QUATERNIUS_CC0.txt` |
 
 URLs directas de descarga (CDN de Poly Pizza, espejo autorizado del pack CC0):
 
@@ -217,7 +217,6 @@ URLs directas de descarga (raw):
 
 - `civil_casual_hoodie.gltf`: https://raw.githubusercontent.com/agentkaerf/FreeModels/main/Ultimate%20Modular%20Men-%20Feb%202022/Individual%20Characters/glTF/Casual_Hoodie.gltf
 - `soldier_swat.gltf`: https://raw.githubusercontent.com/agentkaerf/FreeModels/main/Ultimate%20Modular%20Men-%20Feb%202022/Individual%20Characters/glTF/Swat.gltf
-- `enemy_zombie_basic.gltf`: https://raw.githubusercontent.com/agentkaerf/FreeModels/main/Zombie%20Apocalypse%20Kit%20-%20March%202024/Characters/glTF/Zombie_Basic.gltf
 - `robot_blocky.glb`: https://raw.githubusercontent.com/Vuena/free-low-poly-characters-cc0/main/GLB/blocky_08_robot.glb
 
 ## Presupuesto móvil verificado (personajes)
@@ -335,7 +334,7 @@ de 1024x1024 o menos y están por debajo del límite de 5.000 tris por prop.
 | Building Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/building-kit | CC0 1.0 | `border.glb`, `column.glb`, `door-rotate-square-a.glb`, `floor.glb`, `roof-flat-center.glb`, `stairs-center.glb`, `wall-doorway-wide-square.glb`, `wall-window-square.glb`, `wall.glb`, `Textures/colormap.png` |
 | Car Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/car-kit | CC0 1.0 | `ambulance.glb`, `police.glb`, `sedan.glb`, `taxi.glb`, `truck.glb`, `van.glb`, `Textures/colormap.png` |
 | Factory Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/factory-kit | CC0 1.0 | `catwalk-straight.glb`, `structure-doorway-wide.glb`, `structure-wall.glb`, `Textures/colormap.png` |
-| Furniture Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/furniture-kit | CC0 1.0 | `bookcaseOpen.glb`, `chairDesk.glb`, `computerScreen.glb`, `desk.glb`, `floorFull.glb`, `kitchenBar.glb`, `lampSquareCeiling.glb`, `loungeSofa.glb`, `pottedPlant.glb`, `wall.glb`, `wallDoorwayWide.glb`, `wallWindow.glb` (+25 GLB del kit) |
+| Furniture Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/furniture-kit | CC0 1.0 | `bookcaseOpen.glb`, `chairDesk.glb`, `computerScreen.glb`, `desk.glb`, `floorFull.glb`, `kitchenBar.glb`, `lampSquareCeiling.glb`, `loungeSofa.glb`, `meetingTable.glb`, `meetingTableCross.glb`, `pottedPlant.glb`, `wall.glb`, `wallDoorwayWide.glb`, `wallWindow.glb`, `waterCooler.glb` (kitchenCoffeeMachine), `filingCabinet.glb` (bookcaseClosedWide), (+25 GLB del kit) |
 | Nature Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/nature-kit | CC0 1.0 | `fence_simple.glb`, `grass_large.glb`, `ground_grass.glb`, `ground_pathStraight.glb`, `plant_bush.glb`, `rock_largeA.glb`, `tree_default.glb`, `tree_oak.glb`, `tree_pineDefaultA.glb` |
 | Car Kit (vehiculos jugables G5) | Kenney (Kenney.NL), espejo https://github.com/Arslan12216775/kenney_car-kit | https://kenney.nl/assets/car-kit | CC0 1.0 | `assets/models/vehicles/`: `sedan.glb`, `truck.glb`, `sedan-sports.glb`, `delivery.glb`, `kart-oobi.glb`, `suv.glb`, `race.glb` (ruedas separadas, texturas embebidas; manifest.json) |
 | City Suburban Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/city-kit-suburban | CC0 1.0 | `building-type-a.glb` ... `building-type-u.glb`, `driveway-long.glb`, `driveway-short.glb`, `fence*.glb`, `path*.glb`, `planter.glb`, `tree-large.glb`, `tree-small.glb`, `Textures/colormap.png` |
@@ -343,7 +342,7 @@ de 1024x1024 o menos y están por debajo del límite de 5.000 tris por prop.
 | Retro Urban Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/retro-urban-kit | CC0 1.0 | `balcony-*.glb`, `cliff-*.glb`, `detail-*.glb`, `door-*.glb`, `grass*.glb`, `pallet*.glb`, `planks.glb`, `road-*.glb`, `roof-metal*.glb`, `scaffolding-*.glb`, `tree-*.glb`, `truck-*.glb`, `wall-*.glb`, `window-*.glb`, `Textures/*.png` (64-128px) |
 | Survival Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/survival-kit | CC0 1.0 | `barrel*.glb`, `bedroll*.glb`, `bottle*.glb`, `box*.glb`, `bucket.glb`, `campfire*.glb`, `chest.glb`, `fence*.glb`, `fish*.glb`, `floor*.glb`, `grass*.glb`, `metal-panel*.glb`, `patch-grass*.glb`, `resource-*.glb`, `rock-*.glb`, `signpost*.glb`, `structure*.glb`, `tent*.glb`, `tool-*.glb`, `tree*.glb`, `workbench*.glb`, `Textures/colormap.png` (512px) |
 | Food Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/food-kit | CC0 1.0 | 200 food/prop models (`apple.glb`, `burger*.glb`, `can*.glb`, `bottle*.glb`, `cake*.glb`, `cheese*.glb`, `fruit*.glb`, `vegetable*.glb`, `bread.glb`, `candy*.glb`, etc.), `Textures/colormap.png` (512px), all < 1.4k tris |
-| Mini Market Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/mini-market-kit | CC0 1.0 | `bottle-return.glb`, `cash-register.glb`, `character-employee.glb`, `column.glb`, `display-bread.glb`, `display-fruit.glb`, `fence*.glb`, `floor.glb`, `freezer*.glb`, `shelf-*.glb`, `shopping-basket.glb`, `shopping-cart.glb`, `wall*.glb`, `Textures/colormap.png` (512px), all < 900 tris |
+| Mini Market Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/mini-market-kit | CC0 1.0 | `bottle-return.glb`, `cash-register.glb` (as `printer.glb`), `character-employee.glb`, `column.glb`, `display-bread.glb`, `display-fruit.glb`, `fence*.glb`, `floor.glb`, `freezer*.glb`, `shelf-*.glb`, `shopping-basket.glb`, `shopping-cart.glb`, `wall*.glb`, `Textures/colormap.png` (512px), all < 900 tris |
 | Mini Forest Kit | Kenney (Kenney.NL) | https://kenney.nl/assets/mini-forest-kit | CC0 1.0 | `bridge.glb`, `building-*.glb`, `character-archer.glb`, `fence.glb`, `flag.glb`, `ladder.glb`, `patch-*.glb`, `plant.glb`, `platform.glb`, `rocks-*.glb`, `stones.glb`, `target.glb`, `tent.glb`, `tree*.glb`, `weapon-*.glb`, `Textures/colormap.png` (512px), all < 850 tris |
 
 ---
@@ -405,9 +404,7 @@ El manifest `assets/models/characters/v2/manifest.json` documenta id, rol, archi
 (1,75 m normalizados en juego; `source_height` es la altura original del glTF), huesos
 clave, nombres reales de animaciones y su mapeo a `idle/walk/run/aim/shoot/hit/die`.
 Humanos: `Idle`, `Walk`, `Run`, `Idle_Gun_Pointing`, `Gun_Shoot`, `HitRecieve`, `Death`
-(24 clips por modelo). Zombis: `Idle`, `Walk`, `Run`, `Idle_Attack`, `Punch`, `HitReact`,
-`Death` (16 clips; el `Zombie_Ribcage` no tiene brazos ni ataque: `aim=Idle`, `shoot=Jump`
-como fallback documentado en el manifest).
+(24 clips por modelo).
 
 ## Presupuesto móvil verificado (C6 P1)
 
