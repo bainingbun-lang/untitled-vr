@@ -65,7 +65,7 @@ func get_pose(hand: String) -> Transform3D:
 func is_grip_pressed(hand: String) -> bool:
 	if _is_simulated:
 		return _grip_values.get(hand, 0.0) > 0.5
-	return _read_action_value(hand, "squeeze") > 0.5
+	return _read_action_value(hand, "grip") > 0.5
 
 func is_trigger_pressed(hand: String) -> bool:
 	if _is_simulated:
@@ -75,7 +75,7 @@ func is_trigger_pressed(hand: String) -> bool:
 func get_grip_value(hand: String) -> float:
 	if _is_simulated:
 		return _grip_values.get(hand, 0.0)
-	return _read_action_value(hand, "squeeze")
+	return _read_action_value(hand, "grip")
 
 func get_trigger_value(hand: String) -> float:
 	if _is_simulated:
@@ -135,7 +135,19 @@ func trigger_haptic(hand: String, duration: float, frequency: float, amplitude: 
 	if controller != null and controller.has_method("trigger_haptic"):
 		controller.call("trigger_haptic", duration, frequency, amplitude)
 
+func _controller_value(hand: String, input_name: String) -> float:
+	# Lectura directa del XRController3D (igual que godot-xr-tools); la via get_action_state no existe en Godot.
+	var c = null
+	if _input_provider != null:
+		c = _input_provider.get(hand + "_controller")
+	if c == null or not (c is XRController3D):
+		return -1.0
+	return c.get_float(input_name)
+
 func _read_action_value(hand: String, action_name: String) -> float:
+	var direct := _controller_value(hand, action_name)
+	if direct >= 0.0:
+		return direct
 	if _interface == null or not _interface.has_method("get_action_state"):
 		return 0.0
 	var state = _interface.call("get_action_state", "godot", action_name, hand)

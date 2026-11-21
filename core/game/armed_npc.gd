@@ -1655,7 +1655,7 @@ func _update_steering(delta: float) -> void:
 				break
 		var accel = TargetAcceleration.new()
 		steering_behavior.calculate_steering(accel)
-		print("[STEER] NPC %s accel=%s vel=%s" % [npc_id, str(accel.linear), str(velocity)])
+		pass # print("[STEER] NPC %s accel=%s vel=%s" % [npc_id, str(accel.linear), str(velocity)])
 		if accel.linear.length_squared() > 0.0001:
 			var max_accel: float = steering_agent.linear_acceleration_max
 			var max_speed: float = steering_agent.linear_speed_max
@@ -1668,7 +1668,7 @@ func _update_steering(delta: float) -> void:
 			rotation.y = lerp_angle(rotation.y, steering_agent.orientation + steering_agent.angular_velocity * delta, 0.5)
 		var previous: Vector3 = global_position
 		move_and_slide()
-		print("[STEER] NPC %s moved from %s to %s" % [npc_id, str(previous), str(global_position)])
+		pass # print("[STEER] NPC %s moved from %s to %s" % [npc_id, str(previous), str(global_position)])
 		if _has_navigation_grid() and not bool(navigation.call("is_walkable_world", global_position, nav_cell_size)):
 			global_position = previous
 			velocity.x = 0.0
@@ -1685,7 +1685,7 @@ func _update_behavior_tree(delta: float) -> void:
 	if behavior_tree == null or bt_blackboard == null:
 		print("[BT] NPC %s: behavior_tree=%s, bt_blackboard=%s" % [npc_id, str(behavior_tree), str(bt_blackboard)])
 		return
-	print("[BT] NPC %s: starting tick" % [npc_id])
+	pass # print("[BT] NPC %s: starting tick" % [npc_id])
 	_sim_time += delta
 	var ctx: Dictionary = _context()
 	var role_lower: String = role.to_lower()
