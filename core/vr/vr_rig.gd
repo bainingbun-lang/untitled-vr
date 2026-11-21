@@ -253,9 +253,9 @@ func is_grip_pressed(hand_name: String) -> bool:
 	var controller = controller_for(hand_name)
 	if controller == null:
 		return false
-	if controller.has_method("is_button_pressed") and bool(controller.call("is_button_pressed", &"grip")):
+	if controller.has_method("is_button_pressed") and bool(controller.call("is_button_pressed", &"squeeze")):
 		return true
-	return controller.has_method("get_float") and float(controller.call("get_float", &"grip")) > 0.5
+	return controller.has_method("get_float") and float(controller.call("get_float", &"squeeze")) > 0.5
 
 
 func is_trigger_pressed(hand_name: String) -> bool:
@@ -316,7 +316,7 @@ func _update_hand_models() -> void:
 		var grip: float = 0.0
 		var trigger: float = 0.0
 		if controller != null and controller.has_method("get_float"):
-			grip = float(controller.call("get_float", &"grip"))
+			grip = float(controller.call("get_float", &"squeeze"))
 			trigger = float(controller.call("get_float", &"trigger"))
 		else:
 			grip = 1.0 if is_grip_pressed(hand_name) else 0.0

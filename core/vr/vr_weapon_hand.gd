@@ -355,24 +355,48 @@ func reload_close_bolt() -> bool:
 	return bool(reload_gestures.close_bolt()) if reload_gestures != null else false
 
 
+var _alt_drawn: bool = false
+var _alt_draw_time: float = -10.0
+
+
+func _alt_draw_pressed(hand_name: String) -> bool:
+	if _button("trigger", hand_name):
+		return true
+	var provider = _provider()
+	if provider == null or not provider.has_method("is_button_pressed"):
+		return false
+	for action in ["a", "b", "x", "y", "thumbstick_click", "grip_click"]:
+		if bool(provider.call("is_button_pressed", hand_name, action)):
+			return true
+	return false
+
+
 func step(delta: float) -> void:
 	_time += maxf(delta, 0.0)
 	var primary := _pose(hand)
 	var secondary := _pose(other_hand())
-	var grip := _button("grip", hand)
-	var other_grip := _button("grip", other_hand())
+	var grip := _button("squeeze", hand)
+	var other_grip := _button("squeeze", other_hand())
+	# Con la mano vacia, tambien sacan el arma el gatillo y los botones A/B/X/Y o el clic del stick:
+	# no todos los jugadores saben que el agarre es el boton lateral.
+	var alt: bool = weapon_id.is_empty() and _alt_draw_pressed(hand)
+	var want: bool = grip or alt
 
-	if grip and not _was_grip:
+	if want and not _was_grip:
 		if weapon_id.is_empty():
 			if _in_bag_zone(primary):
 				try_take()
 			elif not try_take_from_holster(primary):
 				_grab_nearby_prop(primary)
-	elif not grip and _was_grip:
-		if not weapon_id.is_empty() and _in_bag_zone(primary):
+		if alt and not weapon_id.is_empty():
+			_alt_drawn = true
+			_alt_draw_time = _time
+	elif not want and _was_grip:
+		if not _alt_drawn and not weapon_id.is_empty() and _in_bag_zone(primary):
 			stow()
 		_release_prop(primary)
-	_was_grip = grip
+		_alt_drawn = false
+	_was_grip = want
 	_carry_prop(primary, delta)
 	if auto_equip and not _auto_done and weapon_id.is_empty() and bag != null and not (bag.items() as Array).is_empty():
 		_auto_done = true
@@ -401,7 +425,7 @@ func step(delta: float) -> void:
 	var target := aim_direction(primary, secondary, _two_hand)
 	_aim_dir = limit_turn(_aim_dir, target, max_aim_turn_degrees, aim_smoothing)
 
-	var trigger := _button("trigger", hand)
+	var trigger := _button("trigger", hand) and (_time - _alt_draw_time) > 0.4
 	if trigger and (not _was_trigger or _auto_ready()):
 		try_fire(_space())
 	elif not trigger and _was_trigger:
@@ -722,7 +746,7 @@ func _button(action: String, hand_name: String) -> bool:
 	var provider = _provider()
 	if provider == null:
 		return false
-	var method := "is_grip_pressed" if action == "grip" else "is_trigger_pressed"
+	var method := "is_grip_pressed" if action == "squeeze" else "is_trigger_pressed"
 	if provider.has_method(method):
 		return bool(provider.call(method, hand_name))
 	if provider.has_method("is_pressed"):
@@ -821,7 +845,7 @@ func _update_visual(primary: Transform3D, delta: float = 0.0) -> void:
 	var shake: float = current_shake()
 	offset += Vector3(sin(_time * 23.0), cos(_time * 19.0), 0.0) * shake
 	if use_physical_grab and grab_system != null and grab_system.is_grabbing():
-		var linked: Transform3D = grab_system.step(delta, primary, _button("grip", hand))
+		var linked: Transform3D = grab_system.step(delta, primary, _button("squeeze", hand))
 		holder.global_transform = Transform3D(linked.basis, linked.origin + aim_basis * kick.origin + Vector3(sin(_time * 23.0), cos(_time * 19.0), 0.0) * shake)
 	else:
 		holder.global_transform = Transform3D(basis, primary.origin + offset)

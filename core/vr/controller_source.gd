@@ -14,7 +14,7 @@ func get_pose(hand: String) -> Transform3D:
 	return Transform3D.IDENTITY
 
 func is_pressed(action: String) -> bool:
-	if action == "grip":
+	if action == "squeeze" or action == "grip":
 		return (left_controller and left_controller.is_button_pressed(XRController3D.BUTTON_GRIP)) or \
 			   (right_controller and right_controller.is_button_pressed(XRController3D.BUTTON_GRIP))
 	return false

@@ -21,7 +21,7 @@ class FakeInput extends RefCounted:
 	var grips: Dictionary = {"left": 0.0, "right": 0.0}
 	var triggers: Dictionary = {"left": 0.0, "right": 0.0}
 	var sticks: Dictionary = {"left": Vector2.ZERO, "right": Vector2.ZERO}
-	var buttons: Dictionary = {"a": false, "b": false, "x": false, "y": false, "menu": false}
+	var buttons: Dictionary = {"a": false, "b": false, "x": false, "y": false, "menu": false, "thumbstick_click": false, "grip_click": false}
 	var haptics: Array = []
 
 	func get_pose(hand: String) -> Transform3D:

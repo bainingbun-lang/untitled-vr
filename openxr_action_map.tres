@@ -18,7 +18,7 @@ localized_name = "Gatillo"
 toplevel_paths = PackedStringArray("/user/hand/left", "/user/hand/right")
 
 [sub_resource type="OpenXRAction" id="OpenXRAction_typ1r"]
-resource_name = "grip"
+resource_name = "squeeze"
 localized_name = "Agarre"
 toplevel_paths = PackedStringArray("/user/hand/left", "/user/hand/right")
 

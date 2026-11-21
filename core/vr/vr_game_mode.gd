@@ -338,7 +338,7 @@ class State extends Node:
 			return 0.0
 		var controller = rig.call("controller_for", hand)
 		if controller != null and controller.has_method("get_float"):
-			return clampf(float(controller.call("get_float", &"grip")), 0.0, 1.0)
+			return clampf(float(controller.call("get_float", &"squeeze")), 0.0, 1.0)
 		return 1.0 if bool(rig.call("is_grip_pressed", hand)) else 0.0
 
 

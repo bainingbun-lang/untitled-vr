@@ -65,7 +65,7 @@ func get_pose(hand: String) -> Transform3D:
 func is_grip_pressed(hand: String) -> bool:
 	if _is_simulated:
 		return _grip_values.get(hand, 0.0) > 0.5
-	return _read_action_value(hand, "grip") > 0.5
+	return _read_action_value(hand, "squeeze") > 0.5
 
 func is_trigger_pressed(hand: String) -> bool:
 	if _is_simulated:
@@ -75,7 +75,7 @@ func is_trigger_pressed(hand: String) -> bool:
 func get_grip_value(hand: String) -> float:
 	if _is_simulated:
 		return _grip_values.get(hand, 0.0)
-	return _read_action_value(hand, "grip")
+	return _read_action_value(hand, "squeeze")
 
 func get_trigger_value(hand: String) -> float:
 	if _is_simulated:
