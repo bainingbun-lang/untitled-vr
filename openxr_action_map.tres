@@ -15,10 +15,11 @@ toplevel_paths = PackedStringArray("/user/hand/left", "/user/hand/right")
 [sub_resource type="OpenXRAction" id="OpenXRAction_5w03k"]
 resource_name = "trigger"
 localized_name = "Gatillo"
+action_type = 1
 toplevel_paths = PackedStringArray("/user/hand/left", "/user/hand/right")
 
 [sub_resource type="OpenXRAction" id="OpenXRAction_typ1r"]
-resource_name = "squeeze"
+resource_name = "grip"
 localized_name = "Agarre"
 toplevel_paths = PackedStringArray("/user/hand/left", "/user/hand/right")
 
@@ -101,11 +102,11 @@ binding_path = "/user/hand/right/input/trigger/value"
 
 [sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_m08eo"]
 action = SubResource("OpenXRAction_typ1r")
-binding_path = "/user/hand/left/input/squeeze/value"
+binding_path = "/user/hand/left/input/grip/value"
 
 [sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_c4j1d"]
 action = SubResource("OpenXRAction_typ1r")
-binding_path = "/user/hand/right/input/squeeze/value"
+binding_path = "/user/hand/right/input/grip/value"
 
 [sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_sopde"]
 action = SubResource("OpenXRAction_clvbf")
@@ -181,11 +182,11 @@ binding_path = "/user/hand/right/input/trigger/value"
 
 [sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_538mi"]
 action = SubResource("OpenXRAction_typ1r")
-binding_path = "/user/hand/left/input/squeeze/value"
+binding_path = "/user/hand/left/input/grip/value"
 
 [sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_548p5"]
 action = SubResource("OpenXRAction_typ1r")
-binding_path = "/user/hand/right/input/squeeze/value"
+binding_path = "/user/hand/right/input/grip/value"
 
 [sub_resource type="OpenXRIPBinding" id="OpenXRIPBinding_6o0wr"]
 action = SubResource("OpenXRAction_clvbf")

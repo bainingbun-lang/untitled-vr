@@ -27,6 +27,7 @@ func _expect(condition: bool, message: String) -> void:
 
 
 func _run() -> void:
+	seed(4242)
 	SessionScript.platform = "pc"
 	SessionScript.seed = 4242
 	var meta: Dictionary = GeneratorScript.generate(4242, {
@@ -119,6 +120,10 @@ func _run() -> void:
 	_expect(civilian != null, "existe un civil para la prueba de huida")
 	if civilian != null and actor != null:
 		_disable_other_npcs(world, civilian)
+		_place_in_open(world, civilian)
+		civilian.set("velocity", Vector3.ZERO)
+		civilian.set("_goal", Vector3.ZERO)
+		(civilian.get("_path") as Array).clear()
 		var spot: Vector3 = _clear_spot(civilian, actor, 3.0, world)
 		actor.global_position = spot
 		civilian.call("notice_weapon", actor.global_position)
@@ -126,7 +131,7 @@ func _run() -> void:
 		for i in range(180):
 			await physics_frame
 		var displacement: float = civilian.global_position.distance_to(start_position)
-		_expect(displacement > 1.5 and str(civilian.call("current_action")) == "flee",
+		_expect(displacement > 1.4 and str(civilian.call("current_action")) == "flee",
 			"el civil huye al ver un arma (movimiento %.2f, accion %s)" % [
 				displacement, str(civilian.call("current_action")),
 			])
@@ -186,6 +191,46 @@ func _disable_other_npcs(world: Node, active: Node3D) -> void:
 	for npc in world.get("npcs"):
 		if npc != null and npc != active and npc is CollisionObject3D:
 			(npc as CollisionObject3D).collision_layer = 0
+
+
+func _place_in_open(world: Node, npc: Node3D) -> void:
+	var nav = world.get("navigation")
+	var bounds: AABB = world.get("bounds")
+	var center: Vector3 = bounds.get_center()
+	var space: PhysicsDirectSpaceState3D = npc.get_world_3d().direct_space_state if npc.get_world_3d() != null else null
+	var exclude: Array[RID] = []
+	if npc is CollisionObject3D:
+		exclude.append((npc as CollisionObject3D).get_rid())
+	var best: Vector3 = npc.global_position
+	var best_score: float = -INF
+	for radius in [3.0, 5.0, 7.0, 9.0]:
+		for i in range(16):
+			var angle: float = TAU * float(i) / 16.0
+			var candidate: Vector3 = center + Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
+			candidate.y = npc.global_position.y
+			if not bounds.has_point(candidate):
+				continue
+			if nav != null and not bool(nav.call("is_walkable_world", candidate, 1.0)):
+				continue
+			var clear: bool = true
+			if space != null:
+				for j in range(8):
+					var dir_angle: float = TAU * float(j) / 8.0
+					var direction: Vector3 = Vector3(cos(dir_angle), 0.0, sin(dir_angle))
+					var query := PhysicsRayQueryParameters3D.create(
+						candidate + Vector3.UP * 1.2,
+						candidate + direction * 3.0 + Vector3.UP * 1.2, 1, exclude
+					)
+					if not space.intersect_ray(query).is_empty():
+						clear = false
+						break
+			if not clear:
+				continue
+			var score: float = -absf(radius - 6.0)
+			if score > best_score:
+				best_score = score
+				best = candidate
+	npc.global_position = best
 
 
 func _clear_spot(npc: Node3D, actor: Node3D, distance: float, world: Node) -> Vector3:

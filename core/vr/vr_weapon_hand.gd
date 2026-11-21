@@ -27,6 +27,7 @@ const HolsterScript = preload("res://core/vr/vr_holsters.gd")
 const ReloadScript = preload("res://core/vr/vr_reload_gestures.gd")
 const ReloadSystemScript = preload("res://core/game/reload_system.gd")
 const RecoilScript = preload("res://core/vr/vr_recoil.gd")
+const RemoteLog = preload("res://core/debug/remote_log.gd")
 
 const HOLSTER_GRAB_SCALE: float = 1.6
 const SLOT_PRIORITY: Array = ["pistol", "assault_rifle", "shotgun", "sniper_rifle", "submachine_gun", "bat"]
@@ -375,8 +376,8 @@ func step(delta: float) -> void:
 	_time += maxf(delta, 0.0)
 	var primary := _pose(hand)
 	var secondary := _pose(other_hand())
-	var grip_value: float = _provider().get_grip_value(hand) if _provider().has_method("get_grip_value") else (1.0 if _button("squeeze", hand) else 0.0)
-	var other_grip_value: float = _provider().get_grip_value(other_hand()) if _provider().has_method("get_grip_value") else (1.0 if _button("squeeze", other_hand()) else 0.0)
+	var grip_value: float = _provider().get_grip_value(hand) if _provider().has_method("get_grip_value") else (1.0 if _button("grip", hand) else 0.0)
+	var other_grip_value: float = _provider().get_grip_value(other_hand()) if _provider().has_method("get_grip_value") else (1.0 if _button("grip", other_hand()) else 0.0)
 	var grip: bool = grip_value > 0.5
 	var other_grip: bool = other_grip_value > 0.5
 	# Con la mano vacia, tambien sacan el arma el gatillo y los botones A/B/X/Y o el clic del stick:
@@ -385,6 +386,7 @@ func step(delta: float) -> void:
 	var want: bool = grip or alt
 
 	if want and not _was_grip:
+		RemoteLog.crumb("grip pressed hand=%s" % hand)
 		if weapon_id.is_empty():
 			if _in_bag_zone(primary):
 				try_take()
@@ -394,6 +396,7 @@ func step(delta: float) -> void:
 			_alt_drawn = true
 			_alt_draw_time = _time
 	elif not want and _was_grip:
+		RemoteLog.crumb("grip released hand=%s" % hand)
 		if not _alt_drawn and not weapon_id.is_empty() and _in_bag_zone(primary):
 			stow()
 		_release_prop(primary)
@@ -468,6 +471,7 @@ func try_take(item_id: String = "", force: bool = false) -> bool:
 		var grip_val: float = _provider().get_grip_value(hand) if _provider().has_method("get_grip_value") else 1.0
 		grab_weapon_from_pose(Transform3D(_aim_basis(pose), pose.origin), grip_val, "grip")
 	weapon_taken.emit(weapon_id, hand)
+	RemoteLog.crumb("weapon taken weapon=%s hand=%s" % [weapon_id, hand])
 	return true
 
 
@@ -537,6 +541,7 @@ func _equip_weapon_from_pickup(pickup: Node3D) -> bool:
 		grab_weapon_from_pose(Transform3D(_aim_basis(_pose(hand)), _pose(hand).origin), grip_val, "grip")
 	pickup.free()
 	weapon_taken.emit(weapon_id, hand)
+	RemoteLog.crumb("weapon taken weapon=%s hand=%s" % [weapon_id, hand])
 	return true
 
 
@@ -572,6 +577,7 @@ func stow() -> void:
 	_two_hand = false
 	_clear_visual()
 	weapon_stowed.emit(stowed_id, hand)
+	RemoteLog.crumb("weapon released weapon=%s hand=%s" % [stowed_id, hand])
 
 
 func _auto_ready() -> bool:
@@ -654,6 +660,7 @@ func try_fire(space = null) -> Dictionary:
 		if manual_reload_active and reload_gestures != null:
 			reload_gestures.fire()
 		fired.emit(last_shot)
+		RemoteLog.crumb("trigger fire weapon=%s hand=%s" % [weapon_id, hand])
 	return last_shot
 
 
@@ -750,7 +757,7 @@ func _button(action: String, hand_name: String) -> bool:
 	var provider = _provider()
 	if provider == null:
 		return false
-	var method := "is_grip_pressed" if action == "squeeze" else "is_trigger_pressed"
+	var method := "is_grip_pressed" if action == "grip" else "is_trigger_pressed"
 	if provider.has_method(method):
 		return bool(provider.call(method, hand_name))
 	if provider.has_method("is_pressed"):

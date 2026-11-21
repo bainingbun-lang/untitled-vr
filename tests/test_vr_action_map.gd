@@ -9,7 +9,7 @@ class FakeSource extends RefCounted:
 
 	func is_pressed(action: String) -> bool:
 		calls.append(action)
-		return action == "squeeze"
+		return action == "grip"
 
 	func get_pose(_hand: String) -> Transform3D:
 		return pose
@@ -65,8 +65,8 @@ func _test_defaults() -> void:
 			signatures.append(map.signature(candidate["bindings"][action]))
 		_expect(_unique(signatures), "%s sin conflictos entre acciones" % platform)
 	_expect(map.default_profile("psvr").is_empty(), "plataforma desconocida sin defaults")
-	_expect(str(map.get_binding("grab", map.default_profile("quest"))["source_action"]) == "squeeze", \
-		"grab de quest usa source_action squeeze")
+	_expect(str(map.get_binding("grab", map.default_profile("quest"))["source_action"]) == "grip", \
+		"grab de quest usa source_action grip")
 	_expect(str(map.get_binding("grab", map.default_profile("pc_teclado"))["id"]) == "E", \
 		"grab de teclado usa E")
 	_expect(str(map.get_binding("menu", map.default_profile("pc_teclado"))["id"]) == "Escape", \
@@ -241,22 +241,22 @@ func _test_adapter() -> void:
 	var map = ActionMapScript.new("quest")
 	var fake := FakeSource.new()
 	var adapter = ActionMapScript.InputSourceAdapter.new(fake, map)
-	_expect(adapter.is_pressed("grab"), "adaptador traduce grab a squeeze")
-	_expect(fake.calls == ["squeeze"], "adaptador llama al source con la accion mapeada")
+	_expect(adapter.is_pressed("grab"), "adaptador traduce grab a grip")
+	_expect(fake.calls == ["grip"], "adaptador llama al source con la accion mapeada")
 	_expect(adapter.get_pose("left") == fake.pose, "adaptador delega get_pose")
 	_expect(adapter.is_tracking("right"), "adaptador delega is_tracking")
 	_expect(adapter.get_joint("left", "thumb") == Transform3D.IDENTITY, "adaptador delega get_joint")
 	_expect(not adapter.is_pressed("fly"), "accion desconocida no consulta al source")
-	_expect(fake.calls == ["squeeze"], "accion desconocida no anade llamadas")
+	_expect(fake.calls == ["grip"], "accion desconocida no anade llamadas")
 
 	adapter.configure(ActionMapScript.new("pc_teclado"))
 	_expect(not adapter.is_pressed("grab"), "teclado no mapea a InputSource")
-	_expect(fake.calls == ["squeeze"], "teclado no consulta al source")
+	_expect(fake.calls == ["grip"], "teclado no consulta al source")
 
-	_expect(bool(map.rebind("grab", {"source_action": "squeeze"})["ok"]), "rebind de source_action")
+	_expect(bool(map.rebind("grab", {"source_action": "grip"})["ok"]), "rebind de source_action")
 	adapter.configure(map)
 	_expect(adapter.is_pressed("grab"), "adaptador usa el nuevo source_action")
-	_expect(fake.calls.count("squeeze") == 2, "adaptador llama con squeeze dos veces (default + rebind)")
+	_expect(fake.calls.count("grip") == 2, "adaptador llama con grip dos veces (default + rebind)")
 
 	var empty_adapter = ActionMapScript.InputSourceAdapter.new()
 	_expect(not empty_adapter.is_pressed("grab"), "adaptador sin source devuelve false")

@@ -27,8 +27,8 @@ const PAUSE_BUTTONS: Array = [
 	{"id": "quit", "label": "SALIR", "rect": Rect2(-0.13, 0.15, 0.26, 0.07)},
 ]
 const START_BUTTONS: Array = [
-	{"id": "play", "label": "JUGAR: OFICINA", "rect": Rect2(-0.2, 0.05, 0.4, 0.08)},
-	{"id": "map_next", "label": "OTRO MAPA", "rect": Rect2(-0.2, -0.06, 0.4, 0.08)},
+	{"id": "play", "label": "JUGAR", "rect": Rect2(-0.2, 0.05, 0.4, 0.08)},
+	{"id": "map_next", "label": "CAMBIAR MAPA", "rect": Rect2(-0.2, -0.06, 0.4, 0.08)},
 	{"id": "recalibrate", "label": "RECALIBRAR", "rect": Rect2(-0.2, -0.17, 0.4, 0.08)},
 ]
 
@@ -338,7 +338,7 @@ class State extends Node:
 			return 0.0
 		var controller = rig.call("controller_for", hand)
 		if controller != null and controller.has_method("get_float"):
-			return clampf(float(controller.call("get_float", &"squeeze")), 0.0, 1.0)
+			return clampf(float(controller.call("get_float", &"grip")), 0.0, 1.0)
 		return 1.0 if bool(rig.call("is_grip_pressed", hand)) else 0.0
 
 
@@ -600,7 +600,6 @@ class StartMenuHost extends Node3D:
 			chosen_meta = meta
 			if menu != null and menu.has_method("set_buttons"):
 				var labeled: Array = START_BUTTONS.duplicate(true)
-				(labeled[0] as Dictionary)["label"] = "JUGAR: " + str(chosen_meta.get("choice_label", "MAPA"))
 				menu.call("set_buttons", labeled)
 			return
 		if button_id == "play":

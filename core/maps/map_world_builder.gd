@@ -3,6 +3,7 @@ extends RefCounted
 
 const WorldMaterialsScript = preload("res://core/maps/world_materials.gd")
 const BuildingScript = preload("res://core/maps/building_generator.gd")
+const VrPerformance = preload("res://core/vr/vr_performance.gd")
 
 const MAX_NODES: int = 200
 const MAX_OBSTACLES: int = 8
@@ -766,7 +767,7 @@ static func _build_environment(root: Node3D, time_of_day: String, theme: String)
 		sky.sky_material = fallback
 	else:
 		var panorama := sky.sky_material as PanoramaSkyMaterial
-		var panorama_texture := WorldMaterialsScript.sky_texture()
+		var panorama_texture: Texture2D = WorldMaterialsScript.sky_texture()
 		if panorama_texture != null:
 			panorama.panorama = panorama_texture
 		else:

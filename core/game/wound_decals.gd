@@ -345,9 +345,9 @@ static func create_puddle(parent: Node, pos: Vector3, normal: Vector3, initial_s
 		impact_pos = pos
 		impact_normal = normal.normalized() if normal.length_squared() > 0.0001 else Vector3.UP
 	
+	parent.add_child(puddle)
 	puddle.global_position = impact_pos + impact_normal * 0.003
 	puddle.global_rotation = Quaternion(Vector3.UP, impact_normal).get_euler()
-	parent.add_child(puddle)
 	
 	var puddle_data := {
 		"node": puddle,
@@ -505,7 +505,6 @@ static func _get_puddle_material() -> Material:
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		material.roughness = 0.15
 		material.metallic = 0.05
-		material.specular = 0.8
 		_puddle_material = material
 	return _puddle_material
 

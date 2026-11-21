@@ -125,10 +125,13 @@ func _setup_action_map() -> void:
 	var action_map = load(ACTION_MAP_PATH) as OpenXRActionMap
 	if action_map != null and iface.has_method("set_action_map"):
 		iface.call("set_action_map", action_map)
-		if iface.has_method("get_action_set"):
-			var action_set = iface.call("get_action_set", "godot")
-			if action_set != null and action_set.has_method("activate"):
-				action_set.call("activate")
+
+
+func _activate_action_set() -> void:
+	if iface.has_method("get_action_set"):
+		var action_set = iface.call("get_action_set", "godot")
+		if action_set != null and action_set.has_method("activate"):
+			action_set.call("activate")
 
 
 func _connect_lifecycle() -> void:
@@ -140,6 +143,7 @@ func _connect_lifecycle() -> void:
 
 func _on_session_begun() -> void:
 	_apply_refresh()
+	_activate_action_set()
 	lifecycle.emit("begun")
 
 

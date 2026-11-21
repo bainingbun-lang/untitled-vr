@@ -47,6 +47,8 @@ const PARKED_VEHICLE_COUNT: int = 4
 const PARKED_VEHICLE_IDS: Array = ["sedan", "pickup", "van", "suv"]
 const PARKED_VEHICLE_HEIGHT: float = 1.0
 
+static var _test_setup_count: int = 0
+
 var actor: Node3D = null
 var spawn_points: Array = []
 var bounds: AABB = AABB()
@@ -92,11 +94,13 @@ func _ready() -> void:
 	var session := _safe_script(SESSION_SCRIPT)
 	if session != null and str(session.get("platform")).is_empty() and session.has_method("detect_platform"):
 		session.set("platform", session.call("detect_platform"))
-	if world_report.is_empty():
+	if world_report.is_empty() and get_tree().current_scene == self:
 		setup(_session_meta())
 
 
 func setup(meta: Dictionary) -> void:
+	_test_setup_count += 1
+	print("world.setup inicio #" + str(_test_setup_count))
 	RemoteLog.crumb("world.setup inicio")
 	_discard(_geometry_root)
 	_discard(actor)

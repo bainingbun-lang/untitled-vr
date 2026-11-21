@@ -273,25 +273,12 @@ func _process(delta: float) -> void:
 		_menu_pending = false
 		_build_simple_menu()
 		_start_menu()
-	if not _menu_ok and not _auto_started and _waited > 14.0 and flow == null:
-		_auto_started = true
-		_diag("Sin menu visible: arrancando la partida directo")
-		var gm := load(GAME_MODE_PATH) as Script
-		var m = gm.call("default_map_meta", 4242) if gm != null else {}
-		var sess := load(SESSION_PATH) as Script
-		if sess != null and typeof(m) == TYPE_DICTIONARY and not (m as Dictionary).is_empty():
-			sess.set("vr_menu_confirmed", true)
-			sess.call("start", (m as Dictionary).duplicate(true), get_tree())
 	_simple_menu_input()
 	if _menu_ok:
 		_status_t += delta
 		if _status_t >= 1.0:
 			_status_t = 0.0
 			_update_status()
-		if not _auto_started and _waited > 14.0 and host != null and is_instance_valid(host):
-			_auto_started = true
-			_diag("Sin pulsar nada: arrancando la partida sola")
-			host.call("on_button", "play")
 	if flow != null:
 		_process_calibration()
 		return
@@ -359,9 +346,11 @@ func _on_lifecycle(event: String) -> void:
 
 # El host del menu cuelga de root y sobreviviria al cambio de escena.
 func _on_menu_button(button_id: String) -> void:
+	RemoteLog.crumb("menu button pressed button=%s" % button_id)
 	if host != null and is_instance_valid(host):
 		host.queue_free()
 	menu = null
 	if button_id == "recalibrate" and calibration != null:
 		calibration.delete_saved()
 		_start_calibration()
+	RemoteLog.crumb("menu action chosen action=%s" % button_id)

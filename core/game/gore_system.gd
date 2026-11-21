@@ -1,3 +1,26 @@
+# Adaptado de Dismemberment_Tutorial_Godot4.2 (Alenvei, 2023)
+# MIT License
+#
+# Copyright (c) 2023 Alenvei
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 class_name GoreSystem
 extends RefCounted
 
@@ -186,6 +209,7 @@ static func dismember_limb(parent: Node, bone_idx: int, skeleton: Skeleton3D, hi
 		"bone_idx": bone_idx,
 		"npc_changes": npc_state_changes,
 		"bleed_node": _stump_bleeds[-1]["node"] if _stump_bleeds.size() > 0 else null,
+		"joints": detached_limb.get_meta("pin_joints", []) if detached_limb != null else [],
 	}
 
 static func _create_stump_cap(parent: Node, pos: Vector3, normal: Vector3, radius: float) -> MeshInstance3D:
@@ -228,6 +252,36 @@ static func _create_detached_limb(parent: Node, bone_idx: int, skeleton: Skeleto
 		return limb
 	host.add_child(limb)
 	limb.global_position = pos
+	
+	var joints: Array = []
+	for child_idx in skeleton.get_bone_children(bone_idx):
+		var child_name := String(skeleton.get_bone_name(child_idx))
+		var child_pos := skeleton.to_global(skeleton.get_bone_global_pose(child_idx).origin)
+		var child_length := _get_bone_length(skeleton, child_idx)
+		var child_limb := RigidBody3D.new()
+		child_limb.name = "DetachedLimb_%s" % child_name.replace(".", "_")
+		child_limb.mass = clampf(child_length * 2.5, 0.8, 5.0)
+		var child_shape := CollisionShape3D.new()
+		var child_capsule := CapsuleShape3D.new()
+		child_capsule.radius = clampf(child_length * 0.12, 0.05, 0.15)
+		child_capsule.height = clampf(child_length * 0.7, 0.15, 0.8)
+		child_shape.shape = child_capsule
+		child_limb.add_child(child_shape)
+		var child_visual := MeshInstance3D.new()
+		child_visual.name = "MeshInstance3D"
+		child_visual.mesh = _create_limb_mesh(child_length)
+		child_visual.material_override = _get_part_material()
+		child_limb.add_child(child_visual)
+		host.add_child(child_limb)
+		child_limb.global_position = child_pos
+		var joint := PinJoint3D.new()
+		joint.name = "PinJoint3D_%s" % child_name.replace(".", "_")
+		joint.set_node_a(limb.get_path())
+		joint.set_node_b(child_limb.get_path())
+		child_limb.add_child(joint)
+		_part_pool.append(child_limb)
+		joints.append(joint)
+	limb.set_meta("pin_joints", joints)
 	
 	var outward: Vector3 = (pos - (parent.global_position if parent is Node3D else Vector3.ZERO)).normalized()
 	if outward.length_squared() < 0.0001:

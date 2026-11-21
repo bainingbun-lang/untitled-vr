@@ -469,12 +469,12 @@ static func build_criminal_hostile() -> BehaviorTree:
 	var root: BTSelector = BTSelector.new()
 	tree.add_child(root)
 	
-	# Priority 1: Attack if advantageous
+	# Priority 1: Attack if enemy visible
 	var attack_seq: BTSequence = BTSequence.new()
 	root.add_child(attack_seq)
 	
-	var advantage_cond: BTConditionHasAdvantage = BTConditionHasAdvantage.new()
-	attack_seq.add_child(advantage_cond)
+	var has_target_cond: BTConditionHasEnemy = BTConditionHasEnemy.new()
+	attack_seq.add_child(has_target_cond)
 	
 	var attack_action: BTActionAttack = BTActionAttack.new()
 	attack_action.action_name = "attack"

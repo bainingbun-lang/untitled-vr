@@ -22,6 +22,10 @@ func update(delta: float, context: Dictionary) -> void:
 	# Needs update
 	needs.tick(delta)
 	
+	# Preserve crawl state when legs are lost
+	if state_machine.get_state() == "crawl":
+		return
+	
 	# Decision Logic
 	if needs.stun > 0.5:
 		state_machine.transition_to("stunned")

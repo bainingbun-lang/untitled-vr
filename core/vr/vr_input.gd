@@ -31,15 +31,6 @@ func initialize(iface: Object = null) -> bool:
 		if not bool(_interface.call("initialize")):
 			return false
 	
-	if ResourceLoader.exists(ACTION_MAP_PATH):
-		_action_map = load(ACTION_MAP_PATH) as OpenXRActionMap
-		if _action_map != null and _interface.has_method("set_action_map"):
-			_interface.call("set_action_map", _action_map)
-			if _interface.has_method("get_action_set"):
-				var set_ = _interface.call("get_action_set", "godot")
-				if set_ != null and set_.has_method("activate"):
-					set_.call("activate")
-	
 	return bool(_interface.call("is_initialized"))
 
 func set_simulated(simulated: bool) -> void:

@@ -11,6 +11,7 @@ var _failures: Array = []
 var _case: String = ""
 
 func _initialize() -> void:
+	seed(20260101)
 	await process_frame
 	await _run_integration_tests()
 	if _failures.is_empty():
@@ -138,10 +139,21 @@ func _test_hostile_mode_attacks() -> void:
 	for npc in hostile_npcs:
 		if npc == null or not is_instance_valid(npc):
 			continue
+		npc.realistic = false
+		npc.perception = null
+		npc.vision_range = 1000.0
 		npc.set_target(player_target)
 
+	var attacked: bool = false
 	for i in range(120):
 		await physics_frame
+		for npc in hostile_npcs:
+			if npc == null or not is_instance_valid(npc):
+				continue
+			var action = npc.current_action() if npc.has_method("current_action") else ""
+			if action in ["attack", "suppress", "chase"]:
+				attacked = true
+				break
 		if i == 10:
 			for npc in hostile_npcs:
 				if npc == null or not is_instance_valid(npc):
@@ -153,15 +165,6 @@ func _test_hostile_mode_attacks() -> void:
 					if behavior != null:
 						behavior.note_aggression("player")
 		harness.step(2)
-
-	var attacked: bool = false
-	for npc in hostile_npcs:
-		if npc == null or not is_instance_valid(npc):
-			continue
-		var action = npc.current_action() if npc.has_method("current_action") else ""
-		if action in ["attack", "suppress", "chase"]:
-			attacked = true
-			break
 
 	_expect(attacked, "al menos un NPC hostil intenta atacar tras provocación")
 

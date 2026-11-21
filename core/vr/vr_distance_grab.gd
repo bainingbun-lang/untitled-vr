@@ -20,7 +20,7 @@ var _original_emission: Color = Color(0, 0, 0, 0)
 var _flying: bool = false
 var _fly_start: Vector3 = Vector3.ZERO
 var _fly_end: Vector3 = Vector3.ZERO
-var _fly_start_time: float = 0.0
+var _fly_elapsed: float = 0.0
 var _fly_duration: float = 0.3
 var _space_state: PhysicsDirectSpaceState3D = null
 var _cone_cos: float = 0.0
@@ -51,7 +51,7 @@ func _get_space_state(weapon_hand: Node) -> PhysicsDirectSpaceState3D:
 		_space_state = world.direct_space_state if world != null else null
 	return _space_state
 
-func step(delta: float, hand_pose: Transform3D, grip_pressed: bool, holsters, bag, weapon_hand: Node) -> void:
+func step(delta: float, hand_pose: Transform3D, grip_value: float, holsters, bag, weapon_hand: Node) -> void:
 	if not enabled:
 		return
 	
@@ -74,7 +74,7 @@ func step(delta: float, hand_pose: Transform3D, grip_pressed: bool, holsters, ba
 		else:
 			target_cleared.emit(_hand)
 	
-	if _target != null and grip_pressed:
+	if _target != null and grip_value > 0.5:
 		_start_fly(hand_pose, weapon_hand)
 
 func _find_target(space: PhysicsDirectSpaceState3D, hand_pose: Transform3D, holsters, bag, weapon_hand: Node) -> Node3D:
@@ -158,7 +158,7 @@ func _start_fly(hand_pose: Transform3D, weapon_hand) -> void:
 	_flying = true
 	_fly_start = _target.global_position
 	_fly_end = hand_pose.origin
-	_fly_start_time = Time.get_ticks_msec() / 1000.0
+	_fly_elapsed = 0.0
 	_fly_duration = randf_range(FLY_DURATION_MIN, FLY_DURATION_MAX)
 	
 	var controller = weapon_hand.input_provider
@@ -168,8 +168,8 @@ func _start_fly(hand_pose: Transform3D, weapon_hand) -> void:
 			ctrl.call("trigger_haptic", 0.08, 0.5, 0.7)
 
 func _update_fly(delta: float, hand_pose: Transform3D, weapon_hand) -> void:
-	var elapsed: float = (Time.get_ticks_msec() / 1000.0) - _fly_start_time
-	var t: float = clampf(elapsed / _fly_duration, 0.0, 1.0)
+	_fly_elapsed += delta
+	var t: float = clampf(_fly_elapsed / _fly_duration, 0.0, 1.0)
 	
 	var ease_t: float = t * t * (3.0 - 2.0 * t)
 	
@@ -199,8 +199,10 @@ func _finish_grab(weapon_hand) -> void:
 			weapon_hand._build_visual(weapon_id)
 			if weapon_hand.use_physical_grab:
 				weapon_hand.configure_handling()
+				var provider = weapon_hand._provider()
+				var grip_val: float = provider.get_grip_value(_hand) if provider.has_method("get_grip_value") else 1.0
 				var pose: Transform3D = Transform3D(weapon_hand._aim_basis(weapon_hand._pose(_hand)), weapon_hand._pose(_hand).origin)
-				weapon_hand.grab_weapon_from_pose(pose, 1.0, "grip")
+				weapon_hand.grab_weapon_from_pose(pose, grip_val, "grip")
 			target.free()
 			weapon_hand.weapon_taken.emit(weapon_id, _hand)
 			weapon_hand.pulse(_hand, 0.06, 0.5, 0.6)

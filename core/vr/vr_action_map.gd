@@ -11,7 +11,7 @@ const EVENT_KEYS := ["platform", "kind", "device", "id", "hand", "pressed", "val
 
 const DEFAULT_BINDINGS := {
 	"quest": {
-"grab": {"kind": "button", "device": "quest_controller", "id": "grip", "hand": "left", "source_action": "squeeze", "threshold": 0.5},
+"grab": {"kind": "button", "device": "quest_controller", "id": "grip", "hand": "left", "source_action": "grip", "threshold": 0.5},
 	"trigger": {"kind": "button", "device": "quest_controller", "id": "trigger", "hand": "any", "source_action": "trigger", "threshold": 0.5},
 	"teleport": {"kind": "button", "device": "quest_controller", "id": "thumbstick_press", "hand": "right", "source_action": "teleport", "threshold": 0.5},
 	"menu": {"kind": "button", "device": "quest_controller", "id": "menu", "hand": "left", "source_action": "menu", "threshold": 0.5},
@@ -19,7 +19,7 @@ const DEFAULT_BINDINGS := {
 	"run": {"kind": "button", "device": "quest_controller", "id": "thumbstick_press", "hand": "left", "source_action": "run", "threshold": 0.5},
 },
 	"pc_vr": {
-		"grab": {"kind": "button", "device": "pc_vr_controller", "id": "grip", "hand": "left", "source_action": "squeeze", "threshold": 0.5},
+		"grab": {"kind": "button", "device": "pc_vr_controller", "id": "grip", "hand": "left", "source_action": "grip", "threshold": 0.5},
 		"trigger": {"kind": "button", "device": "pc_vr_controller", "id": "trigger", "hand": "any", "source_action": "trigger", "threshold": 0.5},
 		"teleport": {"kind": "button", "device": "pc_vr_controller", "id": "thumbstick_press", "hand": "right", "source_action": "teleport", "threshold": 0.5},
 		"menu": {"kind": "button", "device": "pc_vr_controller", "id": "menu", "hand": "left", "source_action": "menu", "threshold": 0.5},

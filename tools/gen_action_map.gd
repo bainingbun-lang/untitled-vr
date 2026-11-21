@@ -13,7 +13,7 @@ var ACTIONS: Array = [
 	["aim_pose", 3, "Aim pose", {"both": "/input/aim/pose"}],
 	["grip_pose", 3, "Grip pose", {"both": "/input/grip/pose"}],
 	["trigger", 1, "Gatillo", {"both": "/input/trigger/value"}],
-	["squeeze", 1, "Agarre", {"both": "/input/squeeze/value"}],
+	["grip", 1, "Agarre", {"both": "/input/grip/value"}],
 	["thumbstick", 2, "Stick", {"both": "/input/thumbstick"}],
 	["thumbstick_click", 0, "Stick pulsado", {"both": "/input/thumbstick/click"}],
 	["a", 0, "A", {"right": "/input/a/click"}],

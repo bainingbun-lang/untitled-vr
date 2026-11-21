@@ -118,8 +118,8 @@ func _make_weapon_pickup(weapon_id: String, pos: Vector3) -> Node3D:
 	box.size = Vector3(0.1, 0.1, 0.5)
 	shape.shape = box
 	body.add_child(shape)
-	body.global_position = pos
 	root.add_child(body)
+	body.global_position = pos
 	return body
 
 func _make_physics_prop(pos: Vector3) -> Node3D:
@@ -131,8 +131,8 @@ func _make_physics_prop(pos: Vector3) -> Node3D:
 	sphere.radius = 0.1
 	shape.shape = sphere
 	body.add_child(shape)
-	body.global_position = pos
 	root.add_child(body)
+	body.global_position = pos
 	return body
 
 func _make_grabbable_prop(pos: Vector3) -> Node3D:
@@ -144,8 +144,8 @@ func _make_grabbable_prop(pos: Vector3) -> Node3D:
 	box.size = Vector3(0.2, 0.2, 0.2)
 	shape.shape = box
 	body.add_child(shape)
-	body.global_position = pos
 	root.add_child(body)
+	body.global_position = pos
 	return body
 
 func _test_basic_targeting() -> void:
@@ -165,7 +165,7 @@ func _test_basic_targeting() -> void:
 	hand.auto_process = false
 	root.add_child(hand)
 	
-	grab.step(0.016, provider.pose, false, holsters, bag, hand)
+	grab.step(0.016, provider.pose, 0.0, holsters, bag, hand)
 	
 	_expect(grab.get_target() == weapon, "arma a 1m detectada como objetivo")
 	_expect(grab.is_enabled(), "distance grab habilitado por defecto")
@@ -173,6 +173,7 @@ func _test_basic_targeting() -> void:
 	weapon.free()
 	hand.queue_free()
 	grab.cancel()
+	await process_frame
 
 func _test_cone_priority() -> void:
 	_case = "prioridad por cono de 8 grados"
@@ -193,7 +194,7 @@ func _test_cone_priority() -> void:
 	hand.auto_process = false
 	root.add_child(hand)
 	
-	grab.step(0.016, provider.pose, false, holsters, bag, hand)
+	grab.step(0.016, provider.pose, 0.0, holsters, bag, hand)
 	
 	_expect(grab.get_target() == weapon_center, "arma centrada en el rayo tiene prioridad")
 	
@@ -202,6 +203,7 @@ func _test_cone_priority() -> void:
 	weapon_outside.free()
 	hand.queue_free()
 	grab.cancel()
+	await process_frame
 
 func _test_close_grab_priority() -> void:
 	_case = "prioridad agarre cercano (< 0.25m a funda)"
@@ -222,13 +224,14 @@ func _test_close_grab_priority() -> void:
 	hand.auto_process = false
 	root.add_child(hand)
 	
-	grab.step(0.016, provider.pose, false, holsters, bag, hand)
+	grab.step(0.016, provider.pose, 0.0, holsters, bag, hand)
 	
 	_expect(grab.get_target() == null, "no hay objetivo a distancia si mano cerca de funda")
 	
 	weapon.free()
 	hand.queue_free()
 	grab.cancel()
+	await process_frame
 
 func _test_disabled() -> void:
 	_case = "desactivable por ajuste"
@@ -249,7 +252,7 @@ func _test_disabled() -> void:
 	hand.auto_process = false
 	root.add_child(hand)
 	
-	grab.step(0.016, provider.pose, false, holsters, bag, hand)
+	grab.step(0.016, provider.pose, 0.0, holsters, bag, hand)
 	
 	_expect(grab.get_target() == null, "no detecta objetivo si desactivado")
 	_expect(not grab.is_enabled(), "is_enabled devuelve false")
@@ -257,6 +260,7 @@ func _test_disabled() -> void:
 	weapon.free()
 	hand.queue_free()
 	grab.cancel()
+	await process_frame
 
 func _test_fly_to_hand() -> void:
 	_case = "vuelo a la mano en 0.25-0.35s"
@@ -277,24 +281,24 @@ func _test_fly_to_hand() -> void:
 	root.add_child(hand)
 	grab.set_enabled(true)
 	
-	grab.step(0.016, provider.pose, false, holsters, bag, hand)
+	grab.step(0.016, provider.pose, 0.0, holsters, bag, hand)
 	_expect(grab.get_target() == weapon, "objetivo detectado antes del grip")
 	
 	provider.grip_pressed = true
-	grab.step(0.016, provider.pose, true, holsters, bag, hand)
+	grab.step(0.016, provider.pose, 1.0, holsters, bag, hand)
 	_expect(grab.is_flying(), "inicia vuelo al presionar grip")
 	
 	var start_pos: Vector3 = weapon.global_position
 	var flew: bool = false
 	for i in range(30):
-		grab.step(0.016, provider.pose, true, holsters, bag, hand)
+		grab.step(0.016, provider.pose, 1.0, holsters, bag, hand)
 		if weapon.global_position.distance_to(start_pos) > 0.1:
 			flew = true
 			break
 	_expect(flew, "el objeto se mueve hacia la mano")
 	
 	for i in range(50):
-		grab.step(0.016, provider.pose, true, holsters, bag, hand)
+		grab.step(0.016, provider.pose, 1.0, holsters, bag, hand)
 		if not grab.is_flying():
 			break
 	
@@ -304,6 +308,7 @@ func _test_fly_to_hand() -> void:
 	
 	hand.queue_free()
 	grab.cancel()
+	await process_frame
 
 func _test_weapon_equip() -> void:
 	_case = "reutiliza _equip_weapon_from_pickup"
@@ -324,11 +329,11 @@ func _test_weapon_equip() -> void:
 	root.add_child(hand)
 	grab.set_enabled(true)
 	
-	grab.step(0.016, provider.pose, false, holsters, bag, hand)
+	grab.step(0.016, provider.pose, 0.0, holsters, bag, hand)
 	provider.grip_pressed = true
 	
 	for i in range(80):
-		grab.step(0.016, provider.pose, true, holsters, bag, hand)
+		grab.step(0.016, provider.pose, 1.0, holsters, bag, hand)
 		if not grab.is_flying():
 			break
 	
@@ -337,6 +342,7 @@ func _test_weapon_equip() -> void:
 	
 	hand.queue_free()
 	grab.cancel()
+	await process_frame
 
 func _test_prop_grab() -> void:
 	_case = "agarre de props fisicos (physics_props/grabbable)"
@@ -356,12 +362,12 @@ func _test_prop_grab() -> void:
 	root.add_child(hand)
 	grab.set_enabled(true)
 	
-	grab.step(0.016, provider.pose, false, holsters, bag, hand)
+	grab.step(0.016, provider.pose, 0.0, holsters, bag, hand)
 	_expect(grab.get_target() == prop, "prop fisico detectado")
 	
 	provider.grip_pressed = true
 	for i in range(80):
-		grab.step(0.016, provider.pose, true, holsters, bag, hand)
+		grab.step(0.016, provider.pose, 1.0, holsters, bag, hand)
 		if not grab.is_flying():
 			break
 	
@@ -370,6 +376,7 @@ func _test_prop_grab() -> void:
 	prop.free()
 	hand.queue_free()
 	grab.cancel()
+	await process_frame
 
 func _test_no_grab_outside_range() -> void:
 	_case = "no agarra fuera de 6m"
@@ -388,17 +395,18 @@ func _test_no_grab_outside_range() -> void:
 	hand.auto_process = false
 	root.add_child(hand)
 	
-	grab.step(0.016, provider.pose, false, holsters, bag, hand)
+	grab.step(0.016, provider.pose, 0.0, holsters, bag, hand)
 	
 	_expect(grab.get_target() == null, "arma a 7m no detectada")
 	
 	provider.grip_pressed = true
-	grab.step(0.016, provider.pose, true, holsters, bag, hand)
+	grab.step(0.016, provider.pose, 1.0, holsters, bag, hand)
 	_expect(not grab.is_flying(), "no inicia vuelo si fuera de rango")
 	
 	weapon.free()
 	hand.queue_free()
 	grab.cancel()
+	await process_frame
 
 func _test_no_grab_outside_cone() -> void:
 	_case = "no agarra fuera del cono de 8 grados"
@@ -417,10 +425,11 @@ func _test_no_grab_outside_cone() -> void:
 	hand.auto_process = false
 	root.add_child(hand)
 	
-	grab.step(0.016, provider.pose, false, holsters, bag, hand)
+	grab.step(0.016, provider.pose, 0.0, holsters, bag, hand)
 	
 	_expect(grab.get_target() == null, "arma a ~30 grados fuera del cono no detectada")
 	
 	weapon.free()
 	hand.queue_free()
 	grab.cancel()
+	await process_frame

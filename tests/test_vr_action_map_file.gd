@@ -19,6 +19,45 @@ class FakeController extends Node3D:
 	func get_float(action: StringName) -> float:
 		return float(values.get(String(action), 0.0)) if known.has(String(action)) else 0.0
 
+class FakeInput extends RefCounted:
+	var rig = null
+
+	func controller_for(hand: String):
+		return rig.controller_for(hand)
+
+	func get_pose(hand: String) -> Transform3D:
+		var controller = controller_for(hand)
+		return controller.global_transform if controller != null else Transform3D.IDENTITY
+
+	func get_stick(hand: String) -> Vector2:
+		var controller = controller_for(hand)
+		if controller == null or not controller.has_method("get_vector2"):
+			return Vector2.ZERO
+		return controller.call("get_vector2", &"thumbstick")
+
+	func is_trigger_pressed(hand: String) -> bool:
+		var controller = controller_for(hand)
+		return controller != null and controller.has_method("get_float") and float(controller.call("get_float", &"trigger")) > 0.5
+
+	func is_grip_pressed(hand: String) -> bool:
+		var controller = controller_for(hand)
+		return controller != null and controller.has_method("get_float") and float(controller.call("get_float", &"grip")) > 0.5
+
+	func get_grip_value(hand: String) -> float:
+		var controller = controller_for(hand)
+		return float(controller.call("get_float", &"grip")) if controller != null and controller.has_method("get_float") else 0.0
+
+	func is_button_pressed(hand: String, action: String) -> bool:
+		var controller = controller_for(hand)
+		return controller != null and controller.has_method("is_button_pressed") and bool(controller.call("is_button_pressed", StringName(action)))
+
+	func is_menu_pressed(hand: String = "left") -> bool:
+		return is_button_pressed(hand, "menu")
+
+	func is_reload_pressed(hand: String = "right") -> bool:
+		return is_button_pressed(hand, "a") or is_button_pressed(hand, "x")
+
+
 class FakeWs extends Node:
 	var calls := 0
 	func fire(_id, _o, _d, _s, _e) -> Dictionary:
@@ -64,7 +103,7 @@ func _initialize() -> void:
 			paths.append(str(binding.binding_path))
 		for hand in ["left", "right"]:
 			_expect(paths.has("/user/hand/%s/input/thumbstick" % hand) and paths.has("/user/hand/%s/input/trigger/value" % hand) \
-				and paths.has("/user/hand/%s/input/squeeze/value" % hand), "%s: stick, gatillo y agarre en %s" % [profile.interaction_profile_path, hand])
+				and paths.has("/user/hand/%s/input/grip/value" % hand), "%s: stick, gatillo y agarre en %s" % [profile.interaction_profile_path, hand])
 		_expect(paths.has("/user/hand/right/input/a/click") and paths.has("/user/hand/left/input/x/click") and paths.has("/user/hand/left/input/menu/click"), "botones A/X/menu")
 	_expect(profiles.has("/interaction_profiles/oculus/touch_controller") and profiles.has("/interaction_profiles/meta/touch_plus_controller"), "perfiles Touch y Touch Plus (Quest 3)")
 	var rig_source: String = FileAccess.get_file_as_string("res://core/vr/vr_rig.gd")
@@ -99,6 +138,9 @@ func _end_to_end(names: Array) -> void:
 	rig.right_controller.get_parent().add_child(right)
 	rig.left_controller = left
 	rig.right_controller = right
+	var input := FakeInput.new()
+	input.rig = rig
+	rig.set_input_provider(input)
 	left.values["thumbstick"] = Vector2(0.0, -1.0)
 	var before: Vector3 = rig.xr_origin.global_position
 	rig.step(0.5)

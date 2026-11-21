@@ -134,7 +134,7 @@ func _sync_input_to_vr_input() -> void:
 		vr_input.set_grip_value(hand, input.grips.get(hand, 0.0))
 		vr_input.set_trigger_value(hand, input.triggers.get(hand, 0.0))
 		vr_input.set_stick(hand, input.sticks.get(hand, Vector2.ZERO))
-	for action in ["a", "b", "x", "y", "menu"]:
+	for action in ["a", "b", "x", "y", "menu", "thumbstick_click", "grip_click"]:
 		for hand in ["left", "right"]:
 			vr_input.set_button(hand, action, input.buttons.get(action, false))
 

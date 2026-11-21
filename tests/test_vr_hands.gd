@@ -47,11 +47,11 @@ func _initialize() -> void:
 	rig.controller_for("left").get_parent().add_child(fake)
 	rig.left_controller = fake
 	rig.left_hand.weapon_id = "pistol"
-	fake.values["squeeze"] = 0.0
+	fake.values["grip"] = 0.0
 	fake.values["trigger"] = 0.0
 	rig.step(0.016)
 	var relaxed: float = rig.hand_models["left"].curl_of("ring")
-	fake.values["squeeze"] = 1.0
+	fake.values["grip"] = 1.0
 	rig.step(0.016)
 	_expect(rig.hand_models["left"].curl_of("ring") > relaxed + 0.1, "rig.step: los dedos siguen el grip analogico")
 	fake.values["trigger"] = 1.0

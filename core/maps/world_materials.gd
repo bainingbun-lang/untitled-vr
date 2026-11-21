@@ -199,7 +199,7 @@ static func surface_material(surface: String, mobile: bool = false) -> StandardM
 		material.render_priority = 1
 		material.shading_mode = StandardMaterial3D.SHADING_MODE_PER_PIXEL
 		material.flag_use_point_size = false
-		material.flag_disable_ambient_light = true
+		material.flag_disable_ambient_light = false
 		material.flag_disable_fog = true
 	else:
 		material.uv1_triplanar = true
