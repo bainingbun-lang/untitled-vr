@@ -375,8 +375,10 @@ func step(delta: float) -> void:
 	_time += maxf(delta, 0.0)
 	var primary := _pose(hand)
 	var secondary := _pose(other_hand())
-	var grip := _button("squeeze", hand)
-	var other_grip := _button("squeeze", other_hand())
+	var grip_value: float = _provider().get_grip_value(hand) if _provider().has_method("get_grip_value") else (1.0 if _button("squeeze", hand) else 0.0)
+	var other_grip_value: float = _provider().get_grip_value(other_hand()) if _provider().has_method("get_grip_value") else (1.0 if _button("squeeze", other_hand()) else 0.0)
+	var grip: bool = grip_value > 0.5
+	var other_grip: bool = other_grip_value > 0.5
 	# Con la mano vacia, tambien sacan el arma el gatillo y los botones A/B/X/Y o el clic del stick:
 	# no todos los jugadores saben que el agarre es el boton lateral.
 	var alt: bool = weapon_id.is_empty() and _alt_draw_pressed(hand)
@@ -434,7 +436,7 @@ func step(delta: float) -> void:
 
 	recoil.step(delta)
 	_recoil = maxf(_recoil - delta * 5.0, 0.0)
-	_update_visual(primary, delta)
+	_update_visual(primary, delta, grip_value)
 
 
 # force: arma de inicio, se saca del bolso aunque la mano no este en su zona.
@@ -463,7 +465,8 @@ func try_take(item_id: String = "", force: bool = false) -> bool:
 	_build_visual(weapon_id)
 	if use_physical_grab:
 		configure_handling()
-		grab_weapon_from_pose(Transform3D(_aim_basis(pose), pose.origin), 1.0, "grip")
+		var grip_val: float = _provider().get_grip_value(hand) if _provider().has_method("get_grip_value") else 1.0
+		grab_weapon_from_pose(Transform3D(_aim_basis(pose), pose.origin), grip_val, "grip")
 	weapon_taken.emit(weapon_id, hand)
 	return true
 
@@ -530,7 +533,8 @@ func _equip_weapon_from_pickup(pickup: Node3D) -> bool:
 	weapon_id = id
 	_build_visual(weapon_id)
 	if use_physical_grab and grab_system != null:
-		grab_weapon_from_pose(Transform3D(_aim_basis(_pose(hand)), _pose(hand).origin), 1.0, "grip")
+		var grip_val: float = _provider().get_grip_value(hand) if _provider().has_method("get_grip_value") else 1.0
+		grab_weapon_from_pose(Transform3D(_aim_basis(_pose(hand)), _pose(hand).origin), grip_val, "grip")
 	pickup.free()
 	weapon_taken.emit(weapon_id, hand)
 	return true
@@ -834,7 +838,7 @@ func sight_ray_cast(max_distance: float = 50.0, exclude: Array = []) -> Dictiona
 	}
 
 
-func _update_visual(primary: Transform3D, delta: float = 0.0) -> void:
+func _update_visual(primary: Transform3D, delta: float = 0.0, grip_value: float = 1.0) -> void:
 	if holder == null or weapon_id.is_empty():
 		return
 	var basis := _aim_basis(primary)
@@ -845,7 +849,7 @@ func _update_visual(primary: Transform3D, delta: float = 0.0) -> void:
 	var shake: float = current_shake()
 	offset += Vector3(sin(_time * 23.0), cos(_time * 19.0), 0.0) * shake
 	if use_physical_grab and grab_system != null and grab_system.is_grabbing():
-		var linked: Transform3D = grab_system.step(delta, primary, _button("squeeze", hand))
+		var linked: Transform3D = grab_system.step(delta, primary, grip_value)
 		holder.global_transform = Transform3D(linked.basis, linked.origin + aim_basis * kick.origin + Vector3(sin(_time * 23.0), cos(_time * 19.0), 0.0) * shake)
 	else:
 		holder.global_transform = Transform3D(basis, primary.origin + offset)
